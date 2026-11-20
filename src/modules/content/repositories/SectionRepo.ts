@@ -26,7 +26,7 @@ export class SectionRepo {
       answersJSON: model.answersJSON,
       stylesJSON: model.stylesJSON,
       animationsJSON: model.animationsJSON
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -44,7 +44,7 @@ export class SectionRepo {
       answersJSON: model.answersJSON,
       stylesJSON: model.stylesJSON,
       animationsJSON: model.animationsJSON
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -57,7 +57,7 @@ export class SectionRepo {
   }
 
   public async loadAll(churchId: string): Promise<Section[]> {
-    return getDb().selectFrom("sections").selectAll().where("churchId", "=", churchId).orderBy("sort").execute() as any;
+    return getDb().selectFrom("sections").selectAll().where("churchId", "=", churchId).orderBy("sort").execute();
   }
 
   public async updateSortForBlock(churchId: string, blockId: string) {
@@ -88,7 +88,7 @@ export class SectionRepo {
     return getDb().selectFrom("sections").selectAll()
       .where("churchId", "=", churchId)
       .where("blockId", "=", blockId)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   public async loadForBlocks(churchId: string, blockIds: string[]) {
@@ -96,7 +96,7 @@ export class SectionRepo {
     return getDb().selectFrom("sections").selectAll()
       .where("churchId", "=", churchId)
       .where("blockId", "in", blockIds)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   public async loadForPage(churchId: string, pageId: string) {
@@ -107,7 +107,7 @@ export class SectionRepo {
         eb.and([eb("pageId", "is", null), eb("blockId", "is", null)])
       ]))
       .orderBy("sort")
-      .execute() as any;
+      .execute();
   }
 
   public async loadForZone(churchId: string, pageId: string, zone: string) {
@@ -115,17 +115,17 @@ export class SectionRepo {
       .where("churchId", "=", churchId)
       .where("pageId", "=", pageId)
       .where("zone", "=", zone)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   public async insert(model: Section): Promise<Section> {
     return this.create(model);
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Section; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Section[]; }
+  public convertToModel(_churchId: string, data: Section) { return data; }
+  public convertAllToModel(_churchId: string, data: Section[]) { return data || []; }
 
-  protected rowToModel(row: any): Section {
+  protected rowToModel(row: Section): Section {
     return {
       id: row.id,
       churchId: row.churchId,

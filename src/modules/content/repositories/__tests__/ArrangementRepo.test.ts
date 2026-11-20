@@ -5,13 +5,13 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "ge
 import { getDb } from "../../db/index.js";
 import { ArrangementRepo } from "../ArrangementRepo.js";
 
-function recordingDb(rows: any[]) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+function recordingDb(rows: unknown[]) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => rows;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
@@ -49,7 +49,7 @@ describe("ArrangementRepo song-scoped FreeShow lookups", () => {
   ])("%s joins live songs and selects only arrangement columns", async (method, args, column) => {
     const { proxy, calls } = recordingDb([]);
     (getDb as jest.Mock).mockReturnValue(proxy);
-    await (new ArrangementRepo() as any)[method](...args);
+    await new ArrangementRepo()[method as "loadByFreeShowId" | "loadBySongDetailId"](args[0], args[1]);
     expect(calls.find((c) => c.method === "innerJoin")?.args[0]).toBe("songs as s");
     expect(calls.find((c) => c.method === "selectAll")?.args).toEqual(["a"]);
     expect(calls.find((c) => c.method === "where" && c.args[0] === column)?.args).toEqual([column, "=", args[1]]);

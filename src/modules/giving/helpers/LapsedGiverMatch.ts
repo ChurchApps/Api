@@ -10,12 +10,13 @@ export class LapsedGiverMatch {
 
   // Accepts the condition's fieldData JSON or an already-parsed object; out-of-range values are clamped.
   public static parseRule(input?: string | Partial<LapsedGiverRule>): LapsedGiverRule {
-    let data: any = input || {};
+    // A string input is replaced by its parsed JSON just below.
+    let data = (input || {}) as Partial<Record<keyof LapsedGiverRule, unknown>>;
     if (typeof input === "string") {
       try { data = JSON.parse(input); } catch { data = {}; }
     }
-    const num = (v: any, fallback: number, min: number, max: number) => {
-      const n = parseInt(v, 10);
+    const num = (v: unknown, fallback: number, min: number, max: number) => {
+      const n = parseInt(v as string, 10);
       return Math.min(max, Math.max(min, isNaN(n) ? fallback : n));
     };
     const regularWeeks = num(data.regularWeeks, this.defaults.regularWeeks, 1, 104);

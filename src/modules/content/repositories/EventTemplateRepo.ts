@@ -21,7 +21,7 @@ export class EventTemplateRepo {
       visibility: model.visibility,
       roomIds: model.roomIds,
       resourcesJson: model.resourcesJson
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -34,7 +34,7 @@ export class EventTemplateRepo {
       visibility: model.visibility,
       roomIds: model.roomIds,
       resourcesJson: model.resourcesJson
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -47,9 +47,9 @@ export class EventTemplateRepo {
   }
 
   public async loadAll(churchId: string): Promise<EventTemplate[]> {
-    return getDb().selectFrom("eventTemplates").selectAll().where("churchId", "=", churchId).orderBy("name").execute() as any;
+    return getDb().selectFrom("eventTemplates").selectAll().where("churchId", "=", churchId).orderBy("name").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as EventTemplate; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as EventTemplate[]; }
+  public convertToModel(_churchId: string, data: EventTemplate) { return data; }
+  public convertAllToModel(_churchId: string, data: EventTemplate[]) { return data || []; }
 }

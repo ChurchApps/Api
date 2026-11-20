@@ -42,7 +42,7 @@ describe("DonationRepo.loadByDateRange", () => {
 
   it("returns complete gifts inside the range, both ends included, newest first", async () => {
     const rows = await new DonationRepo().loadByDateRange(CHURCH_ID, "2026-01-01", "2026-12-31");
-    expect(rows.map((r: any) => r.id)).toEqual(["tstrgLast", "tstrgFirst"]);
+    expect(rows.map((r) => r.id)).toEqual(["tstrgLast", "tstrgFirst"]);
   });
 
   it("stays scoped to the church", async () => {

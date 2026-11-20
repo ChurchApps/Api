@@ -31,7 +31,7 @@ describe("LapsedGiverMatch", () => {
       { personId: "RECENT", donationDate: "2026-10-05" },
       { personId: null, donationDate: "2026-07-20" }
     ];
-    expect(LapsedGiverMatch.match(rows as any, anchor, rule)).toEqual([]);
+    expect(LapsedGiverMatch.match(rows, anchor, rule)).toEqual([]);
   });
 
   it("a failed or pending charge in the lapse window is not a recent gift", () => {

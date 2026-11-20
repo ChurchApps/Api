@@ -12,39 +12,37 @@ export class RegistrationCouponRepo {
 
   private async create(model: RegistrationCoupon): Promise<RegistrationCoupon> {
     model.id = UniqueIdHelper.shortId();
-    const m: any = { ...model };
-    if (m.startDate) m.startDate = DateHelper.toMysqlDate(m.startDate);
-    if (m.endDate) m.endDate = DateHelper.toMysqlDate(m.endDate);
+    const startDate = model.startDate ? DateHelper.toMysqlDate(model.startDate) : model.startDate;
+    const endDate = model.endDate ? DateHelper.toMysqlDate(model.endDate) : model.endDate;
     await getDb().insertInto("registrationCoupons").values({
       id: model.id,
       churchId: model.churchId,
       eventId: model.eventId,
       code: model.code,
-      discountType: m.discountType ?? null,
-      value: m.value ?? null,
-      startDate: m.startDate ?? null,
-      endDate: m.endDate ?? null,
-      minMembers: m.minMembers ?? null,
-      maxUses: m.maxUses ?? null,
+      discountType: model.discountType ?? null,
+      value: model.value ?? null,
+      startDate: startDate ?? null,
+      endDate: endDate ?? null,
+      minMembers: model.minMembers ?? null,
+      maxUses: model.maxUses ?? null,
       active: model.active === false ? false : true
-    } as any).execute();
+    }).execute();
     return model;
   }
 
   private async update(model: RegistrationCoupon): Promise<RegistrationCoupon> {
-    const m: any = { ...model };
-    if (m.startDate) m.startDate = DateHelper.toMysqlDate(m.startDate);
-    if (m.endDate) m.endDate = DateHelper.toMysqlDate(m.endDate);
+    const startDate = model.startDate ? DateHelper.toMysqlDate(model.startDate) : model.startDate;
+    const endDate = model.endDate ? DateHelper.toMysqlDate(model.endDate) : model.endDate;
     await getDb().updateTable("registrationCoupons").set({
       code: model.code,
-      discountType: m.discountType ?? null,
-      value: m.value ?? null,
-      startDate: m.startDate ?? null,
-      endDate: m.endDate ?? null,
-      minMembers: m.minMembers ?? null,
-      maxUses: m.maxUses ?? null,
+      discountType: model.discountType ?? null,
+      value: model.value ?? null,
+      startDate: startDate ?? null,
+      endDate: endDate ?? null,
+      minMembers: model.minMembers ?? null,
+      maxUses: model.maxUses ?? null,
       active: model.active === false ? false : true
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -59,7 +57,7 @@ export class RegistrationCouponRepo {
   public async loadForEvent(churchId: string, eventId: string): Promise<RegistrationCoupon[]> {
     return getDb().selectFrom("registrationCoupons").selectAll()
       .where("churchId", "=", churchId)
-      .where("eventId", "=", eventId).execute() as any;
+      .where("eventId", "=", eventId).execute();
   }
 
   public async loadByCode(churchId: string, eventId: string, code: string): Promise<RegistrationCoupon | undefined> {
@@ -70,6 +68,6 @@ export class RegistrationCouponRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as RegistrationCoupon; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as RegistrationCoupon[]; }
+  public convertToModel(_churchId: string, data: RegistrationCoupon) { return data; }
+  public convertAllToModel(_churchId: string, data: RegistrationCoupon[]) { return data || []; }
 }

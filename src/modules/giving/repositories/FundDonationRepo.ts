@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
+import type { FundDonationRow } from "./types.js";
 import { UniqueIdHelper, DateHelper } from "@churchapps/apihelper";
 import { FundDonation } from "../models/index.js";
 
@@ -19,7 +20,7 @@ export class FundDonationRepo {
       donationId: model.donationId,
       fundId: model.fundId,
       amount: model.amount
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -28,7 +29,7 @@ export class FundDonationRepo {
       donationId: model.donationId,
       fundId: model.fundId,
       amount: model.amount
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -36,8 +37,8 @@ export class FundDonationRepo {
     await getDb().deleteFrom("fundDonations").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public async load(churchId: string, id: string) {
-    const result = await sql<any>`
+  public async load(churchId: string, id: string): Promise<FundDonationRow | null> {
+    const result = await sql<FundDonationRow>`
     SELECT fd.*, d.currency
     FROM fundDonations fd
     INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -46,8 +47,8 @@ export class FundDonationRepo {
     return result.rows[0] ?? null;
   }
 
-  public async loadAll(churchId: string) {
-    const result = await sql<any>`
+  public async loadAll(churchId: string): Promise<FundDonationRow[]> {
+    const result = await sql<FundDonationRow>`
       SELECT fd.*, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -55,8 +56,8 @@ export class FundDonationRepo {
     return result.rows;
   }
 
-  public async loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
-    const result = await sql<any>`
+  public async loadAllByDate(churchId: string, startDate: Date, endDate: Date): Promise<FundDonationRow[]> {
+    const result = await sql<FundDonationRow>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -66,8 +67,8 @@ export class FundDonationRepo {
     return result.rows;
   }
 
-  public async loadByDonationId(churchId: string, donationId: string) {
-    const result = await sql<any>`
+  public async loadByDonationId(churchId: string, donationId: string): Promise<FundDonationRow[]> {
+    const result = await sql<FundDonationRow>`
       SELECT fd.*, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -76,8 +77,8 @@ export class FundDonationRepo {
     return result.rows;
   }
 
-  public async loadByPersonId(churchId: string, personId: string) {
-    const result = await sql<any>`
+  public async loadByPersonId(churchId: string, personId: string): Promise<FundDonationRow[]> {
+    const result = await sql<FundDonationRow>`
       SELECT fd.*, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -86,8 +87,8 @@ export class FundDonationRepo {
     return result.rows;
   }
 
-  public async loadByFundId(churchId: string, fundId: string) {
-    const result = await sql<any>`
+  public async loadByFundId(churchId: string, fundId: string): Promise<FundDonationRow[]> {
+    const result = await sql<FundDonationRow>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -96,8 +97,8 @@ export class FundDonationRepo {
     return result.rows;
   }
 
-  public async loadByFundIdDate(churchId: string, fundId: string, startDate: Date, endDate: Date) {
-    const result = await sql<any>`
+  public async loadByFundIdDate(churchId: string, fundId: string, startDate: Date, endDate: Date): Promise<FundDonationRow[]> {
+    const result = await sql<FundDonationRow>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -110,7 +111,7 @@ export class FundDonationRepo {
   // Fund total grouped by gift currency (one row per currency) so the controller can convert without reading every gift.
   public async loadFundTotalsByCurrency(churchId: string, fundId: string, startDate?: Date, endDate?: Date) {
     const dateFilter = startDate && endDate ? sql`AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}` : sql``;
-    const result = await sql<any>`
+    const result = await sql<{ currency: string | null; amount: number | string | null }>`
       SELECT d.currency AS currency, SUM(fd.amount) AS amount
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -118,12 +119,12 @@ export class FundDonationRepo {
         AND (d.status IS NULL OR d.status = 'complete')
         ${dateFilter}
       GROUP BY d.currency`.execute(getDb());
-    return result.rows.map((r: any) => ({ currency: r.currency as string | null, amount: Number(r.amount) }));
+    return result.rows.map((r) => ({ currency: r.currency, amount: Number(r.amount) }));
   }
 
-  public async loadByFundName(churchId: string, fundName: string) {
+  public async loadByFundName(churchId: string, fundName: string): Promise<FundDonationRow[]> {
     const pattern = `%${fundName}%`;
-    const result = await sql<any>`
+    const result = await sql<FundDonationRow>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -133,9 +134,9 @@ export class FundDonationRepo {
     return result.rows;
   }
 
-  public async loadByFundNameDate(churchId: string, fundName: string, startDate: Date, endDate: Date) {
+  public async loadByFundNameDate(churchId: string, fundName: string, startDate: Date, endDate: Date): Promise<FundDonationRow[]> {
     const pattern = `%${fundName}%`;
-    const result = await sql<any>`
+    const result = await sql<FundDonationRow>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
@@ -151,19 +152,19 @@ export class FundDonationRepo {
       .innerJoin("donations as d", (join) => join.onRef("d.id", "=", "fd.donationId").onRef("d.churchId", "=", "fd.churchId"))
       .where("fd.churchId", "=", churchId)
       .where("fd.fundId", "=", fundId)
-      .where((eb: any) => eb.or([eb("d.status", "is", null), eb("d.status", "=", "complete")]))
+      .where((eb) => eb.or([eb("d.status", "is", null), eb("d.status", "=", "complete")]))
       .select((eb) => [
         eb.fn.sum("fd.amount").as("totalAmount"),
         eb.fn.count("fd.donationId").distinct().as("donationCount")
-      ]) as any;
+      ]);
     if (startDate) query = query.where("d.donationDate", ">=", startDate);
     if (endDate) query = query.where("d.donationDate", "<=", endDate);
-    const row: any = await query.executeTakeFirst();
+    const row = await query.executeTakeFirst();
     return { totalAmount: Number(row?.totalAmount) || 0, donationCount: Number(row?.donationCount) || 0 };
   }
 
-  private rowToModel(data: any): FundDonation {
-    const result: any = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount, currency: data?.currency };
+  private rowToModel(data: FundDonationRow): FundDonation {
+    const result: FundDonationRow = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount, currency: data?.currency };
     if (data.batchId !== undefined) {
       result.donation = {
         id: result.donationId,
@@ -176,11 +177,12 @@ export class FundDonationRepo {
     return result;
   }
 
-  public convertToModel(_churchId: string, data: any) {
-    return data ? this.rowToModel(data) : null;
+  // FundDonationController.save passes the whole saved array here; it is read as a single row, as before.
+  public convertToModel(_churchId: string, data: FundDonationRow | FundDonationRow[]) {
+    return data ? this.rowToModel(data as FundDonationRow) : null;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(_churchId: string, data: FundDonationRow[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

@@ -6,6 +6,7 @@ import { getDb } from "../../db/index";
 import { FundRepo } from "../FundRepo";
 
 const mockedGetDb = getDb as jest.Mock;
+type WhereChain = { where: () => WhereChain; execute: () => Promise<void> };
 
 describe("FundRepo visible flag persistence", () => {
   afterEach(() => jest.restoreAllMocks());
@@ -15,18 +16,18 @@ describe("FundRepo visible flag persistence", () => {
     mockedGetDb.mockReturnValue({ insertInto: () => ({ values }) });
 
     const repo = new FundRepo();
-    await repo.save({ churchId: "C1", name: "Missions", visible: false } as any);
+    await repo.save({ churchId: "C1", name: "Missions", visible: false });
 
     expect(values).toHaveBeenCalledWith(expect.objectContaining({ visible: false }));
   });
 
   it("includes visible in the update values on update", async () => {
-    const whereChain: any = { where: () => whereChain, execute: () => Promise.resolve() };
+    const whereChain: WhereChain = { where: () => whereChain, execute: () => Promise.resolve() };
     const set = jest.fn().mockReturnValue(whereChain);
     mockedGetDb.mockReturnValue({ updateTable: () => ({ set }) });
 
     const repo = new FundRepo();
-    await repo.save({ id: "fund_1", churchId: "C1", name: "Missions", visible: false } as any);
+    await repo.save({ id: "fund_1", churchId: "C1", name: "Missions", visible: false });
 
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ visible: false }));
   });

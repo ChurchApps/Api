@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 const calls: string[] = [];
 const execute = jest.fn(async () => { calls.push("insert"); });
-const db: any = { insertInto: () => ({ values: () => ({ execute }) }) };
+const db = { insertInto: () => ({ values: () => ({ execute }) }) };
 jest.mock("../../db/index", () => ({ getDb: () => db }));
 jest.mock("@churchapps/apihelper", () => ({
   __esModule: true,
@@ -12,10 +12,11 @@ jest.mock("@churchapps/apihelper", () => ({
 }));
 const emitMock = jest.fn(async () => { calls.push("emit"); });
 jest.mock("../../../../shared/webhooks/index", () => ({ __esModule: true, WebhookDispatcher: { emit: emitMock } }));
-const fundSaveMock = jest.fn(async (fd: any) => { calls.push("fund:" + fd.fundId); return { ...fd, id: "fd-" + fd.fundId }; });
+const fundSaveMock = jest.fn(async (fd: FundDonation) => { calls.push("fund:" + fd.fundId); return { ...fd, id: "fd-" + fd.fundId }; });
 jest.mock("../FundDonationRepo", () => ({ __esModule: true, FundDonationRepo: class { save = fundSaveMock; } }));
 
 import { DonationRepo } from "../DonationRepo";
+import type { FundDonation } from "../../models/index.js";
 
 describe("DonationRepo.save with fund rows", () => {
   it("writes the fund rows before donation.created fires", async () => {

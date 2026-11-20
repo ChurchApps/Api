@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { RegistrationMember } from "../models/index.js";
 import { injectable } from "inversify";
+import type { MysqlWriteResult } from "./types.js";
 
 @injectable()
 export class RegistrationMemberRepo {
@@ -20,7 +21,7 @@ export class RegistrationMemberRepo {
       firstName: model.firstName,
       lastName: model.lastName,
       registrationTypeId: model.registrationTypeId || null
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -31,7 +32,7 @@ export class RegistrationMemberRepo {
       firstName: model.firstName,
       lastName: model.lastName,
       registrationTypeId: model.registrationTypeId || null
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -46,7 +47,7 @@ export class RegistrationMemberRepo {
       return true;
     }
 
-    const result: any = await sql`INSERT INTO registrationMembers (id, churchId, registrationId, personId, firstName, lastName, registrationTypeId)
+    const result: MysqlWriteResult = await sql`INSERT INTO registrationMembers (id, churchId, registrationId, personId, firstName, lastName, registrationTypeId)
       SELECT ${model.id}, ${model.churchId}, ${model.registrationId}, ${model.personId || null}, ${model.firstName || null}, ${model.lastName || null}, ${typeId}
       FROM dual
       WHERE (SELECT COUNT(*) FROM registrationMembers m JOIN registrations r ON r.id=m.registrationId
@@ -62,7 +63,7 @@ export class RegistrationMemberRepo {
       .where("m.registrationTypeId", "=", typeId)
       .where("r.status", "in", ["pending", "confirmed"])
       .executeTakeFirst();
-    return (result as any)?.cnt || 0;
+    return result?.cnt || 0;
   }
 
   public async delete(churchId: string, id: string) {
@@ -74,13 +75,13 @@ export class RegistrationMemberRepo {
   }
 
   public async loadAll(churchId: string): Promise<RegistrationMember[]> {
-    return getDb().selectFrom("registrationMembers").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("registrationMembers").selectAll().where("churchId", "=", churchId).execute();
   }
 
   public async loadForRegistration(churchId: string, registrationId: string): Promise<RegistrationMember[]> {
     return getDb().selectFrom("registrationMembers").selectAll()
       .where("churchId", "=", churchId)
-      .where("registrationId", "=", registrationId).execute() as any;
+      .where("registrationId", "=", registrationId).execute();
   }
 
   public async loadForEvent(churchId: string, eventId: string): Promise<RegistrationMember[]> {
@@ -89,7 +90,7 @@ export class RegistrationMemberRepo {
       .selectAll("rm")
       .where("r.churchId", "=", churchId)
       .where("r.eventId", "=", eventId)
-      .execute() as any;
+      .execute();
   }
 
   public async deleteForRegistration(churchId: string, registrationId: string): Promise<void> {
@@ -98,6 +99,6 @@ export class RegistrationMemberRepo {
       .where("registrationId", "=", registrationId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as RegistrationMember; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as RegistrationMember[]; }
+  public convertToModel(_churchId: string, data: RegistrationMember) { return data; }
+  public convertAllToModel(_churchId: string, data: RegistrationMember[]) { return data || []; }
 }

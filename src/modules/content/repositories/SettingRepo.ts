@@ -2,6 +2,8 @@ import { injectable } from "inversify";
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Setting } from "../models/index.js";
+import { sql } from "kysely";
+import type { SettingImport } from "./types.js";
 
 // Sermon auto-import keys legitimately hold several rows per church.
 const MULTI_ROW_KEYS = ["youtubeChannelId", "vimeoChannelId", "autoImportSermons"];
@@ -40,10 +42,10 @@ export class SettingRepo {
   }
 
   // Duplicate church-level (churchId, keyName) rows make public settings last-write-win; keep the lowest id so Admin and the public site agree.
-  private keepOnePerKey(rows: any[]) {
+  private keepOnePerKey(rows: Setting[]): Setting[] {
     if (!rows?.length) return rows || [];
-    const best = new Map<string, any>();
-    const result: any[] = [];
+    const best = new Map<string, Setting>();
+    const result: Setting[] = [];
     for (const row of rows) {
       if (MULTI_ROW_KEYS.includes(row.keyName)) { result.push(row); continue; }
       const key = `${row.churchId}\t${row.keyName}`;
@@ -62,7 +64,7 @@ export class SettingRepo {
       keyName: model.keyName,
       value: model.value,
       public: model.public
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -72,7 +74,7 @@ export class SettingRepo {
       keyName: model.keyName,
       value: model.value,
       public: model.public
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -91,50 +93,50 @@ export class SettingRepo {
       .where("userId", "=", userId).execute();
   }
 
-  public async loadAll(churchId: string) {
+  public async loadAll(churchId: string): Promise<Setting[]> {
     return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
       .where("churchId", "=", churchId)
       .where("userId", "is", null).execute());
   }
 
-  public async loadUser(churchId: string, userId: string) {
+  public async loadUser(churchId: string, userId: string): Promise<Setting[]> {
     return getDb().selectFrom("settings").selectAll()
       .where("churchId", "=", churchId)
-      .where("userId", "=", userId).execute() as any;
+      .where("userId", "=", userId).execute();
   }
 
-  public async loadPublicSettings(churchId: string) {
+  public async loadPublicSettings(churchId: string): Promise<Setting[]> {
     return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
       .where("churchId", "=", churchId)
-      .where("public", "=", 1 as any)
+      .where(sql.ref<number>("public"), "=", 1)
       .where("userId", "is", null).execute());
   }
 
-  public async loadAllPublicSettings() {
+  public async loadAllPublicSettings(): Promise<Setting[]> {
     return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
-      .where("public", "=", 1 as any)
+      .where(sql.ref<number>("public"), "=", 1)
       .where("userId", "is", null).execute());
   }
 
-  public async loadMulipleChurches(keyNames: string[], churchIds: string[]) {
+  public async loadMulipleChurches(keyNames: string[], churchIds: string[]): Promise<Setting[]> {
     if (!keyNames || keyNames.length === 0 || !churchIds || churchIds.length === 0) return [];
     return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
       .where("keyName", "in", keyNames)
       .where("churchId", "in", churchIds)
-      .where("public", "=", 1 as any)
+      .where(sql.ref<number>("public"), "=", 1)
       .where("userId", "is", null).execute());
   }
 
-  public async loadByKeyNames(churchId: string, keyNames: string[]) {
+  public async loadByKeyNames(churchId: string, keyNames: string[]): Promise<Setting[]> {
     if (!keyNames || keyNames.length === 0) return [];
     return getDb().selectFrom("settings").selectAll()
       .where("keyName", "in", keyNames)
       .where("churchId", "=", churchId)
-      .where("userId", "is", null).execute() as any;
+      .where("userId", "is", null).execute();
   }
 
-  public getImports(data: any[], type?: string, playlistId?: string, channelId?: string) {
-    let result: any[] = [];
+  public getImports(data: Setting[], type?: string, playlistId?: string, channelId?: string): SettingImport[] {
+    let result: SettingImport[] = [];
     if (playlistId && channelId) {
       const filterType = type === "youtube" ? "youtubeChannelId" : "vimeoChannelId";
       const filteredByPlaylist = data.filter((d) => d.keyName === "autoImportSermons" && d.value.includes(playlistId));
@@ -152,7 +154,7 @@ export class SettingRepo {
     } else {
       const filterByCategory = data.filter((d) => d.keyName === "autoImportSermons");
       if (filterByCategory.length > 0) {
-        let filtered: any[] = [];
+        let filtered: Setting[] = [];
         if (type === "youtube") {
           const filterByYoutube = data.filter((d) => d.keyName === "youtubeChannelId");
           const ids = ArrayHelper.getIds(filterByYoutube, "id");
@@ -180,8 +182,8 @@ export class SettingRepo {
     return result;
   }
 
-  public convertAllImports(data: any[]) {
-    const result: any[] = [];
+  public convertAllImports(data: SettingImport[]) {
+    const result: Record<string, string>[] = [];
     data.forEach((d) => {
       result.push({
         id: d.id,
@@ -199,10 +201,10 @@ export class SettingRepo {
     return Promise.all(promises);
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Setting; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Setting[]; }
+  public convertToModel(_churchId: string, data: Setting) { return data; }
+  public convertAllToModel(_churchId: string, data: Setting[]) { return data || []; }
 
-  protected rowToModel(row: any): Setting {
+  protected rowToModel(row: Setting): Setting {
     return {
       id: row.id,
       churchId: row.churchId,

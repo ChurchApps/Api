@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { RegistrationSelection } from "../models/index.js";
 import { injectable } from "inversify";
+import type { WithUsage } from "./types.js";
 
 @injectable()
 export class RegistrationSelectionRepo {
@@ -23,7 +24,7 @@ export class RegistrationSelectionRepo {
       maxQuantity: model.maxQuantity ?? null,
       sort: model.sort ?? null,
       active: model.active === false ? false : true
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -36,7 +37,7 @@ export class RegistrationSelectionRepo {
       maxQuantity: model.maxQuantity ?? null,
       sort: model.sort ?? null,
       active: model.active === false ? false : true
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -52,12 +53,12 @@ export class RegistrationSelectionRepo {
     return getDb().selectFrom("registrationSelections").selectAll()
       .where("churchId", "=", churchId)
       .where("eventId", "=", eventId)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   // Active selections plus a derived `used` quantity (SUM over choices on active registrations).
-  public async loadActiveWithUsage(churchId: string, eventId: string): Promise<any[]> {
-    const result: any = await sql`SELECT s.*, (
+  public async loadActiveWithUsage(churchId: string, eventId: string): Promise<WithUsage<RegistrationSelection>[]> {
+    const result = await sql<WithUsage<RegistrationSelection>>`SELECT s.*, (
         SELECT COALESCE(SUM(c.quantity),0) FROM registrationSelectionChoices c JOIN registrations r ON r.id=c.registrationId
         WHERE c.selectionId=s.id AND r.status IN ('pending','confirmed')
       ) AS used
@@ -67,6 +68,6 @@ export class RegistrationSelectionRepo {
     return result.rows;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as RegistrationSelection; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as RegistrationSelection[]; }
+  public convertToModel(_churchId: string, data: RegistrationSelection) { return data; }
+  public convertAllToModel(_churchId: string, data: RegistrationSelection[]) { return data || []; }
 }

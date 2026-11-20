@@ -3,15 +3,17 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { DateHelper as LocalDateHelper } from "../../../shared/helpers/DateHelper.js";
-import { Donation, DonationSummary, FundDonation } from "../models/index.js";
+import { Donation, FundDonation } from "../models/index.js";
+import type { DonationStatus } from "../models/Donation.js";
 import { FundDonationRepo } from "./FundDonationRepo.js";
+import type { DonationPersonFundRow, DonationRow, DonationWeekRow, WeeklyDonationSummary } from "./types.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @injectable()
 export class DonationRepo {
 
   public async save(donation: Donation, fundDonations?: FundDonation[]) {
-    if (donation.personId === "") donation.personId = null as any;
+    if (donation.personId === "") donation.personId = null;
     // Emit here rather than in the controller — online giving is logged through
     // GatewayService, so the repo is the only chokepoint that catches every path.
     const isNew = !donation.id;
@@ -51,7 +53,7 @@ export class DonationRepo {
       enteredBy: donation.enteredBy ?? null,
       status: donation.status,
       transactionId: donation.transactionId
-    } as any).execute();
+    }).execute();
     return donation;
   }
 
@@ -71,7 +73,7 @@ export class DonationRepo {
       entryTime,
       status: donation.status,
       transactionId: donation.transactionId
-    } as any).where("id", "=", donation.id).where("churchId", "=", donation.churchId).execute();
+    }).where("id", "=", donation.id).where("churchId", "=", donation.churchId).execute();
     return donation;
   }
 
@@ -98,8 +100,8 @@ export class DonationRepo {
     const rows = await getDb().selectFrom("donations").selectAll()
       .where("churchId", "=", churchId)
       .where((eb) => eb.or([eb("status", "is", null), eb("status", "=", "complete")]))
-      .where("donationDate", ">=", LocalDateHelper.toMysqlDateOnly(startDate) as any)
-      .where("donationDate", "<=", LocalDateHelper.toMysqlDateOnly(endDate) as any)
+      .where(sql.ref<string>("donationDate"), ">=", LocalDateHelper.toMysqlDateOnly(startDate))
+      .where(sql.ref<string>("donationDate"), "<=", LocalDateHelper.toMysqlDateOnly(endDate))
       .orderBy("donationDate", "desc")
       .execute();
     return rows;
@@ -135,7 +137,7 @@ export class DonationRepo {
     // belongs in the donor's history. An INNER JOIN silently dropped those rows.
     // Giving statements leave out non-deductible funds; the admin person record asks for every gift.
     const deductible = includeNonDeductible ? sql`` : sql`AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL)`;
-    const result = await sql<any>`
+    const result = await sql<DonationRow>`
       SELECT d.*, f.id as fundId, IFNULL(f.name, 'Unkown') as fundName, fd.amount as fundAmount
       FROM donations d
       LEFT JOIN fundDonations fd on fd.donationId = d.id
@@ -169,9 +171,9 @@ export class DonationRepo {
 
     let query = getDb().selectFrom("donations").selectAll()
       .where("churchId", "=", churchId)
-      .where("amount", "=", amount as any)
-      .where("donationDate", ">=", startStr as any)
-      .where("donationDate", "<=", endStr as any);
+      .where("amount", "=", amount)
+      .where(sql.ref<string>("donationDate"), ">=", startStr)
+      .where(sql.ref<string>("donationDate"), "<=", endStr);
 
     if (personId) {
       query = query.where("personId", "=", personId);
@@ -190,7 +192,7 @@ export class DonationRepo {
     const sDate = DateHelper.toMysqlDate(startDate);
     const eDate = DateHelper.toMysqlDate(endDate);
     const fundFilter = fundId ? sql`AND fd.fundId = ${fundId}` : sql``;
-    const counts = await sql<any>`
+    const counts = await sql<{ donorCount: number | string; donationCount: number | string }>`
       SELECT COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
       FROM donations d
       INNER JOIN fundDonations fd on fd.donationId = d.id
@@ -199,7 +201,7 @@ export class DonationRepo {
         AND (d.status IS NULL OR d.status = 'complete')
         AND d.donationDate BETWEEN ${sDate} AND ${eDate}
         ${fundFilter}`.execute(getDb());
-    const amounts = await sql<any>`
+    const amounts = await sql<{ currency: string | null; totalGiving: number; giftSum: number; giftRows: number }>`
       SELECT d.currency AS currency, SUM(fd.amount) as totalGiving, SUM(d.amount) as giftSum, COUNT(*) as giftRows
       FROM donations d
       INNER JOIN fundDonations fd on fd.donationId = d.id
@@ -212,14 +214,14 @@ export class DonationRepo {
     return {
       donorCount: Number(counts.rows[0]?.donorCount || 0),
       donationCount: Number(counts.rows[0]?.donationCount || 0),
-      amountsByCurrency: amounts.rows as { currency: string | null; totalGiving: number; giftSum: number; giftRows: number }[]
+      amountsByCurrency: amounts.rows
     };
   }
 
   public async loadSummary(churchId: string, startDate: Date, endDate: Date) {
     const sDate = DateHelper.toMysqlDate(startDate);
     const eDate = DateHelper.toMysqlDate(endDate);
-    const result = await sql<any>`
+    const result = await sql<DonationWeekRow>`
       SELECT STR_TO_DATE(concat(year(d.donationDate), ' ', week(d.donationDate, 0), ' Sunday'), '%X %V %W') AS week,
         SUM(fd.amount) as totalAmount, f.name as fundName, d.currency AS currency
       FROM donations d
@@ -234,7 +236,7 @@ export class DonationRepo {
   }
 
   public async loadPersonBasedSummary(churchId: string, startDate: Date, endDate: Date) {
-    const result = await sql<any>`
+    const result = await sql<DonationPersonFundRow>`
       SELECT d.personId, d.amount as donationAmount, d.currency AS currency, fd.fundId, fd.amount as fundAmount, f.name as fundName
       FROM donations d
       INNER JOIN fundDonations fd on fd.donationId = d.id
@@ -245,7 +247,7 @@ export class DonationRepo {
     return result.rows;
   }
 
-  private rowToModel(row: any): Donation {
+  private rowToModel(row: DonationRow): Donation {
     const result: Donation = {
       id: row.id,
       churchId: row.churchId,
@@ -279,7 +281,7 @@ export class DonationRepo {
   // The gateway message lives on eventLogs, which keys off the gateway customer rather than the
   // donation, so the newest failure event for that donor is the closest available match.
   public async loadFailed(churchId: string) {
-    const result = await sql<any>`
+    const result = await sql<DonationRow>`
       SELECT d.*, (
         SELECT e.message FROM eventLogs e
         INNER JOIN customers c ON c.id = e.customerId AND c.churchId = e.churchId
@@ -293,7 +295,7 @@ export class DonationRepo {
   }
 
   public async loadFailedByAge(daysOld: number) {
-    const result = await sql<any>`
+    const result = await sql<Donation>`
       SELECT * FROM donations
       WHERE status = 'failed'
         AND donationDate >= DATE_SUB(CURDATE(), INTERVAL ${daysOld + 2} DAY)
@@ -302,22 +304,22 @@ export class DonationRepo {
   }
 
   public async updateStatus(churchId: string, transactionId: string, status: string): Promise<void> {
-    await getDb().updateTable("donations").set({ status } as any).where("churchId", "=", churchId).where("transactionId", "=", transactionId).execute();
+    await getDb().updateTable("donations").set({ status: status as DonationStatus }).where("churchId", "=", churchId).where("transactionId", "=", transactionId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: DonationRow) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(_churchId: string, data: DonationRow[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 
-  public convertAllToSummary(_churchId: string, data: any[]) {
-    const result: DonationSummary[] = [];
+  public convertAllToSummary(_churchId: string, data: Pick<DonationWeekRow, "week" | "fundName" | "totalAmount">[]) {
+    const result: WeeklyDonationSummary[] = [];
     data.forEach((d) => {
       const week = d.week;
-      let weekRow: DonationSummary = ArrayHelper.getOne(result, "week", week);
+      let weekRow: WeeklyDonationSummary = ArrayHelper.getOne(result, "week", week);
       if (weekRow === null) {
         weekRow = { week, donations: [] };
         result.push(weekRow);
@@ -327,7 +329,7 @@ export class DonationRepo {
     return result;
   }
 
-  public convertAllToPersonSummary(_churchId: string, data: any[]) {
+  public convertAllToPersonSummary(_churchId: string, data: DonationPersonFundRow[]) {
     const result: { personId: string; totalAmount: number; funds: { [fundName: string]: number }[] }[] = [];
     const checkDecimals = (value: number) => {
       if (value === Math.floor(value)) {
@@ -340,7 +342,7 @@ export class DonationRepo {
     const peopleIds = ArrayHelper.getIds(data, "personId");
     peopleIds.forEach((id) => {
       let totalAmount: number = 0;
-      const funds: any[] = [];
+      const funds: { [fundName: string]: number }[] = [];
       const personDonations = ArrayHelper.getAll(data, "personId", id);
       personDonations.forEach((pd) => {
         totalAmount += pd.fundAmount;
@@ -361,7 +363,7 @@ export class DonationRepo {
     const anonDonations = ArrayHelper.getAll(data, "personId", null);
     if (anonDonations.length > 0) {
       let totalAmount: number = 0;
-      const funds: any[] = [];
+      const funds: { [fundName: string]: number }[] = [];
       anonDonations.forEach((ad) => {
         totalAmount += ad.donationAmount;
       });
@@ -374,7 +376,7 @@ export class DonationRepo {
         });
         funds.push({ [fundBasedRecords[0].fundName]: checkDecimals(totalFundAmount) });
       });
-      result.push({ personId: null as any, totalAmount: checkDecimals(totalAmount), funds });
+      result.push({ personId: null, totalAmount: checkDecimals(totalAmount), funds });
     }
 
     return result;

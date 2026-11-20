@@ -48,22 +48,22 @@ describe("DonationRepo.loadByPersonId", () => {
 
   it("returns donations that have a fund allocation", async () => {
     const rows = await new DonationRepo().loadByPersonId(CHURCH_ID, PERSON_ID);
-    expect(rows.map((r: any) => r.id)).toContain("tst1087da");
+    expect(rows.map((r) => r.id)).toContain("tst1087da");
   });
 
   it("returns donations with no fund allocation row", async () => {
     const rows = await new DonationRepo().loadByPersonId(CHURCH_ID, PERSON_ID);
-    expect(rows.map((r: any) => r.id)).toContain("tst1087db");
+    expect(rows.map((r) => r.id)).toContain("tst1087db");
   });
 
   it("leaves out gifts to non-deductible funds by default (giving statements)", async () => {
     const rows = await new DonationRepo().loadByPersonId(CHURCH_ID, PERSON_ID);
-    expect(rows.map((r: any) => r.id)).not.toContain("tst1248d");
+    expect(rows.map((r) => r.id)).not.toContain("tst1248d");
   });
 
   it("returns gifts to non-deductible funds when asked (person record)", async () => {
     const rows = await new DonationRepo().loadByPersonId(CHURCH_ID, PERSON_ID, true);
-    expect(rows.map((r: any) => r.id)).toEqual(expect.arrayContaining(["tst1087da", "tst1087db", "tst1248d"]));
+    expect(rows.map((r) => r.id)).toEqual(expect.arrayContaining(["tst1087da", "tst1087db", "tst1248d"]));
   });
 
   it("stays scoped to the church", async () => {

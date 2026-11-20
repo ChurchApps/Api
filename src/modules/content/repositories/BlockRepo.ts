@@ -17,7 +17,7 @@ export class BlockRepo {
       siteId: model.siteId ?? "",
       blockType: model.blockType,
       name: model.name
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -26,7 +26,7 @@ export class BlockRepo {
       siteId: model.siteId ?? "",
       blockType: model.blockType,
       name: model.name
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -42,7 +42,7 @@ export class BlockRepo {
     let query = getDb().selectFrom("blocks").selectAll().where("churchId", "=", churchId);
     // "" = shared only; a specific site sees shared blocks plus its own.
     query = siteId === "" ? query.where("siteId", "=", "") : query.where("siteId", "in", ["", siteId]);
-    return query.orderBy("name").execute() as any;
+    return query.orderBy("name").execute();
   }
 
   public async loadByBlockType(churchId: string, blockType: string, siteId = "") {
@@ -50,13 +50,13 @@ export class BlockRepo {
       .where("churchId", "=", churchId)
       .where("blockType", "=", blockType);
     query = siteId === "" ? query.where("siteId", "=", "") : query.where("siteId", "in", ["", siteId]);
-    return query.orderBy("name").execute() as any;
+    return query.orderBy("name").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Block; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Block[]; }
+  public convertToModel(_churchId: string, data: Block) { return data; }
+  public convertAllToModel(_churchId: string, data: Block[]) { return data || []; }
 
-  protected rowToModel(row: any): Block {
+  protected rowToModel(row: Block): Block {
     return {
       id: row.id,
       churchId: row.churchId,

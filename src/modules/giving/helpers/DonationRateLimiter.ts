@@ -1,5 +1,6 @@
 import type express from "express";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
+import type { ApiGatewayRequest, MembershipReposSlice } from "./types.js";
 
 // Card-testing brake for the anonymous money endpoints. Counters share the membership loginAttempts table so every
 // Lambda container sees them. Limits sit well above a real guest (addcard + charge = 2 attempts per gift).
@@ -11,7 +12,8 @@ export class DonationRateLimiter {
 
   // API Gateway appends the real source IP to any client-sent X-Forwarded-For, so only the last hop is trustworthy.
   static getClientIp(req: express.Request): string {
-    const ctx: any = (req as any)?.apiGateway?.event?.requestContext ?? (req as any)?.requestContext;
+    const gatewayReq = req as express.Request & ApiGatewayRequest;
+    const ctx = gatewayReq?.apiGateway?.event?.requestContext ?? gatewayReq?.requestContext;
     const sourceIp = ctx?.identity?.sourceIp || ctx?.http?.sourceIp;
     if (sourceIp) return sourceIp;
     const hops = String(req?.headers?.["x-forwarded-for"] || "").split(",").map((hop) => hop.trim()).filter(Boolean);
@@ -27,7 +29,7 @@ export class DonationRateLimiter {
   /** Counts this attempt; false when the caller's IP or the church is over its hourly limit. Fails open. */
   static async allow(req: express.Request, churchId: string): Promise<boolean> {
     try {
-      const repos = await RepoManager.getRepos<any>("membership");
+      const repos = await RepoManager.getRepos<MembershipReposSlice>("membership");
       const ip = this.ipKey(this.getClientIp(req));
       const counted: { key: string; max: number }[] = [];
       if (ip) counted.push({ key: "give|ip|" + ip, max: this.maxPerIp });
@@ -48,7 +50,7 @@ export class DonationRateLimiter {
     try {
       const ip = this.ipKey(this.getClientIp(req));
       if (!ip) return;
-      const repos = await RepoManager.getRepos<any>("membership");
+      const repos = await RepoManager.getRepos<MembershipReposSlice>("membership");
       await repos.loginAttempt.increment("give|decline|" + ip, this.windowSeconds);
     } catch (e) {
       console.error("DonationRateLimiter.recordDecline failed:", e);

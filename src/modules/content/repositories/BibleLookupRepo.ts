@@ -16,11 +16,11 @@ export class BibleLookupRepo {
     await getDb().insertInto("bibleLookups").values({
       id: model.id,
       translationKey: model.translationKey,
-      lookupTime: sql`NOW()` as any,
+      lookupTime: sql<Date>`NOW()`,
       ipAddress: model.ipAddress,
       startVerseKey: model.startVerseKey,
       endVerseKey: model.endVerseKey
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -31,7 +31,7 @@ export class BibleLookupRepo {
       ipAddress: model.ipAddress,
       startVerseKey: model.startVerseKey,
       endVerseKey: model.endVerseKey
-    } as any).where("id", "=", model.id).execute();
+    }).where("id", "=", model.id).execute();
     return model;
   }
 
@@ -53,8 +53,8 @@ export class BibleLookupRepo {
     // Collapsing to distinct key/ip pairs first keeps the join off millions of duplicate rows.
     const pairs = db.selectFrom("bibleLookups")
       .select(["translationKey", "ipAddress"])
-      .where("lookupTime", ">=", start as any)
-      .where("lookupTime", "<=", end as any)
+      .where(sql.ref<string>("lookupTime"), ">=", start)
+      .where(sql.ref<string>("lookupTime"), "<=", end)
       .groupBy(["translationKey", "ipAddress"]);
     const result = await db.selectFrom(pairs.as("d"))
       .innerJoin(keys.as("m"), "m.k", "d.translationKey")
@@ -73,10 +73,10 @@ export class BibleLookupRepo {
     return (await getDb().selectFrom("bibleLookups").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public convertToModel(data: any) { return data as BibleLookup; }
-  public convertAllToModel(data: any[]) { return (data || []) as BibleLookup[]; }
+  public convertToModel(data: BibleLookup) { return data; }
+  public convertAllToModel(data: BibleLookup[]) { return data || []; }
 
-  protected rowToModel(row: any): BibleLookup {
+  protected rowToModel(row: BibleLookup): BibleLookup {
     return {
       id: row.id,
       translationKey: row.translationKey,

@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { RegistrationType } from "../models/index.js";
 import { injectable } from "inversify";
+import type { WithUsage } from "./types.js";
 
 @injectable()
 export class RegistrationTypeRepo {
@@ -25,7 +26,7 @@ export class RegistrationTypeRepo {
       formId: model.formId ?? null,
       sort: model.sort ?? null,
       active: model.active === false ? false : true
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -40,7 +41,7 @@ export class RegistrationTypeRepo {
       formId: model.formId ?? null,
       sort: model.sort ?? null,
       active: model.active === false ? false : true
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -56,12 +57,12 @@ export class RegistrationTypeRepo {
     return getDb().selectFrom("registrationTypes").selectAll()
       .where("churchId", "=", churchId)
       .where("eventId", "=", eventId)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   // Active types plus a derived `used` count (members of that type on active registrations).
-  public async loadActiveWithUsage(churchId: string, eventId: string): Promise<any[]> {
-    const result: any = await sql`SELECT t.*, (
+  public async loadActiveWithUsage(churchId: string, eventId: string): Promise<WithUsage<RegistrationType>[]> {
+    const result = await sql<WithUsage<RegistrationType>>`SELECT t.*, (
         SELECT COUNT(*) FROM registrationMembers m JOIN registrations r ON r.id=m.registrationId
         WHERE m.registrationTypeId=t.id AND r.status IN ('pending','confirmed')
       ) AS used
@@ -71,6 +72,6 @@ export class RegistrationTypeRepo {
     return result.rows;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as RegistrationType; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as RegistrationType[]; }
+  public convertToModel(_churchId: string, data: RegistrationType) { return data; }
+  public convertAllToModel(_churchId: string, data: RegistrationType[]) { return data || []; }
 }

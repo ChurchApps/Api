@@ -4,6 +4,11 @@ import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { Donation, EventLog, Subscription } from "../models/index.js";
+import type { Repos } from "../repositories/Repos.js";
+import type { EventLogRepo } from "../repositories/EventLogRepo.js";
+
+type DunningRepos = { eventLog: Pick<EventLogRepo, "loadByProviderId" | "save"> };
+import type { DunningChurch, MembershipReposSlice } from "./types.js";
 
 const DUNNING_DAYS = [3, 7];
 
@@ -15,16 +20,16 @@ const HEADINGS: Record<number, string> = {
 
 export class DunningHelper {
 
-  static async notify(churchId: string, donation: Donation, day: number, repos: any): Promise<boolean> {
+  static async notify(churchId: string, donation: Donation, day: number, repos: DunningRepos): Promise<boolean> {
     if (!donation?.id || !donation.personId) return false;
 
     const providerId = `${donation.id}:${day}`;
     if (await repos.eventLog.loadByProviderId(churchId, providerId)) return false;
 
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const person: any = await membershipRepos.person.load(churchId, donation.personId);
+    const membershipRepos = await RepoManager.getRepos<MembershipReposSlice>("membership");
+    const person = await membershipRepos.person.load(churchId, donation.personId);
     if (!person?.email) return false;
-    const church: any = await membershipRepos.church.loadById(churchId);
+    const church = await membershipRepos.church.loadById(churchId);
     if (!church) return false;
 
     await this.send(person.email, church, donation, day);
@@ -43,16 +48,16 @@ export class DunningHelper {
     return true;
   }
 
-  static async notifyCanceled(churchId: string, subscription: Subscription, repos: any): Promise<boolean> {
+  static async notifyCanceled(churchId: string, subscription: Subscription, repos: DunningRepos): Promise<boolean> {
     if (!subscription?.id || !subscription.personId) return false;
 
     const providerId = `${subscription.id}:canceled`;
     if (await repos.eventLog.loadByProviderId(churchId, providerId)) return false;
 
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const person: any = await membershipRepos.person.load(churchId, subscription.personId);
+    const membershipRepos = await RepoManager.getRepos<MembershipReposSlice>("membership");
+    const person = await membershipRepos.person.load(churchId, subscription.personId);
     if (!person?.email) return false;
-    const church: any = await membershipRepos.church.loadById(churchId);
+    const church = await membershipRepos.church.loadById(churchId);
     if (!church) return false;
 
     const domain = this.domain(church);
@@ -71,7 +76,7 @@ export class DunningHelper {
   }
 
   static async run(): Promise<{ sent: number }> {
-    const repos = await RepoManager.getRepos<any>("giving");
+    const repos = await RepoManager.getRepos<Repos>("giving");
     let sent = 0;
     for (const day of DUNNING_DAYS) {
       const donations = (await repos.donation.loadFailedByAge(day)) as Donation[];
@@ -86,7 +91,7 @@ export class DunningHelper {
     return { sent };
   }
 
-  private static async send(to: string, church: any, donation: Donation, day: number) {
+  private static async send(to: string, church: DunningChurch, donation: Donation, day: number) {
     const domain = this.domain(church);
     const amount = CurrencyHelper.formatCurrencyWithLocale(donation.amount || 0, (donation.currency || "USD").toUpperCase());
     const attemptedOn = dayjs(donation.donationDate).format("MMM D, YYYY");
@@ -107,7 +112,7 @@ export class DunningHelper {
     return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
-  private static domain(church: any) {
+  private static domain(church: DunningChurch) {
     return Environment.appEnv === "staging" ? `${church.subDomain}.staging.b1.church` : `${church.subDomain}.b1.church`;
   }
 }

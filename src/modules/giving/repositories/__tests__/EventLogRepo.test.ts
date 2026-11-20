@@ -5,6 +5,10 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "evt_generated" } }));
 
 import { EventLogRepo, isDuplicateKeyError } from "../EventLogRepo";
+import type { EventLog } from "../../models/index.js";
+
+type SelectChain = { where: () => SelectChain; limit: () => SelectChain; executeTakeFirst: () => Promise<unknown> };
+type UpdateChain = { set: () => UpdateChain; where: () => UpdateChain; execute: () => Promise<void> };
 
 const mockedGetDb = getDb as jest.Mock;
 
@@ -22,11 +26,11 @@ describe("isDuplicateKeyError", () => {
 
 // Concurrent webhooks: the duplicate surfaces so DonateController answers 200 without processing twice.
 describe("EventLogRepo.create idempotency under the unique constraint", () => {
-  const buildDb = (opts: { insertError?: any; existingRow?: any }) => ({
+  const buildDb = (opts: { insertError?: unknown; existingRow?: Partial<EventLog> }) => ({
     insertInto: () => ({ values: () => ({ execute: () => (opts.insertError ? Promise.reject(opts.insertError) : Promise.resolve()) }) }),
     selectFrom: () => ({
       selectAll: () => {
-        const chain: any = {
+        const chain: SelectChain = {
           where: () => chain,
           limit: () => chain,
           executeTakeFirst: () => Promise.resolve(opts.existingRow ?? null)
@@ -42,19 +46,19 @@ describe("EventLogRepo.create idempotency under the unique constraint", () => {
     const existing = { id: "evt_winner", churchId: "C1", providerId: "pi_1", resolved: false };
     mockedGetDb.mockReturnValue(buildDb({ insertError: { errno: 1062 }, existingRow: existing }));
     const repo = new EventLogRepo();
-    await expect((repo as any).create({ churchId: "C1", providerId: "pi_1", provider: "stripe", eventType: "charge.succeeded" })).rejects.toMatchObject({ errno: 1062 });
+    await expect(repo["create"]({ churchId: "C1", providerId: "pi_1", provider: "stripe", eventType: "charge.succeeded" } as EventLog)).rejects.toMatchObject({ errno: 1062 });
   });
 
   it("rethrows non-duplicate insert errors", async () => {
     mockedGetDb.mockReturnValue(buildDb({ insertError: { errno: 1213, message: "Deadlock found" } }));
     const repo = new EventLogRepo();
-    await expect((repo as any).create({ churchId: "C1", providerId: "pi_2", provider: "stripe" })).rejects.toMatchObject({ errno: 1213 });
+    await expect(repo["create"]({ churchId: "C1", providerId: "pi_2", provider: "stripe" } as EventLog)).rejects.toMatchObject({ errno: 1213 });
   });
 
   it("inserts normally when there is no conflict", async () => {
     mockedGetDb.mockReturnValue(buildDb({}));
     const repo = new EventLogRepo();
-    const result = await (repo as any).create({ id: "evt_new", churchId: "C1", providerId: "pi_3", provider: "stripe" });
+    const result = await repo["create"]({ id: "evt_new", churchId: "C1", providerId: "pi_3", provider: "stripe" });
     expect(result.id).toBe("evt_new");
   });
 });
@@ -66,12 +70,12 @@ describe("EventLogRepo.save for an existing event", () => {
 
   it("updates resolved instead of inserting the same id again", async () => {
     const ops: string[] = [];
-    const chain: any = { set: () => chain, where: () => chain, execute: () => { ops.push("update"); return Promise.resolve(); } };
+    const chain: UpdateChain = { set: () => chain, where: () => chain, execute: () => { ops.push("update"); return Promise.resolve(); } };
     mockedGetDb.mockReturnValue({
       insertInto: () => ({ values: () => ({ execute: () => { ops.push("insert"); return Promise.reject({ errno: 1062, code: "ER_DUP_ENTRY" }); } }) }),
       updateTable: () => chain
     });
-    const result = await new EventLogRepo().save({ id: "evt_existing", churchId: "C1", resolved: true } as any);
+    const result = await new EventLogRepo().save({ id: "evt_existing", churchId: "C1", resolved: true });
     expect(ops).toEqual(["update"]);
     expect(result.resolved).toBe(true);
   });
