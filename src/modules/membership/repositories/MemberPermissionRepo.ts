@@ -1,4 +1,5 @@
 import { injectable } from "inversify";
+import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { MemberPermission } from "../models/index.js";
@@ -68,13 +69,13 @@ export class MemberPermissionRepo {
       .where("churchId", "=", churchId)
       .where("contentType", "=", contentType)
       .where("contentId", "=", contentId)
-      .where("emailNotification", "=", emailNotification as any)
+      .where("emailNotification", "=", emailNotification)
       .execute();
   }
 
   public async loadFormsByPerson(churchId: string, personId: string) {
     return getDb().selectFrom("memberPermissions as mp")
-      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "mp.memberId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "mp.memberId").on((eb) => eb.or([eb(sql.ref<number>("p.removed"), "=", 0), eb("p.removed", "is", null)])))
       .selectAll("mp")
       .select("p.displayName as personName")
       .where("mp.churchId", "=", churchId)
@@ -86,7 +87,7 @@ export class MemberPermissionRepo {
 
   public async loadPeopleByForm(churchId: string, formId: string) {
     return getDb().selectFrom("memberPermissions as mp")
-      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "mp.memberId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "mp.memberId").on((eb) => eb.or([eb(sql.ref<number>("p.removed"), "=", 0), eb("p.removed", "is", null)])))
       .selectAll("mp")
       .select("p.displayName as personName")
       .where("mp.churchId", "=", churchId)
@@ -106,7 +107,7 @@ export class MemberPermissionRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): MemberPermission {
+  protected rowToModel(row: MemberPermission): MemberPermission {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -119,12 +120,12 @@ export class MemberPermissionRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: MemberPermission) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: MemberPermission[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

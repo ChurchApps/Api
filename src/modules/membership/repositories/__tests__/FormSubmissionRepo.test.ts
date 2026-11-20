@@ -1,11 +1,12 @@
 import "reflect-metadata";
 jest.mock("../../db/index.js", () => ({ getDb: jest.fn() }));
-jest.mock("../../helpers/index.js", () => ({ DateHelper: { toMysqlDate: (d: any) => d } }));
+jest.mock("../../helpers/index.js", () => ({ DateHelper: { toMysqlDate: (d: unknown) => d } }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "gen" } }));
 
-import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
+import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler, type CompiledQuery } from "kysely";
 import { FormSubmissionRepo } from "../FormSubmissionRepo.js";
 import { getDb } from "../../db/index.js";
+import type { MembershipDatabase } from "../../db/DatabaseTypes.js";
 
 // Issue #1356: an admin's "Change person" sets contentType/contentId but keeps submittedBy, so My Forms must match both.
 describe("FormSubmissionRepo.loadForSubmitter", () => {
@@ -23,17 +24,17 @@ describe("FormSubmissionRepo.loadForSubmitter", () => {
   });
 });
 
-function capturingDb(rows: any[] = []) {
+function capturingDb(rows: unknown[] = []) {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
   driver.acquireConnection = async () => ({
-    executeQuery: async (q: any) => {
+    executeQuery: async <R>(q: CompiledQuery) => {
       queries.push({ sql: q.sql, parameters: q.parameters });
-      return { rows } as any;
+      return { rows: rows as R[] };
     },
     streamQuery: async function* () {}
   });
-  const db = new Kysely<any>({
+  const db = new Kysely<MembershipDatabase>({
     dialect: {
       createAdapter: () => new MysqlAdapter(),
       createDriver: () => driver,

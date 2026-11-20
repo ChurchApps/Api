@@ -5,6 +5,25 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { RolePermission, Api, LoginUserChurch } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
+interface PermissionRow {
+  churchName: string;
+  churchId: string;
+  subDomain: string;
+  apiName: RolePermission["apiName"];
+  contentType: RolePermission["contentType"];
+  contentId: string;
+  action: RolePermission["action"];
+  personId?: string;
+  membershipStatus?: string;
+  archivedDate: Date;
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
 @injectable()
 export class RolePermissionRepo {
   public async save(model: RolePermission) {
@@ -53,14 +72,14 @@ export class RolePermissionRepo {
   }
 
   public async loadForUser(userId: string, removeUniversal: boolean): Promise<LoginUserChurch[]> {
-    const rawResult = await sql`SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id AS personId, p.membershipStatus, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country FROM roleMembers rm INNER JOIN roles r ON r.id=rm.roleId INNER JOIN rolePermissions rp ON (rp.roleId=r.id OR (rp.roleId IS NULL AND rp.churchId=rm.churchId)) LEFT JOIN churches c ON c.id=r.churchId LEFT JOIN userChurches uc ON uc.churchId=r.churchId AND uc.userId = rm.userId LEFT JOIN people p ON p.id = uc.personId AND p.churchId=uc.churchId AND (p.removed=0 OR p.removed IS NULL) WHERE rm.userId=${userId} AND (COALESCE(rp.contentType,'') <> 'Server' OR r.churchId='0') GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate`.execute(getDb());
-    const data = rawResult.rows as any[];
+    const rawResult = await sql<PermissionRow>`SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id AS personId, p.membershipStatus, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country FROM roleMembers rm INNER JOIN roles r ON r.id=rm.roleId INNER JOIN rolePermissions rp ON (rp.roleId=r.id OR (rp.roleId IS NULL AND rp.churchId=rm.churchId)) LEFT JOIN churches c ON c.id=r.churchId LEFT JOIN userChurches uc ON uc.churchId=r.churchId AND uc.userId = rm.userId LEFT JOIN people p ON p.id = uc.personId AND p.churchId=uc.churchId AND (p.removed=0 OR p.removed IS NULL) WHERE rm.userId=${userId} AND (COALESCE(rp.contentType,'') <> 'Server' OR r.churchId='0') GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate`.execute(getDb());
+    const data = rawResult.rows;
 
     const result: LoginUserChurch[] = [];
     let currentUserChurch: LoginUserChurch = null;
     let currentApi: Api = null;
     let reportingApi: Api = null;
-    data.forEach((row: any) => {
+    data.forEach((row) => {
       if (currentUserChurch === null || row.churchId !== currentUserChurch.church.id) {
         currentUserChurch = {
           church: {
@@ -105,11 +124,11 @@ export class RolePermissionRepo {
   }
 
   public async loadForChurch(churchId: string, univeralChurch: LoginUserChurch): Promise<LoginUserChurch> {
-    const rawResult = await sql`SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country FROM roles r INNER JOIN rolePermissions rp ON rp.roleId=r.id LEFT JOIN churches c ON c.id=r.churchId WHERE c.id=${churchId} AND (COALESCE(rp.contentType,'') <> 'Server' OR r.churchId='0') GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action`.execute(getDb());
-    const data = rawResult.rows as any[];
+    const rawResult = await sql<PermissionRow>`SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country FROM roles r INNER JOIN rolePermissions rp ON rp.roleId=r.id LEFT JOIN churches c ON c.id=r.churchId WHERE c.id=${churchId} AND (COALESCE(rp.contentType,'') <> 'Server' OR r.churchId='0') GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action`.execute(getDb());
+    const data = rawResult.rows;
     let result: LoginUserChurch = null;
     let currentApi: Api = null;
-    data.forEach((row: any) => {
+    data.forEach((row) => {
       if (result === null) {
         result = {
           church: {
@@ -155,13 +174,13 @@ export class RolePermissionRepo {
   }
 
   public async loadUserPermissionInChurch(userId: string, churchId: string) {
-    const rawResult = await sql`SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country FROM roleMembers rm INNER JOIN roles r ON r.id=rm.roleId INNER JOIN rolePermissions rp ON (rp.roleId=r.id OR (rp.roleId IS NULL AND rp.churchId=rm.churchId)) LEFT JOIN churches c ON c.id=r.churchId WHERE rm.userId=${userId} AND rm.churchId=${churchId} AND c.archivedDate IS NULL AND (COALESCE(rp.contentType,'') <> 'Server' OR r.churchId='0') GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action`.execute(getDb());
-    const data = rawResult.rows as any[];
+    const rawResult = await sql<PermissionRow>`SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country FROM roleMembers rm INNER JOIN roles r ON r.id=rm.roleId INNER JOIN rolePermissions rp ON (rp.roleId=r.id OR (rp.roleId IS NULL AND rp.churchId=rm.churchId)) LEFT JOIN churches c ON c.id=r.churchId WHERE rm.userId=${userId} AND rm.churchId=${churchId} AND c.archivedDate IS NULL AND (COALESCE(rp.contentType,'') <> 'Server' OR r.churchId='0') GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action`.execute(getDb());
+    const data = rawResult.rows;
 
     let result: LoginUserChurch = null;
     let currentApi: Api = null;
 
-    data.forEach((row: any) => {
+    data.forEach((row) => {
       if (result === null) {
         result = {
           church: {
@@ -243,7 +262,7 @@ export class RolePermissionRepo {
       .where(sql<boolean>`COALESCE(contentType,'') <> 'Server'`)
       .orderBy("churchId").orderBy("apiName").orderBy("contentType").orderBy("action")
       .execute();
-    rows.forEach((row: any) => {
+    rows.forEach((row) => {
       const apis = (result[row.churchId] ??= []);
       let api = apis.find((a) => a.keyName === row.apiName);
       if (!api) {
@@ -265,6 +284,6 @@ export class RolePermissionRepo {
     return this.create(model);
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: RolePermission) { return data; }
+  public convertAllToModel(_churchId: string, data: RolePermission[]) { return data || []; }
 }

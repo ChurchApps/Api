@@ -1,9 +1,12 @@
 import { PublicEmailThrottle } from "../PublicEmailThrottle.js";
+import type { AuditLog } from "../../models/index.js";
+import type { Repos } from "../../repositories/Repos.js";
+import type { AuditLogFilter } from "../../repositories/AuditLogRepo.js";
 
 function repos(counts: number[] = [0, 0]) {
-  const loadCount = jest.fn(async () => counts.shift() ?? 0);
-  const create = jest.fn(async (log: any) => log);
-  return { auditLog: { loadCount, create } } as any;
+  const loadCount = jest.fn(async (_churchId: string, _filter: AuditLogFilter) => counts.shift() ?? 0);
+  const create = jest.fn(async (log: AuditLog) => log);
+  return Object.assign({} as Repos, { auditLog: { loadCount, create } });
 }
 
 describe("PublicEmailThrottle.allow", () => {

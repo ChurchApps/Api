@@ -57,7 +57,7 @@ export class HouseholdRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): Household {
+  protected rowToModel(row: Household): Household {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -65,12 +65,12 @@ export class HouseholdRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Household) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: Household[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

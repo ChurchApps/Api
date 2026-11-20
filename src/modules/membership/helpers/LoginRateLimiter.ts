@@ -1,6 +1,17 @@
 import type express from "express";
 import type { Repos } from "../repositories/Repos.js";
 
+/** API Gateway request context (REST v1 `identity`, HTTP v2 `http`) attached by the serverless adapter. */
+interface GatewayRequestContext {
+  identity?: { sourceIp?: string };
+  http?: { sourceIp?: string };
+}
+
+type GatewayRequest = express.Request & {
+  apiGateway?: { event?: { requestContext?: GatewayRequestContext } };
+  requestContext?: GatewayRequestContext;
+};
+
 /**
  * Throttles failed credential checks (login / verifyCredentials).
  *
@@ -37,7 +48,8 @@ export class LoginRateLimiter {
    * counter on every request by sending their own X-Forwarded-For.)
    */
   public static getClientIp(req: express.Request): string {
-    const ctx: any = (req as any)?.apiGateway?.event?.requestContext ?? (req as any)?.requestContext;
+    const gatewayReq = req as GatewayRequest;
+    const ctx = gatewayReq?.apiGateway?.event?.requestContext ?? gatewayReq?.requestContext;
     const sourceIp = ctx?.identity?.sourceIp || ctx?.http?.sourceIp;
     if (sourceIp) return sourceIp;
 

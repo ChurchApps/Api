@@ -20,7 +20,7 @@ export class OAuthClientRepo {
       redirectUris: client.redirectUris,
       scopes: client.scopes,
       selfRegistered: client.selfRegistered ? true : false,
-      createdAt: sql`NOW()` as any
+      createdAt: sql<Date>`NOW()`
     }).execute();
     return client;
   }
@@ -59,6 +59,6 @@ export class OAuthClientRepo {
     return getDb().selectFrom("oAuthClients").selectAll().orderBy("name").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: OAuthClient) { return data; }
+  public convertAllToModel(_churchId: string, data: OAuthClient[]) { return data || []; }
 }

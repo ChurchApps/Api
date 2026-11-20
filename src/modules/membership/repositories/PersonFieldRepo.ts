@@ -51,7 +51,7 @@ export class PersonFieldRepo {
   }
 
   // choices is an opaque JSON string end-to-end; clients parse it.
-  protected rowToModel(row: any): PersonField {
+  protected rowToModel(row: PersonField): PersonField {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -62,11 +62,11 @@ export class PersonFieldRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: PersonField) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: PersonField[]) {
     return (data || []).map((row) => this.rowToModel(row));
   }
 }

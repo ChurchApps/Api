@@ -16,7 +16,7 @@ export class ChurchRepo {
       id: church.id,
       name: church.name,
       subDomain: church.subDomain,
-      registrationDate: sql`NOW()` as any,
+      registrationDate: sql<Date>`NOW()`,
       address1: church.address1,
       address2: church.address2,
       city: church.city,
@@ -53,7 +53,7 @@ export class ChurchRepo {
 
   // Server-admin only; deliberately outside save() so church admins can never approve themselves.
   public async setEmailApproved(id: string, approved: boolean) {
-    await getDb().updateTable("churches").set({ emailApprovedDate: approved ? sql`NOW()` as any : null }).where("id", "=", id).execute();
+    await getDb().updateTable("churches").set({ emailApprovedDate: approved ? sql<Date>`NOW()` : null }).where("id", "=", id).execute();
   }
 
   public async delete(_churchId: string, id: string) {
@@ -66,7 +66,7 @@ export class ChurchRepo {
 
   public async loadCount() {
     const result = (await getDb().selectFrom("churches").select((eb) => eb.fn.countAll().as("count")).executeTakeFirst()) ?? null;
-    return parseInt((result as any)?.count || "0", 10);
+    return parseInt(String(result?.count || "0"), 10);
   }
 
   public async loadAll() {
@@ -116,7 +116,7 @@ export class ChurchRepo {
         join.onRef("c.id", "=", "uc.churchId").on("c.archivedDate", "is", null))
       .leftJoin("people as p", (join) =>
         join.onRef("p.id", "=", "uc.personId").on((eb) =>
-          eb.or([eb("p.removed", "=", false as any), eb("p.removed", "is", null)])))
+          eb.or([eb("p.removed", "=", false), eb("p.removed", "is", null)])))
       .select([
         "c.id",
         "c.name",
@@ -136,9 +136,9 @@ export class ChurchRepo {
         "p.membershipStatus"
       ])
       .where("uc.userId", "=", userId)
-      .execute() as any[];
+      .execute();
     const loginUserChurches: LoginUserChurch[] = [];
-    rows.forEach((row: any) => {
+    rows.forEach((row) => {
       const apis: Api[] = [];
       const addChurch = {
         church: {
@@ -166,7 +166,7 @@ export class ChurchRepo {
   }
 
   public async getAbandoned(noMonths = 6) {
-    const result = await sql`SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL ${noMonths} MONTH)`.execute(getDb());
+    const result = await sql<{ churchId: string }>`SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL ${noMonths} MONTH)`.execute(getDb());
     return result.rows;
   }
 
@@ -174,7 +174,7 @@ export class ChurchRepo {
     await sql`DELETE churches FROM churches LEFT JOIN (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches ON churches.id = groupedChurches.churchId WHERE groupedChurches.lastAccessed <= DATE_SUB(NOW(), INTERVAL ${noMonths} MONTH)`.execute(getDb());
   }
 
-  protected rowToModel(row: any): Church {
+  protected rowToModel(row: Church): Church {
     return {
       id: row.id,
       name: row.name,
@@ -195,13 +195,13 @@ export class ChurchRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: Church) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any) {
+  public convertAllToModel(data: Church[]) {
     if (!Array.isArray(data)) return [];
-    return data.map((d: any) => this.rowToModel(d));
+    return data.map((d) => this.rowToModel(d));
   }
 }

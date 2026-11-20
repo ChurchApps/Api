@@ -40,7 +40,7 @@ export class ConversationalFormHelper {
     if (!contact?.email) return null;
     const email = contact.email.trim();
 
-    const matches = ((await repos.person.searchEmail(churchId, email)) as any[]) || [];
+    const matches = (await repos.person.searchEmail(churchId, email)) || [];
     const existing = matches.find((p) => (p.email || "").toLowerCase() === email.toLowerCase());
     if (existing) return repos.person.convertToModel(churchId, existing);
 

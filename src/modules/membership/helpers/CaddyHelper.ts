@@ -8,6 +8,12 @@ interface HostDial {
   dial: string;
 }
 
+interface CaddyRoute {
+  match: { host: string[] }[];
+  handle: Record<string, unknown>[];
+  terminal: boolean;
+}
+
 export class CaddyHelper {
   private static getAdminBaseUrl() {
     return "http://" + Environment.caddyHost + ":" + Environment.caddyPort;
@@ -17,12 +23,12 @@ export class CaddyHelper {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  private static async putConfig(url: string, data: any) {
+  private static async putConfig(url: string, data: unknown) {
     try {
       await axios.put(url, data, { timeout: 10000 });
-    } catch (err: any) {
+    } catch (err) {
       // 409 means key already exists - that's fine, use PATCH to update
-      if (err?.response?.status === 409) {
+      if ((err as { response?: { status?: number } })?.response?.status === 409) {
         await axios.patch(url, data, { timeout: 10000 });
       } else {
         throw err;
@@ -92,11 +98,11 @@ export class CaddyHelper {
       results.push("http_redirect: ok");
 
       return { success: true, results };
-    } catch (err: any) {
+    } catch (err) {
       return {
         success: false,
         results,
-        error: err?.message || "Unknown error",
+        error: (err as { message?: string })?.message || "Unknown error",
         step: results.length
       };
     }
@@ -115,7 +121,7 @@ export class CaddyHelper {
   static async generateRoutes() {
     const repos = await RepoManager.getRepos<Repos>("membership");
     const hostDials: HostDial[] = (await repos.domain.loadPairs()) as HostDial[];
-    const routes: any[] = [];
+    const routes: CaddyRoute[] = [];
 
     hostDials.forEach((hd) => {
       routes.push(this.getRoute(hd.host, hd.dial));

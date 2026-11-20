@@ -2,21 +2,23 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "usr_gen" } }));
 jest.mock("../../helpers/index.js", () => ({
   __esModule: true,
-  DateHelper: { toMysqlDate: (d: any) => d ?? null }
+  DateHelper: { toMysqlDate: (d: unknown) => d ?? null }
 }));
 
 import { getDb } from "../../db/index.js";
 import { UserRepo } from "../UserRepo.js";
 import { AuthGuidHelper } from "../../helpers/AuthGuidHelper.js";
 
-function recordingDb(results: any[] = []) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+type Eb = ((col: string, op: string, val: string) => string) & { or: (arr: string[]) => string[] };
+
+function recordingDb(results: unknown[] = []) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy<Record<string, unknown>>({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => results;
       if (prop === "executeTakeFirst") return async () => results[0] ?? null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
@@ -30,10 +32,12 @@ describe("UserRepo.loadByAuthGuid", () => {
     await new UserRepo().loadByAuthGuid(raw);
     const where = calls.find((c) => c.method === "where");
     expect(where).toBeTruthy();
-    const ebCalls: any[] = [];
-    const eb: any = (col: string, op: string, val: string) => { ebCalls.push({ col, op, val }); return `${col}${op}${val}`; };
-    eb.or = (arr: any[]) => arr;
-    where.args[0](eb);
+    const ebCalls: { col: string; op: string; val: string }[] = [];
+    const eb: Eb = Object.assign(
+      (col: string, op: string, val: string) => { ebCalls.push({ col, op, val }); return `${col}${op}${val}`; },
+      { or: (arr: string[]) => arr }
+    );
+    (where.args[0] as (eb: Eb) => unknown)(eb);
     expect(ebCalls).toEqual([
       { col: "authGuid", op: "=", val: raw },
       { col: "authGuid", op: "like", val: AuthGuidHelper.hash(raw) + ":%" }

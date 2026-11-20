@@ -21,8 +21,8 @@ export class OAuthRelaySessionRepo {
       provider: session.provider,
       redirectUri: session.redirectUri,
       status: session.status || "pending",
-      expiresAt: expiresAt as any,
-      createdAt: sql`NOW()` as any
+      expiresAt: sql<Date>`${expiresAt}`,
+      createdAt: sql<Date>`NOW()`
     }).execute();
     return session;
   }
@@ -42,7 +42,7 @@ export class OAuthRelaySessionRepo {
   public async loadBySessionCode(sessionCode: string): Promise<OAuthRelaySession> {
     return (await getDb().selectFrom("oAuthRelaySessions").selectAll()
       .where("sessionCode", "=", sessionCode)
-      .where("expiresAt", ">", sql`NOW()` as any)
+      .where("expiresAt", ">", sql<Date>`NOW()`)
       .executeTakeFirst()) ?? null;
   }
 
@@ -51,7 +51,7 @@ export class OAuthRelaySessionRepo {
   }
 
   public async deleteExpired() {
-    await getDb().deleteFrom("oAuthRelaySessions").where("expiresAt", "<", sql`NOW()` as any).execute();
+    await getDb().deleteFrom("oAuthRelaySessions").where("expiresAt", "<", sql<Date>`NOW()`).execute();
   }
 
   // Generate 8-character session code (TV-friendly, no ambiguous characters)
@@ -64,6 +64,6 @@ export class OAuthRelaySessionRepo {
     return code;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: OAuthRelaySession) { return data; }
+  public convertAllToModel(_churchId: string, data: OAuthRelaySession[]) { return data || []; }
 }

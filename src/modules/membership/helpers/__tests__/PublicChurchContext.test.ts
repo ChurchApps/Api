@@ -1,10 +1,11 @@
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { jwtSecret: "test-secret" } }));
 
 import jwt from "jsonwebtoken";
+import type express from "express";
 import { Environment } from "../../../../shared/helpers/Environment.js";
 import { PublicChurchContext } from "../PublicChurchContext.js";
 
-const req = (over: any = {}) => ({ headers: {}, body: {}, ...over });
+const req = (over: Partial<express.Request> = {}) => ({ headers: {}, body: {}, ...over }) as express.Request;
 
 describe("PublicChurchContext", () => {
   it("reads churchId from a church JWT", () => {

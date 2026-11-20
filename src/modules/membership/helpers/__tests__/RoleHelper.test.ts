@@ -1,17 +1,19 @@
+import type { Role, RoleMember, RolePermission } from "../../models/index.js";
+
 // ChurchAppsSupport#1426: anyone in any role picks up the Everyone permissions, so a Check-in grant
 // on Everyone let every role holder run the kiosk and use its person reads.
-const mockRolePermissionSave = jest.fn(async (rp: any) => rp);
+const mockRolePermissionSave = jest.fn(async (rp: RolePermission) => rp);
 
 jest.mock("../../../../shared/infrastructure/index", () => ({
   RepoManager: {
     getRepos: async () => ({
-      role: { save: async (r: any) => ({ ...r, id: "role-" + r.name }) },
-      roleMember: { save: async (rm: any) => rm },
+      role: { save: async (r: Role) => ({ ...r, id: "role-" + r.name }) },
+      roleMember: { save: async (rm: RoleMember) => rm },
       rolePermission: { save: mockRolePermissionSave }
     })
   }
 }));
-jest.mock("../../models/index", () => ({ RolePermission: class { constructor(data: any) { Object.assign(this, data); } } }));
+jest.mock("../../models/index", () => ({ RolePermission: class { constructor(data: Partial<RolePermission>) { Object.assign(this, data); } } }));
 
 import { RoleHelper } from "../RoleHelper";
 

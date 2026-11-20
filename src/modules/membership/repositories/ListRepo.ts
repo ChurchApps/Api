@@ -2,7 +2,10 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
-import { List } from "../models/index.js";
+import { List, ListAction, ListRuleGroup } from "../models/index.js";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
+
+export type ListRow = MembershipDatabase["lists"] & { createdByPersonName?: string };
 
 @injectable()
 export class ListRepo {
@@ -26,7 +29,7 @@ export class ListRepo {
       householdInclusion: model.householdInclusion ?? "none",
       notifyOnChange: model.notifyOnChange ? 1 : 0,
       actions: model.actions ? JSON.stringify(model.actions) : null,
-      dateCreated: sql`NOW()` as any
+      dateCreated: sql<Date>`NOW()`
     }).execute();
     return model;
   }
@@ -43,7 +46,7 @@ export class ListRepo {
       householdInclusion: model.householdInclusion ?? "none",
       notifyOnChange: model.notifyOnChange ? 1 : 0,
       actions: model.actions ? JSON.stringify(model.actions) : null,
-      dateModified: sql`NOW()` as any
+      dateModified: sql<Date>`NOW()`
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -89,7 +92,7 @@ export class ListRepo {
   }
 
   public async loadAutoRefresh(): Promise<List[]> {
-    const rows = await getDb().selectFrom("lists").selectAll().where("autoRefresh", "=", 1 as any).execute();
+    const rows = await getDb().selectFrom("lists").selectAll().where("autoRefresh", "=", 1).execute();
     return rows.map((r) => this.rowToModel(r));
   }
 
@@ -98,13 +101,13 @@ export class ListRepo {
     await getDb().deleteFrom("lists").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  private rowToModel(row: any): List {
+  private rowToModel(row: ListRow): List {
     if (!row) return null;
-    let conditions: any = {};
+    let conditions: unknown = {};
     try { conditions = JSON.parse(row.conditions ?? "{}"); } catch { conditions = {}; }
-    let rules: any = null;
+    let rules: ListRuleGroup | null = null;
     try { rules = row.rules ? JSON.parse(row.rules) : null; } catch { rules = null; }
-    let actions: any = null;
+    let actions: ListAction[] | null = null;
     try { actions = row.actions ? JSON.parse(row.actions) : null; } catch { actions = null; }
     return {
       id: row.id,
@@ -124,6 +127,6 @@ export class ListRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) { return this.rowToModel(data); }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []).map((d) => this.rowToModel(d)); }
+  public convertToModel(_churchId: string, data: ListRow) { return this.rowToModel(data); }
+  public convertAllToModel(_churchId: string, data: ListRow[]) { return (data || []).map((d) => this.rowToModel(d)); }
 }

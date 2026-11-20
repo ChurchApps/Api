@@ -10,7 +10,7 @@ import { QuestionRepo } from "../QuestionRepo.js";
 describe("QuestionRepo choices (issue 1135)", () => {
   const repo = new QuestionRepo();
   const choices = [{ value: "Yes", text: "Yes" }, { value: "No", text: "No" }];
-  const row = (raw: any) => ({ id: "q1", churchId: "c1", formId: "f1", fieldType: "Multiple Choice", choices: raw });
+  const row = (raw: string | null) => ({ id: "q1", churchId: "c1", formId: "f1", fieldType: "Multiple Choice", choices: raw });
 
   it("parses normally encoded choices", () => {
     expect(repo.convertToModel("c1", row(JSON.stringify(choices)))?.choices).toEqual(choices);

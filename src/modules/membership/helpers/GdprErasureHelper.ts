@@ -1,11 +1,45 @@
 import { FileStorageHelper } from "@churchapps/apihelper";
 import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
-import { Repos } from "../repositories/index.js";
+import type { RoleMemberRepo } from "../repositories/RoleMemberRepo.js";
+import type { UserRepo } from "../repositories/UserRepo.js";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
+
+// Membership may not import other modules' DatabaseTypes, so these are the columns the erasure touches there.
+interface PersonOwnedRow { churchId: string; personId: string }
+interface GivingErasureDb {
+  donations: PersonOwnedRow;
+  customers: PersonOwnedRow & { id: string };
+  subscriptions: { id: string; churchId: string; customerId: string };
+  subscriptionFunds: { churchId: string; subscriptionId: string };
+  gatewayPaymentMethods: { churchId: string; customerId: string };
+  eventLogs: { churchId: string; customerId: string };
+}
+interface AttendanceErasureDb { visits: PersonOwnedRow }
+interface MessagingErasureDb {
+  devices: PersonOwnedRow;
+  connections: PersonOwnedRow;
+  deliveryLogs: PersonOwnedRow;
+  notifications: PersonOwnedRow;
+  notificationPreferences: PersonOwnedRow;
+  privateMessages: { churchId: string; fromPersonId: string; toPersonId: string };
+  messages: PersonOwnedRow & { displayName: string; content: string };
+}
+interface DoingErasureDb { assignments: PersonOwnedRow; blockoutDates: PersonOwnedRow }
+interface ContentErasureDb {
+  registrations: PersonOwnedRow & { id: string };
+  registrationMembers: { churchId: string; registrationId: string };
+}
+
+// The membership repos anonymize() uses; the full Repos satisfies it.
+interface ErasureRepos {
+  roleMember: Pick<RoleMemberRepo, "isSoleDomainAdmin" | "deleteSelf">;
+  user: Pick<UserRepo, "delete">;
+}
 
 export class GdprErasureHelper {
 
   /** Replaces PII with generic values while preserving operational records for reporting */
-  public static async anonymize(churchId: string, personId: string, userId: string | null, membershipRepos: Repos) {
+  public static async anonymize(churchId: string, personId: string, userId: string | null, membershipRepos: ErasureRepos) {
     if (userId && (await membershipRepos.roleMember.isSoleDomainAdmin(churchId, userId))) {
       throw new Error("This person is the only Domain Admin for this church. Make someone else a Domain Admin before deleting their account.");
     }
@@ -23,7 +57,7 @@ export class GdprErasureHelper {
     // Delete user account last (auth records)
     // The login is global: only this church's links go, and the account itself only when no other church still uses it.
     if (userId) {
-      const db = KyselyPool.getDb<any>("membership");
+      const db = KyselyPool.getDb<MembershipDatabase>("membership");
       await db.deleteFrom("userChurches").where("userId", "=", userId).where("churchId", "=", churchId).execute();
       await membershipRepos.roleMember.deleteSelf(churchId, userId);
       const otherChurch = await db.selectFrom("userChurches").select("id").where("userId", "=", userId).executeTakeFirst();
@@ -32,8 +66,8 @@ export class GdprErasureHelper {
     }
   }
 
-  private static async anonymizeMembership(churchId: string, personId: string, _repos: Repos) {
-    const db = KyselyPool.getDb<any>("membership");
+  private static async anonymizeMembership(churchId: string, personId: string, _repos: ErasureRepos) {
+    const db = KyselyPool.getDb<MembershipDatabase>("membership");
 
     await db.updateTable("people").set({
       displayName: "Anonymized",
@@ -59,9 +93,9 @@ export class GdprErasureHelper {
       photoUpdated: null,
       nametagNotes: null,
       donorNumber: null,
-      removed: true as any,
-      optedOut: true as any
-    } as any).where("id", "=", personId).where("churchId", "=", churchId).execute();
+      removed: true,
+      optedOut: true
+    }).where("id", "=", personId).where("churchId", "=", churchId).execute();
 
     await Promise.all([
       db.deleteFrom("groupMembers").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
@@ -71,10 +105,10 @@ export class GdprErasureHelper {
   }
 
   private static async anonymizeGiving(churchId: string, personId: string) {
-    const db = KyselyPool.getDb<any>("giving");
+    const db = KyselyPool.getDb<GivingErasureDb>("giving");
 
     // NULL out personId on donations — keeps amounts/dates for financial records
-    await db.updateTable("donations").set({ personId: null } as any)
+    await db.updateTable("donations").set({ personId: null })
       .where("personId", "=", personId).where("churchId", "=", churchId).execute();
 
     const customers = await db.selectFrom("customers").select("id")
@@ -106,14 +140,14 @@ export class GdprErasureHelper {
   }
 
   private static async anonymizeAttendance(churchId: string, personId: string) {
-    const db = KyselyPool.getDb<any>("attendance");
+    const db = KyselyPool.getDb<AttendanceErasureDb>("attendance");
     // NULL out personId on visits — keeps dates for aggregate stats
-    await db.updateTable("visits").set({ personId: null } as any)
+    await db.updateTable("visits").set({ personId: null })
       .where("personId", "=", personId).where("churchId", "=", churchId).execute();
   }
 
   private static async anonymizeMessaging(churchId: string, personId: string) {
-    const db = KyselyPool.getDb<any>("messaging");
+    const db = KyselyPool.getDb<MessagingErasureDb>("messaging");
     await Promise.all([
       db.deleteFrom("devices").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
       db.deleteFrom("connections").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
@@ -123,13 +157,13 @@ export class GdprErasureHelper {
       db.deleteFrom("privateMessages").where("churchId", "=", churchId)
         .where((eb) => eb.or([eb("fromPersonId", "=", personId), eb("toPersonId", "=", personId)])).execute(),
       // Anonymize public messages — clear content but keep conversation structure
-      db.updateTable("messages").set({ displayName: "Anonymized", content: "" } as any)
+      db.updateTable("messages").set({ displayName: "Anonymized", content: "" })
         .where("personId", "=", personId).where("churchId", "=", churchId).execute()
     ]);
   }
 
   private static async anonymizeDoing(churchId: string, personId: string) {
-    const db = KyselyPool.getDb<any>("doing");
+    const db = KyselyPool.getDb<DoingErasureDb>("doing");
     await Promise.all([
       db.deleteFrom("assignments").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
       db.deleteFrom("blockoutDates").where("personId", "=", personId).where("churchId", "=", churchId).execute()
@@ -137,7 +171,7 @@ export class GdprErasureHelper {
   }
 
   private static async anonymizeContent(churchId: string, personId: string) {
-    const db = KyselyPool.getDb<any>("content");
+    const db = KyselyPool.getDb<ContentErasureDb>("content");
     // Delete registration members first, then registrations
     const registrations = await db.selectFrom("registrations").select("id")
       .where("personId", "=", personId).where("churchId", "=", churchId).execute();

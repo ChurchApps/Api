@@ -49,7 +49,7 @@ describe("GroupRepo.search", () => {
     await dbs.attendance.destroy();
   });
 
-  const names = (rows: any[]) => rows.map((r) => r.name);
+  const names = (rows: { name?: string }[]) => rows.map((r) => r.name);
 
   it("returns every active group when no filter is set", async () => {
     expect(names(await new GroupRepo().search(CHURCH_ID, "0", "0", "0"))).toEqual(["Alpha", "Bravo", "Charlie"]);

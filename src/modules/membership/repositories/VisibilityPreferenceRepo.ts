@@ -44,7 +44,7 @@ export class VisibilityPreferenceRepo {
     return getDb().selectFrom("visibilityPreferences").selectAll().where("churchId", "=", churchId).execute();
   }
 
-  public async loadForPerson(churchId: string, personId: string): Promise<any> {
+  public async loadForPerson(churchId: string, personId: string): Promise<VisibilityPreference | null> {
     return (await getDb().selectFrom("visibilityPreferences").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).executeTakeFirst()) ?? null;
   }
 
@@ -63,7 +63,7 @@ export class VisibilityPreferenceRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): VisibilityPreference {
+  protected rowToModel(row: VisibilityPreference): VisibilityPreference {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -74,12 +74,12 @@ export class VisibilityPreferenceRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: VisibilityPreference) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: VisibilityPreference[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }
