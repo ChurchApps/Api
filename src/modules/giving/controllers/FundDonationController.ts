@@ -9,7 +9,7 @@ import { ExchangeRateHelper } from "../../../shared/helpers/ExchangeRateHelper.j
 @controller("/giving/funddonations")
 export class FundDonationController extends GivingBaseController {
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return this.repos.fundDonation.loadByPersonId(au.churchId, au.personId);
     });
@@ -17,7 +17,7 @@ export class FundDonationController extends GivingBaseController {
 
   // Fund total in the church currency, for the same fundId/startDate/endDate filter as the list below.
   @httpGet("/totals")
-  public async getTotals(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getTotals(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
       const fundId = req.query.fundId?.toString() || "";
@@ -31,7 +31,7 @@ export class FundDonationController extends GivingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
       else return this.repos.fundDonation.convertToModel(au.churchId, await this.repos.fundDonation.load(au.churchId, id));
@@ -39,7 +39,7 @@ export class FundDonationController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
       else {
@@ -73,13 +73,13 @@ export class FundDonationController extends GivingBaseController {
             result = await this.repos.fundDonation.loadAll(au.churchId);
           }
         }
-        return this.repos.fundDonation.convertAllToModel(au.churchId, result as any[]);
+        return this.repos.fundDonation.convertAllToModel(au.churchId, result);
       }
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, FundDonation[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, FundDonation[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!BatchAccessHelper.canEnter(au)) return this.json({}, 401);
       for (const fundDonation of req.body) {
@@ -96,7 +96,7 @@ export class FundDonationController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!BatchAccessHelper.canEnter(au)) return this.json({}, 401);
       else if (!(await BatchAccessHelper.canDeleteFundDonation(this.repos, au, id))) return this.json({ error: "This batch is closed." }, 403);

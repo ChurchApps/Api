@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { Time } from "../models/index.js";
 import { getDb } from "../db/index.js";
+import { mysqlValue } from "./sqlValues.js";
 
 @injectable()
 export class TimeRepo {
@@ -11,16 +12,16 @@ export class TimeRepo {
 
   private async create(model: Time): Promise<Time> {
     model.id = UniqueIdHelper.shortId();
-    const startTime = model.startTime ? DateHelper.toMysqlDate(model.startTime) : model.startTime;
-    const endTime = model.endTime ? DateHelper.toMysqlDate(model.endTime) : model.endTime;
-    await getDb().insertInto("times").values({ id: model.id, churchId: model.churchId, planId: model.planId, displayName: model.displayName, startTime, endTime, teams: model.teams, serviceTimeType: model.serviceTimeType ?? "service" } as any).execute();
+    const startTime = model.startTime ? mysqlValue<Date>(DateHelper.toMysqlDate(model.startTime)) : model.startTime;
+    const endTime = model.endTime ? mysqlValue<Date>(DateHelper.toMysqlDate(model.endTime)) : model.endTime;
+    await getDb().insertInto("times").values({ id: model.id, churchId: model.churchId, planId: model.planId, displayName: model.displayName, startTime, endTime, teams: model.teams, serviceTimeType: model.serviceTimeType ?? "service" }).execute();
     return model;
   }
 
   private async update(model: Time): Promise<Time> {
-    const startTime = model.startTime ? DateHelper.toMysqlDate(model.startTime) : model.startTime;
-    const endTime = model.endTime ? DateHelper.toMysqlDate(model.endTime) : model.endTime;
-    await getDb().updateTable("times").set({ planId: model.planId, displayName: model.displayName, startTime, endTime, teams: model.teams, serviceTimeType: model.serviceTimeType ?? "service" } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    const startTime = model.startTime ? mysqlValue<Date>(DateHelper.toMysqlDate(model.startTime)) : model.startTime;
+    const endTime = model.endTime ? mysqlValue<Date>(DateHelper.toMysqlDate(model.endTime)) : model.endTime;
+    await getDb().updateTable("times").set({ planId: model.planId, displayName: model.displayName, startTime, endTime, teams: model.teams, serviceTimeType: model.serviceTimeType ?? "service" }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

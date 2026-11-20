@@ -2,14 +2,14 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
-import { Workflow } from "../models/index.js";
+import { Task, Workflow, WorkflowStep, WorkflowStepRoute, WorkflowTrigger } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WorkflowHelper, WorkflowTemplates } from "../helpers/index.js";
 
 @controller("/doing/workflows")
 export class WorkflowController extends DoingBaseController {
   @httpGet("/templates")
-  public async getTemplates(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getTemplates(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       return WorkflowTemplates.all;
@@ -17,7 +17,7 @@ export class WorkflowController extends DoingBaseController {
   }
 
   @httpGet("/:id/report")
-  public async getReport(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getReport(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       const since = new Date();
@@ -32,7 +32,7 @@ export class WorkflowController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflow.load(au.churchId, id);
@@ -40,7 +40,7 @@ export class WorkflowController extends DoingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflow.loadAll(au.churchId);
@@ -48,7 +48,7 @@ export class WorkflowController extends DoingBaseController {
   }
 
   @httpPost("/fromTemplate")
-  public async fromTemplate(req: express.Request<{}, {}, { templateKey: string; name?: string }>, res: express.Response): Promise<any> {
+  public async fromTemplate(req: express.Request<{}, {}, { templateKey: string; name?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const template = WorkflowTemplates.get(req.body.templateKey);
@@ -59,7 +59,7 @@ export class WorkflowController extends DoingBaseController {
   }
 
   @httpPost("/:id/duplicate")
-  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const result = await WorkflowHelper.duplicateWorkflow(au.churchId, id, this.repos);
@@ -69,7 +69,7 @@ export class WorkflowController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Workflow[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Workflow[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       for (const workflow of req.body) {
@@ -89,7 +89,7 @@ export class WorkflowController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const [triggers, routes, steps, cards] = (await Promise.all([
@@ -97,7 +97,7 @@ export class WorkflowController extends DoingBaseController {
         this.repos.workflowStepRoute.loadForWorkflow(au.churchId, id),
         this.repos.workflowStep.loadForWorkflow(au.churchId, id),
         this.repos.task.loadByWorkflow(au.churchId, id, "Open")
-      ])) as any[][];
+      ])) as [WorkflowTrigger[], WorkflowStepRoute[], WorkflowStep[], Task[]];
       for (const trigger of triggers) await this.repos.workflowTrigger.delete(au.churchId, trigger.id);
       for (const route of routes) await this.repos.workflowStepRoute.delete(au.churchId, route.id);
       for (const step of steps) {

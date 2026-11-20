@@ -1,5 +1,5 @@
 import "reflect-metadata";
-jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({ EventTriggerHelper: {}, ExecutionHelper: {}, RuleEngine: { runScheduled: jest.fn() } }));
 jest.mock("../../../../shared/helpers/index", () => ({ Permissions: {} }));
 

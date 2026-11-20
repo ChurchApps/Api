@@ -62,7 +62,7 @@ export class PlanFeedController extends DoingBaseController {
     @requestParam("planId") planId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // First try to get existing plan items
       let result = (await this.repos.planItem.loadForPlan(churchId, planId)) as PlanItem[];
@@ -88,7 +88,7 @@ export class PlanFeedController extends DoingBaseController {
     @requestParam("planTypeId") planTypeId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const plan = (await this.repos.plan.loadCurrentByPlanTypeId(planTypeId)) as Plan;
       if (!plan) return { messages: [] };

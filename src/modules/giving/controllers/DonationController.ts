@@ -1,7 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
-import { Donation } from "../models/index.js";
+import { Donation, Gateway } from "../models/index.js";
+import { DonationSummaryRow, FailedDonationRow, MergedSummaryRow, PersonSummaryRow } from "./types.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { ExchangeRateHelper } from "../../../shared/helpers/ExchangeRateHelper.js";
@@ -10,7 +11,7 @@ import { BatchAccessHelper } from "../helpers/BatchAccessHelper.js";
 @controller("/giving/donations")
 export class DonationController extends GivingBaseController {
   @httpGet("/kpis")
-  public async getKpis(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getKpis(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
       else {
@@ -38,7 +39,7 @@ export class DonationController extends GivingBaseController {
   // Read-only: lets a client that already shows gifts in their own currency (B1App DonatePage) total them
   // in the church currency with the same server-owned rates. Rates are never accepted from a client.
   @httpGet("/exchange-rates")
-  public async getExchangeRates(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getExchangeRates(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { currency, rates, asOf } = await this.loadChurchRates(au.churchId);
       return { base: currency, rates, asOf };
@@ -46,7 +47,7 @@ export class DonationController extends GivingBaseController {
   }
 
   @httpGet("/summary")
-  public async getSummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getSummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
       else {
@@ -54,7 +55,7 @@ export class DonationController extends GivingBaseController {
         const endDate = req.query.endDate ? new Date(req.query.endDate.toString()) : new Date();
         const type = req.query.type?.toString() || "";
         if (type === "person") {
-          const result = (await this.repos.donation.loadPersonBasedSummary(au.churchId, startDate, endDate)) as any[];
+          const result = (await this.repos.donation.loadPersonBasedSummary(au.churchId, startDate, endDate)) as PersonSummaryRow[];
           const { currency, rates } = await this.loadChurchRates(au.churchId);
           const converted = result.map((r) => ({
             ...r,
@@ -63,7 +64,7 @@ export class DonationController extends GivingBaseController {
           }));
           return this.repos.donation.convertAllToPersonSummary(au.churchId, converted);
         }
-        const result = (await this.repos.donation.loadSummary(au.churchId, startDate, endDate)) as any[];
+        const result = (await this.repos.donation.loadSummary(au.churchId, startDate, endDate)) as DonationSummaryRow[];
         const { currency, rates } = await this.loadChurchRates(au.churchId);
         return this.repos.donation.convertAllToSummary(au.churchId, this.mergeSummaryCurrencies(result, currency, rates));
       }
@@ -71,8 +72,8 @@ export class DonationController extends GivingBaseController {
   }
 
   // loadSummary returns one row per week + fund + currency; fold the currencies back into one converted row.
-  private mergeSummaryCurrencies(rows: any[], currency: string, rates: Record<string, number>) {
-    const merged = new Map<string, any>();
+  private mergeSummaryCurrencies(rows: DonationSummaryRow[], currency: string, rates: Record<string, number>) {
+    const merged = new Map<string, MergedSummaryRow>();
     rows.forEach((r) => {
       const key = new Date(r.week).getTime() + "|" + r.fundName;
       const amount = ExchangeRateHelper.convert(r.totalAmount, r.currency, currency, rates);
@@ -84,15 +85,15 @@ export class DonationController extends GivingBaseController {
   }
 
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result = await this.repos.donation.loadByPersonId(au.churchId, au.personId);
-      return this.repos.donation.convertAllToModel(au.churchId, result as any[]);
+      return this.repos.donation.convertAllToModel(au.churchId, result);
     });
   }
 
   @httpGet("/my/summary")
-  public async getMySummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMySummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const year = parseInt(req.query.year?.toString() || "", 10) || new Date().getFullYear();
       const rows = await this.repos.donation.loadPersonYearTotals(au.churchId, au.personId, year);
@@ -103,18 +104,18 @@ export class DonationController extends GivingBaseController {
   }
 
   @httpGet("/failed")
-  public async getFailed(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getFailed(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
-      const rows = (await this.repos.donation.loadFailed(au.churchId)) as any[];
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const rows = (await this.repos.donation.loadFailed(au.churchId)) as FailedDonationRow[];
+      const gateways: Gateway[] = await this.repos.gateway.loadAll(au.churchId);
       const canRetry = gateways.some((g) => GatewayService.supportsRetry(g));
       return rows.map((row) => ({ ...this.repos.donation.convertToModel(au.churchId, row), gatewayMessage: row.gatewayMessage, canRetry }));
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
       else {
@@ -127,7 +128,7 @@ export class DonationController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const personId = req.query?.personId?.toString() || "";
       const canView = au.checkAccess(Permissions.donations.view);
@@ -144,13 +145,13 @@ export class DonationController extends GivingBaseController {
           if (!isDay(startDate) || !isDay(endDate)) return this.json({ error: "startDate and endDate must be YYYY-MM-DD" }, 400);
           result = await this.repos.donation.loadByDateRange(au.churchId, startDate, endDate);
         } else result = await this.repos.donation.loadAll(au.churchId);
-        return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);
+        return this.repos.donation.convertAllToModel(au.churchId, result);
       }
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Donation[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Donation[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!BatchAccessHelper.canEnter(au)) return this.json({}, 401);
       for (const donation of req.body) {
@@ -168,12 +169,12 @@ export class DonationController extends GivingBaseController {
         promises.push(this.repos.donation.save(donation, fundDonations));
       });
       const result = await Promise.all(promises);
-      return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);
+      return this.repos.donation.convertAllToModel(au.churchId, result);
     });
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!BatchAccessHelper.canEnter(au)) return this.json({}, 401);
       else if (!(await BatchAccessHelper.canDeleteDonation(this.repos, au, id))) return this.json({ error: "This batch is closed." }, 403);

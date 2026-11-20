@@ -7,7 +7,7 @@ import { PlanAuth } from "../../../shared/helpers/index.js";
 @controller("/doing/positions")
 export class PositionController extends DoingBaseController {
   @httpGet("/ids")
-  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = req.query.ids as string;
       const ids = idsString.split(",");
@@ -16,7 +16,7 @@ export class PositionController extends DoingBaseController {
   }
 
   @httpGet("/plan/ids")
-  public async getByPlanIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByPlanIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const planIdsString = req.query.planIds as string;
       const planIds = planIdsString.split(",");
@@ -25,14 +25,14 @@ export class PositionController extends DoingBaseController {
   }
 
   @httpGet("/plan/:planId")
-  public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.position.loadByPlanId(au.churchId, planId);
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.position.load(au.churchId, id);
       return this.repos.position.convertToModel(au.churchId, data);
@@ -40,11 +40,11 @@ export class PositionController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Position[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Position[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       for (const item of req.body) {
         if (!await PlanAuth.canEditPlan(au, item.planId)) return this.json({}, 401);
-        const existing: any = item.id ? await this.repos.position.load(au.churchId, item.id) : null;
+        const existing: Position | null = item.id ? await this.repos.position.load(au.churchId, item.id) : null;
         if (existing && !await PlanAuth.canEditPlan(au, existing.planId)) return this.json({}, 401);
       }
       const promises: Promise<Position>[] = [];
@@ -55,7 +55,7 @@ export class PositionController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPosition(au, id)) return this.json({}, 401);
       await this.repos.position.delete(au.churchId, id);

@@ -32,15 +32,15 @@ export class ScreenGroupRepo {
     return getDb().selectFrom("screenGroups").selectAll().where("churchId", "=", churchId).orderBy("name").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: ScreenGroup) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: ScreenGroup[]) {
     return (data || []).map(row => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): ScreenGroup {
+  protected rowToModel(row: ScreenGroup): ScreenGroup {
     return {
       id: row.id,
       churchId: row.churchId,

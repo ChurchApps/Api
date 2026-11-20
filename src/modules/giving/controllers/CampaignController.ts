@@ -9,7 +9,7 @@ import { CampaignHelper } from "../helpers/CampaignHelper.js";
 export class CampaignController extends GivingBaseController {
 
   @httpGet("/churchId/:churchId")
-  public async getPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const campaigns = this.repos.campaign.convertAllToModel(churchId, await this.repos.campaign.loadPublic(churchId));
       if (campaigns.length === 0) return [];
@@ -20,7 +20,7 @@ export class CampaignController extends GivingBaseController {
   }
 
   @httpGet("/progress/people")
-  public async getPeopleProgress(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPeopleProgress(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
       const campaigns = this.repos.campaign.convertAllToModel(au.churchId, await this.repos.campaign.loadAll(au.churchId));
@@ -31,7 +31,7 @@ export class CampaignController extends GivingBaseController {
   }
 
   @httpGet("/progress")
-  public async getAllProgress(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAllProgress(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
       const campaigns = this.repos.campaign.convertAllToModel(au.churchId, await this.repos.campaign.loadAll(au.churchId));
@@ -43,7 +43,7 @@ export class CampaignController extends GivingBaseController {
   }
 
   @httpGet("/:id/progress")
-  public async getProgress(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getProgress(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
       const campaign = this.repos.campaign.convertToModel(au.churchId, await this.repos.campaign.load(au.churchId, id));
@@ -55,7 +55,7 @@ export class CampaignController extends GivingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.campaign.load(au.churchId, id);
       return this.repos.campaign.convertToModel(au.churchId, data);
@@ -63,7 +63,7 @@ export class CampaignController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.campaign.loadAll(au.churchId);
       return this.repos.campaign.convertAllToModel(au.churchId, data);
@@ -71,7 +71,7 @@ export class CampaignController extends GivingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Campaign[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Campaign[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       const promises: Promise<Campaign>[] = [];
@@ -82,7 +82,7 @@ export class CampaignController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       await this.repos.pledge.deleteByCampaignId(au.churchId, id);

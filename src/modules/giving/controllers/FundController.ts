@@ -8,7 +8,7 @@ import { Fund } from "../models/index.js";
 export class FundController extends GivingBaseController {
 
   @httpGet("/churchId/:churchId")
-  public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.fund.loadVisible(churchId);
       return this.repos.fund.convertAllToModel(churchId, data);
@@ -16,11 +16,11 @@ export class FundController extends GivingBaseController {
   }
 
   @httpGet("/public/:churchId/:fundId/total")
-  public async getPublicTotal(@requestParam("churchId") churchId: string, @requestParam("fundId") fundId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicTotal(@requestParam("churchId") churchId: string, @requestParam("fundId") fundId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const fund = await this.repos.fund.load(churchId, fundId);
       if (!fund) return { fundId, totalAmount: 0, donationCount: 0 };
-      const parseDate = (v: any) => {
+      const parseDate = (v: express.Request["query"][string]) => {
         if (!v) return undefined;
         const d = new Date(v.toString());
         return isNaN(d.getTime()) ? undefined : d;
@@ -31,7 +31,7 @@ export class FundController extends GivingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.fund.load(au.churchId, id);
       return this.repos.fund.convertToModel(au.churchId, data);
@@ -39,7 +39,7 @@ export class FundController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const canViewAll = au.checkAccess(Permissions.donations.view) || au.checkAccess(Permissions.donations.edit);
       const data = canViewAll ? await this.repos.fund.loadAll(au.churchId) : await this.repos.fund.loadVisible(au.churchId);
@@ -48,7 +48,7 @@ export class FundController extends GivingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Fund[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Fund[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       const promises: Promise<Fund>[] = [];
@@ -59,7 +59,7 @@ export class FundController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       await this.repos.fund.delete(au.churchId, id);

@@ -9,12 +9,12 @@ import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, C
 export class ContentProviderAuthController extends DoingBaseController {
   // Refresh tokens never leave the server; clients refresh through POST /refresh.
   static redact<T>(data: T): T {
-    const strip = (row: any) => (row ? { ...row, refreshToken: undefined } : row);
+    const strip = <R>(row: R) => (row ? { ...row, refreshToken: undefined } : row);
     return (Array.isArray(data) ? data.map(strip) : strip(data)) as T;
   }
 
   @httpGet("/ids")
-  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const idsString = typeof req.query.ids === "string" ? req.query.ids : req.query.ids ? String(req.query.ids) : "";
@@ -25,7 +25,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpGet("/ministry/:ministryId")
-  public async getByMinistry(@requestParam("ministryId") ministryId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByMinistry(@requestParam("ministryId") ministryId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       return ContentProviderAuthController.redact(await this.repos.contentProviderAuth.loadByMinistry(au.churchId, ministryId));
@@ -38,7 +38,7 @@ export class ContentProviderAuthController extends DoingBaseController {
     @requestParam("providerId") providerId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       return ContentProviderAuthController.redact(await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId));
@@ -46,7 +46,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpGet("/church")
-  public async getChurchLevel(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getChurchLevel(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertAllToModel(au.churchId, await this.repos.contentProviderAuth.loadChurchLevel(au.churchId)));
@@ -54,7 +54,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpGet("/church/:providerId")
-  public async getChurchLevelByProvider(@requestParam("providerId") providerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getChurchLevelByProvider(@requestParam("providerId") providerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.contentProviderAuth.loadChurchLevelByProvider(au.churchId, providerId);
@@ -63,7 +63,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpPost("/church/:providerId")
-  public async saveChurchLevel(@requestParam("providerId") providerId: string, req: express.Request<{}, {}, ContentProviderAuth>, res: express.Response): Promise<any> {
+  public async saveChurchLevel(@requestParam("providerId") providerId: string, req: express.Request<{}, {}, ContentProviderAuth>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       if (!req.body?.accessToken) return this.json({ error: "Missing required parameter: accessToken" }, 400);
@@ -85,7 +85,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.contentProviderAuth.load(au.churchId, id);
@@ -94,7 +94,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.contentProviderAuth.loadAll(au.churchId);
@@ -103,7 +103,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, ContentProviderAuth[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, ContentProviderAuth[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const promises: Promise<ContentProviderAuth>[] = [];
@@ -116,13 +116,13 @@ export class ContentProviderAuthController extends DoingBaseController {
   // Runs the PKCE token exchange server-side: the client_secret lives here (setProviderSecret in ProviderAuthHelper)
   // and the token endpoint sends no CORS headers, so the browser can't do this itself.
   @httpPost("/exchange")
-  public async exchange(req: express.Request<{}, {}, { ministryId?: string; providerId: string; code: string; codeVerifier: string; redirectUri: string }>, res: express.Response): Promise<any> {
+  public async exchange(req: express.Request<{}, {}, { ministryId?: string; providerId: string; code: string; codeVerifier: string; redirectUri: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, code, codeVerifier, redirectUri } = req.body;
       if (!providerId || !code || !codeVerifier || !redirectUri) return this.json({ error: "Missing required parameters" }, 400);
 
-      const provider = getProvider(providerId) as { exchangeCodeForTokens?: (code: string, codeVerifier: string, redirectUri: string) => Promise<any> } | null;
+      const provider = getProvider(providerId) as { exchangeCodeForTokens?: (code: string, codeVerifier: string, redirectUri: string) => Promise<ContentProviderAuthData | null> } | null;
       if (!provider?.exchangeCodeForTokens) return this.json({ error: "Provider does not support code exchange" }, 400);
 
       const tokens = await provider.exchangeCodeForTokens(code, codeVerifier, redirectUri);
@@ -148,7 +148,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpPost("/refresh")
-  public async refresh(req: express.Request<{}, {}, { ministryId?: string; providerId: string }>, res: express.Response): Promise<any> {
+  public async refresh(req: express.Request<{}, {}, { ministryId?: string; providerId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId } = req.body;
@@ -182,7 +182,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       await this.repos.contentProviderAuth.delete(au.churchId, id);
