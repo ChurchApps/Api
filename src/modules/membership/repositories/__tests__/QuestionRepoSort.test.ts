@@ -3,18 +3,42 @@ import "reflect-metadata";
 jest.mock("../../db/index.js", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "gen" } }));
 
+import { RawNode, ValueNode, type RawBuilder } from "kysely";
 import { QuestionRepo } from "../QuestionRepo.js";
 import { getDb } from "../../db/index.js";
 
+interface Row {
+  id: string;
+  sort: number | string;
+  removed?: boolean;
+  [col: string]: unknown;
+}
+type Where = [string, string, unknown];
+interface SelectChain {
+  select: () => SelectChain;
+  selectAll: () => SelectChain;
+  where: (...w: Where) => SelectChain;
+  orderBy: () => SelectChain;
+  execute: () => Promise<Row[]>;
+  executeTakeFirst: () => Promise<Row | undefined>;
+}
+interface UpdateChain {
+  set: (v: Record<string, unknown>) => UpdateChain;
+  where: (...w: Where) => UpdateChain;
+  execute: () => Promise<void>;
+}
+
+const isRaw = (v: unknown): v is RawBuilder<unknown> => typeof v === "object" && v !== null && "toOperationNode" in v;
+
 // In-memory stand-in for the questions table that applies the updates the repo issues.
-function fakeDb(rows: any[]) {
-  const matches = (row: any, wheres: any[]) => wheres.every(([col, , val]) => (typeof val === "number" ? +row[col] === val : row[col] === val));
+function fakeDb(rows: Row[]) {
+  const matches = (row: Row, wheres: Where[]) => wheres.every(([col, , val]) => (typeof val === "number" ? Number(row[col]) === val : row[col] === val));
   const select = () => {
-    const wheres: any[] = [];
-    const chain: any = {
+    const wheres: Where[] = [];
+    const chain: SelectChain = {
       select: () => chain,
       selectAll: () => chain,
-      where: (...w: any[]) => { wheres.push(w); return chain; },
+      where: (...w) => { wheres.push(w); return chain; },
       orderBy: () => chain,
       execute: async () => rows.filter((r) => !r.removed && matches(r, wheres)).sort((a, b) => +a.sort - +b.sort),
       executeTakeFirst: async () => rows.find((r) => matches(r, wheres))
@@ -22,18 +46,22 @@ function fakeDb(rows: any[]) {
     return chain;
   };
   const update = () => {
-    const wheres: any[] = [];
-    let values: any = {};
-    const chain: any = {
-      set: (v: any) => { values = v; return chain; },
-      where: (...w: any[]) => { wheres.push(w); return chain; },
+    const wheres: Where[] = [];
+    let values: Record<string, unknown> = {};
+    const chain: UpdateChain = {
+      set: (v) => { values = v; return chain; },
+      where: (...w) => { wheres.push(w); return chain; },
       execute: async () => {
         rows.filter((r) => matches(r, wheres)).forEach((r) => {
           Object.keys(values).forEach((k) => {
-            const sqlText = values[k]?.toOperationNode ? JSON.stringify(values[k].toOperationNode()) : null;
-            if (sqlText?.includes("sort+1")) r[k] = +r[k] + 1;
-            else if (sqlText?.includes("sort-1")) r[k] = +r[k] - 1;
-            else r[k] = values[k];
+            const value = values[k];
+            const node = isRaw(value) ? value.toOperationNode() : null;
+            const sqlText = node ? JSON.stringify(node) : null;
+            if (sqlText?.includes("sort+1")) r[k] = Number(r[k]) + 1;
+            else if (sqlText?.includes("sort-1")) r[k] = Number(r[k]) - 1;
+            // A bound value such as sql`${2}`: apply the parameter.
+            else if (node && RawNode.is(node) && node.parameters.length === 1 && ValueNode.is(node.parameters[0])) r[k] = node.parameters[0].value;
+            else r[k] = value;
           });
         });
       }
@@ -43,7 +71,7 @@ function fakeDb(rows: any[]) {
   (getDb as jest.Mock).mockReturnValue({ selectFrom: select, updateTable: update });
 }
 
-const order = (rows: any[]) => rows.filter((r) => !r.removed).sort((a, b) => +a.sort - +b.sort).map((r) => r.id);
+const order = (rows: Row[]) => rows.filter((r) => !r.removed).sort((a, b) => +a.sort - +b.sort).map((r) => r.id);
 
 // Issue 1254: moves swapped with the row at sort +/- 1, so a form with gaps in its sort
 // values (left by save and delete) changed only the moved row and the order did not change.

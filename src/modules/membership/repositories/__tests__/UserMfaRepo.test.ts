@@ -4,7 +4,7 @@ import { getDb } from "../../db/index.js";
 import { UserMfaRepo } from "../UserMfaRepo.js";
 
 function dbReturning(executeTakeFirst: () => Promise<unknown>) {
-  const proxy: any = new Proxy({}, {
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "executeTakeFirst") return executeTakeFirst;
@@ -33,8 +33,7 @@ describe("UserMfaRepo.isEnabled", () => {
     (getDb as jest.Mock).mockReturnValue(dbReturning(async () => { throw new Error("Table 'membership.userMfa' doesn't exist"); }));
     expect(await new UserMfaRepo().isEnabled("u1")).toBe(false);
 
-    const wrapped = new Error("query failed");
-    (wrapped as any).cause = { code: "ER_NO_SUCH_TABLE", errno: 1146 };
+    const wrapped = Object.assign(new Error("query failed"), { cause: { code: "ER_NO_SUCH_TABLE", errno: 1146 } });
     (getDb as jest.Mock).mockReturnValue(dbReturning(async () => { throw wrapped; }));
     expect(await new UserMfaRepo().isEnabled("u1")).toBe(false);
   });

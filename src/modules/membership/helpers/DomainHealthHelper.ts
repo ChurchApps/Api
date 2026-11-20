@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { Repos } from "../repositories/index.js";
 import { Domain } from "../models/index.js";
@@ -15,7 +15,7 @@ export class DomainHealthHelper {
       const response = await axios.get(url, {
         timeout: 10000,
         maxRedirects: 0,
-        lookup: SafeHttp.guardedLookup as any,
+        lookup: SafeHttp.guardedLookup as AxiosRequestConfig["lookup"],
         validateStatus: () => true
       });
       const contentType = String(response.headers["content-type"] || "");

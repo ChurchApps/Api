@@ -30,7 +30,7 @@ describe("ChurchRepo.search", () => {
     await dbs.membership.destroy();
   });
 
-  const ids = (rows: any[]) => rows.map((r) => r.id);
+  const ids = (rows: { id?: string }[]) => rows.map((r) => r.id);
 
   it("finds a church by its id", async () => {
     expect(ids(await new ChurchRepo().search("tstcsrch2", true))).toEqual(["tstcsrch2"]);

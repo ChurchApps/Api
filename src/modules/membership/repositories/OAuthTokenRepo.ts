@@ -23,8 +23,8 @@ export class OAuthTokenRepo {
       scopes: token.scopes,
       planTypeId: token.planTypeId,
       replacedById: token.replacedById,
-      expiresAt: expiresAt as any,
-      createdAt: sql`NOW()` as any
+      expiresAt: sql<Date>`${expiresAt}`,
+      createdAt: sql<Date>`NOW()`
     }).execute();
     return token;
   }
@@ -39,7 +39,7 @@ export class OAuthTokenRepo {
       scopes: token.scopes,
       planTypeId: token.planTypeId,
       replacedById: token.replacedById,
-      expiresAt: expiresAt as any
+      expiresAt: sql<Date>`${expiresAt}`
     }).where("id", "=", token.id).execute();
     return token;
   }
@@ -63,7 +63,7 @@ export class OAuthTokenRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public async loadForUser(userChurchId: string): Promise<any[]> {
+  public async loadForUser(userChurchId: string) {
     return await getDb().selectFrom("oAuthTokens")
       .leftJoin("oAuthClients", "oAuthClients.clientId", "oAuthTokens.clientId")
       .where("oAuthTokens.userChurchId", "=", userChurchId)
@@ -103,9 +103,9 @@ export class OAuthTokenRepo {
   }
 
   public async deleteExpired() {
-    await getDb().deleteFrom("oAuthTokens").where("expiresAt", "<", sql`NOW()` as any).execute();
+    await getDb().deleteFrom("oAuthTokens").where("expiresAt", "<", sql<Date>`NOW()`).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: OAuthToken) { return data; }
+  public convertAllToModel(_churchId: string, data: OAuthToken[]) { return data || []; }
 }

@@ -38,7 +38,7 @@ export class UserMfaRepo {
 
   public async enable(userId: string, backupCodes: string, step: number): Promise<boolean> {
     const result = await getDb().updateTable("userMfa")
-      .set({ enabled: true, backupCodes, lastUsedStep: step, dateEnabled: sql`NOW()` as any })
+      .set({ enabled: true, backupCodes, lastUsedStep: step, dateEnabled: sql<Date>`NOW()` })
       .where("userId", "=", userId)
       .where("enabled", "=", false)
       .executeTakeFirst();
@@ -69,6 +69,6 @@ export class UserMfaRepo {
     await getDb().deleteFrom("userMfa").where("userId", "=", userId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: UserMfa) { return data; }
+  public convertAllToModel(_churchId: string, data: UserMfa[]) { return data || []; }
 }

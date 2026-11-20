@@ -1,7 +1,18 @@
 import { injectable } from "inversify";
+import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { UserChurch } from "../models/index.js";
+
+export interface UserChurchSummary {
+  id: string;
+  userId: string;
+  personId: string;
+  // Never set by loadForUser; optional so callers that fall back to it keep compiling.
+  churchId?: string;
+  church: { id: string; name: string; subDomain: string };
+  person: { id: string; name: { first: string; last: string; display: string } } | null;
+}
 
 @injectable()
 export class UserChurchRepo {
@@ -31,7 +42,7 @@ export class UserChurchRepo {
     return userChurch;
   }
 
-  public async delete(userId: string): Promise<any> {
+  public async delete(userId: string): Promise<void> {
     await getDb().deleteFrom("userChurches").where("userId", "=", userId).execute();
   }
 
@@ -54,7 +65,7 @@ export class UserChurchRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public async loadByPersonId(personId: string, churchId: string): Promise<any> {
+  public async loadByPersonId(personId: string, churchId: string) {
     return (await getDb().selectFrom("userChurches as uc")
       .innerJoin("users as u", "u.id", "uc.userId")
       .selectAll("uc")
@@ -64,15 +75,15 @@ export class UserChurchRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public async loadForUser(userId: string): Promise<any[]> {
+  public async loadForUser(userId: string): Promise<UserChurchSummary[]> {
     const rows = await getDb().selectFrom("userChurches as uc")
       .innerJoin("churches as c", (join) => join.onRef("c.id", "=", "uc.churchId").on("c.archivedDate", "is", null))
-      .leftJoin("people as p", (join) => join.onRef("p.id", "=", "uc.personId").onRef("p.churchId", "=", "uc.churchId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .leftJoin("people as p", (join) => join.onRef("p.id", "=", "uc.personId").onRef("p.churchId", "=", "uc.churchId").on((eb) => eb.or([eb("p.removed", "=", sql<boolean>`${0}`), eb("p.removed", "is", null)])))
       .selectAll("uc")
       .select(["c.id as churchId", "c.name as churchName", "c.subDomain", "p.id as activePersonId", "p.firstName", "p.lastName", "p.displayName"])
       .where("uc.userId", "=", userId)
-      .execute() as any[];
-    return rows.map((row: any) => ({
+      .execute();
+    return rows.map((row) => ({
       id: row.id,
       userId: row.userId,
       personId: row.activePersonId,
@@ -108,7 +119,7 @@ export class UserChurchRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): UserChurch {
+  protected rowToModel(row: UserChurch): UserChurch {
     return {
       id: row.id,
       userId: row.userId,
@@ -118,12 +129,12 @@ export class UserChurchRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: UserChurch) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: UserChurch[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

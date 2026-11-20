@@ -18,15 +18,15 @@ export class PublicChurchContext {
     if (!token || token.startsWith("cak_")) return null;
     try {
       const decoded = jwt.verify(token, Environment.jwtSecret, { algorithms: ["HS256"] });
-      if (typeof decoded === "string" || !(decoded as any).churchId) return null;
-      return String((decoded as any).churchId);
+      if (typeof decoded === "string" || !decoded.churchId) return null;
+      return String(decoded.churchId);
     } catch {
       return null;
     }
   }
 
   static createSiteToken(churchId: string, expiresIn = "2h"): string {
-    return jwt.sign({ churchId, purpose: SITE_PURPOSE }, Environment.jwtSecret, { expiresIn: expiresIn as any });
+    return jwt.sign({ churchId, purpose: SITE_PURPOSE }, Environment.jwtSecret, { expiresIn: expiresIn as jwt.SignOptions["expiresIn"] });
   }
 
   static churchIdFromSiteToken(token: string): string | null {
@@ -34,8 +34,8 @@ export class PublicChurchContext {
     try {
       const decoded = jwt.verify(token, Environment.jwtSecret, { algorithms: ["HS256"] });
       if (typeof decoded === "string") return null;
-      if ((decoded as any).purpose !== SITE_PURPOSE || !(decoded as any).churchId) return null;
-      return String((decoded as any).churchId);
+      if (decoded.purpose !== SITE_PURPOSE || !decoded.churchId) return null;
+      return String(decoded.churchId);
     } catch {
       return null;
     }

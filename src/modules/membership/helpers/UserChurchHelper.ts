@@ -47,7 +47,7 @@ export class UserChurchHelper {
     // share it, don't guess - the caller (e.g. B1Admin adding a person to a role) links the right one.
     const matchCounts = new Map<string, number>();
     for (const match of matches) matchCounts.set(match.churchId, (matchCounts.get(match.churchId) || 0) + 1);
-    const savePromises: Promise<any>[] = [];
+    const savePromises: Promise<UserChurch>[] = [];
     for (const match of matches) {
       if (matchCounts.get(match.churchId) !== 1) continue;
       savePromises.push(repos.userChurch.save({ userId, churchId: match.churchId, personId: match.personId }));

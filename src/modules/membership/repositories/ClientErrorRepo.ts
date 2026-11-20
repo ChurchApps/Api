@@ -40,7 +40,7 @@ export class ClientErrorRepo {
   }
 
   public async deleteOld() {
-    await getDb().deleteFrom("clientErrors").where("errorTime", "<", sql`DATE_ADD(NOW(), INTERVAL -7 DAY)` as any).execute();
+    await getDb().deleteFrom("clientErrors").where("errorTime", "<", sql<Date>`DATE_ADD(NOW(), INTERVAL -7 DAY)`).execute();
   }
 
   public async delete(churchId: string, id: string) {
@@ -65,7 +65,7 @@ export class ClientErrorRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): ClientError {
+  protected rowToModel(row: ClientError): ClientError {
     return {
       id: row.id,
       application: row.application,
@@ -79,12 +79,12 @@ export class ClientErrorRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: ClientError) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: ClientError[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

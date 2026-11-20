@@ -21,10 +21,10 @@ export class OAuthDeviceCodeRepo {
       userCode: deviceCode.userCode,
       clientId: deviceCode.clientId,
       scopes: deviceCode.scopes,
-      expiresAt: expiresAt as any,
+      expiresAt: sql<Date>`${expiresAt}`,
       pollInterval: deviceCode.pollInterval || 5,
       status: deviceCode.status || "pending",
-      createdAt: sql`NOW()` as any
+      createdAt: sql<Date>`NOW()`
     }).execute();
     return deviceCode;
   }
@@ -37,7 +37,7 @@ export class OAuthDeviceCodeRepo {
       userChurchId: deviceCode.userChurchId,
       churchId: deviceCode.churchId,
       planTypeId: deviceCode.planTypeId,
-      expiresAt: expiresAt as any
+      expiresAt: sql<Date>`${expiresAt}`
     }).where("id", "=", deviceCode.id).execute();
     return deviceCode;
   }
@@ -65,7 +65,7 @@ export class OAuthDeviceCodeRepo {
 
   public async deleteExpired() {
     await getDb().deleteFrom("oAuthDeviceCodes")
-      .where("expiresAt", "<", sql`NOW()` as any)
+      .where("expiresAt", "<", sql<Date>`NOW()`)
       .where("status", "in", ["pending", "expired"])
       .execute();
   }
@@ -86,6 +86,6 @@ export class OAuthDeviceCodeRepo {
     return code;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: OAuthDeviceCode) { return data; }
+  public convertAllToModel(_churchId: string, data: OAuthDeviceCode[]) { return data || []; }
 }

@@ -56,15 +56,15 @@ export class AssociatedGroupRepo {
     return q.execute();
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: AssociatedGroup) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: AssociatedGroup[]) {
     return (data || []).map(row => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): AssociatedGroup {
+  protected rowToModel(row: AssociatedGroup): AssociatedGroup {
     return {
       id: row.id,
       churchId: row.churchId,

@@ -1,24 +1,27 @@
 import "reflect-metadata";
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "gm_gen" } }));
-jest.mock("../../helpers/index.js", () => ({ __esModule: true, PersonHelper: { getPhotoPath: (_c: string, p: any) => (p.photoUpdated ? "photo/" + p.id : "") } }));
+jest.mock("../../helpers/index.js", () => ({ __esModule: true, PersonHelper: { getPhotoPath: (_c: string, p: Person) => (p.photoUpdated ? "photo/" + p.id : "") } }));
 
 import { getDb } from "../../db/index.js";
 import { GroupMemberRepo } from "../GroupMemberRepo.js";
+import type { Person } from "../../models/index.js";
 
-function recordingDb(results: any[] = []) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+interface Call { method: string; args: unknown[] }
+
+function recordingDb(results: unknown[] = []) {
+  const calls: Call[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => results;
       if (prop === "executeTakeFirst") return async () => results[0] ?? null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
-const whereCalls = (calls: any[]) => calls.filter((c) => c.method === "where");
+const whereCalls = (calls: Call[]) => calls.filter((c) => c.method === "where");
 
 describe("GroupMemberRepo.loadPublicForGroup gating", () => {
   afterEach(() => jest.restoreAllMocks());
@@ -60,7 +63,7 @@ describe("GroupMemberRepo.convertAllToPublicModel privacy", () => {
   });
 
   it("returns [] for non-array input", () => {
-    expect(new GroupMemberRepo().convertAllToPublicModel("c1", null as any)).toEqual([]);
+    expect(new GroupMemberRepo().convertAllToPublicModel("c1", null)).toEqual([]);
   });
 });
 
@@ -75,7 +78,7 @@ describe("GroupMemberRepo.isPublicGroupLeader", () => {
     const wheres = whereCalls(calls);
     expect(wheres.some((c) => c.args[0] === "gm.churchId" && c.args[2] === "c1")).toBe(true);
     expect(wheres.some((c) => c.args[0] === "gm.personId" && c.args[2] === "p9")).toBe(true);
-    expect(wheres.some((c) => c.args[0] === "gm.leader" && c.args[2] === 1)).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "gm.leader" && c.args[2] === true)).toBe(true);
     expect(wheres.some((c) => c.args[0] === "g.churchId" && c.args[2] === "c1")).toBe(true);
     expect(wheres.some((c) => c.args[0] === "g.removed" && c.args[2] === false)).toBe(true);
     expect(wheres.filter((c) => typeof c.args[0] === "function").length).toBeGreaterThanOrEqual(2);

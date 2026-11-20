@@ -22,7 +22,7 @@ export class ApiKeyRepo {
       prefix: model.prefix,
       scopes: model.scopes,
       expiresAt: model.expiresAt,
-      createdAt: sql`NOW()` as any
+      createdAt: sql<Date>`NOW()`
     }).execute();
     return model;
   }
@@ -61,16 +61,16 @@ export class ApiKeyRepo {
   // every authenticated request. Called fire-and-forget; never blocks a request.
   public async touchLastUsed(id: string) {
     await getDb().updateTable("apiKeys")
-      .set({ lastUsedAt: sql`NOW()` as any })
+      .set({ lastUsedAt: sql<Date>`NOW()` })
       .where("id", "=", id)
       .where((eb) => eb.or([
         eb("lastUsedAt", "is", null),
-        eb("lastUsedAt", "<", sql`NOW() - INTERVAL 5 MINUTE` as any)
+        eb("lastUsedAt", "<", sql<Date>`NOW() - INTERVAL 5 MINUTE`)
       ]))
       .execute();
   }
 
-  private rowToModel(row: any): ApiKey {
+  private rowToModel(row: ApiKey): ApiKey {
     if (!row) return null;
     return {
       id: row.id,
@@ -87,6 +87,6 @@ export class ApiKeyRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) { return this.rowToModel(data); }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []).map((d) => this.rowToModel(d)); }
+  public convertToModel(_churchId: string, data: ApiKey) { return this.rowToModel(data); }
+  public convertAllToModel(_churchId: string, data: ApiKey[]) { return (data || []).map((d) => this.rowToModel(d)); }
 }

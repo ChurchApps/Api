@@ -5,6 +5,65 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GroupMember } from "../models/index.js";
 import { PersonHelper } from "../helpers/index.js";
 
+/** groupMembers row, optionally joined with person columns (loadForGroup) or the group name (loadForPerson). */
+interface GroupMemberRow extends Omit<GroupMember, "person" | "group"> {
+  photoUpdated?: Date;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  homePhone?: string;
+  mobilePhone?: string;
+  workPhone?: string;
+  optedOut?: boolean;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  householdId?: string;
+  householdRole?: string;
+  birthDate?: Date;
+  groupName?: string;
+}
+
+/** Row from loadPublicForGroup. */
+interface PublicMemberRow {
+  id?: string;
+  personId?: string;
+  leader?: boolean;
+  displayName?: string;
+  photoUpdated?: Date;
+}
+
+interface PublicMember {
+  id: string;
+  name: { display: string };
+  photo: string;
+  role?: string;
+}
+
+// SUM/AVG come back from MySQL as DECIMAL strings, COUNT as a number.
+interface HealthSummaryRow {
+  groupId: string;
+  memberCount: number;
+  leaderCount: number | string;
+  averageAge: number | string | null;
+  femaleCount: number | string;
+  maleCount: number | string;
+}
+
+interface NameCountRow {
+  name: string;
+  count: number;
+}
+
+interface AgeGenderCountRow {
+  ageGroup: string;
+  gender: string;
+  count: number;
+}
+
 @injectable()
 export class GroupMemberRepo {
   public async save(model: GroupMember) {
@@ -19,7 +78,7 @@ export class GroupMemberRepo {
       groupId: model.groupId,
       personId: model.personId,
       leader: model.leader,
-      joinDate: sql`NOW()` as any
+      joinDate: sql<Date>`NOW()`
     }).execute();
     return model;
   }
@@ -52,7 +111,7 @@ export class GroupMemberRepo {
 
   public async loadForGroup(churchId: string, groupId: string) {
     return getDb().selectFrom("groupMembers as gm")
-      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb(sql.ref<number>("p.removed"), "=", 0), eb("p.removed", "is", null)])))
       .selectAll("gm")
       .select([
         "p.photoUpdated", "p.displayName", "p.firstName", "p.lastName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole", "p.birthDate"
@@ -67,12 +126,12 @@ export class GroupMemberRepo {
 
   public async loadLeadersForGroup(churchId: string, groupId: string) {
     return getDb().selectFrom("groupMembers as gm")
-      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb(sql.ref<number>("p.removed"), "=", 0), eb("p.removed", "is", null)])))
       .selectAll("gm")
       .select(["p.photoUpdated", "p.displayName"])
       .where("gm.churchId", "=", churchId)
       .where("gm.groupId", "=", groupId)
-      .where("gm.leader", "=", 1 as any)
+      .where(sql.ref<number>("gm.leader"), "=", 1)
       .orderBy("p.lastName")
       .orderBy("p.firstName")
       .execute();
@@ -87,11 +146,11 @@ export class GroupMemberRepo {
       .select("gm.id")
       .where("gm.churchId", "=", churchId)
       .where("gm.personId", "=", personId)
-      .where("gm.leader", "=", 1 as any)
+      .where("gm.leader", "=", true)
       .where("g.churchId", "=", churchId)
-      .where("g.removed", "=", false as any)
-      .where((eb) => eb.or([eb("g.confidential", "is", null), eb("g.confidential", "=", false as any)]))
-      .where((eb) => eb.or([eb("g.archived", "is", null), eb("g.archived", "=", false as any)]));
+      .where("g.removed", "=", false)
+      .where((eb) => eb.or([eb("g.confidential", "is", null), eb("g.confidential", "=", false)]))
+      .where((eb) => eb.or([eb("g.archived", "is", null), eb("g.archived", "=", false)]));
     if (groupId) query = query.where("gm.groupId", "=", groupId);
     const row = await query.limit(1).executeTakeFirst();
     return !!row;
@@ -100,14 +159,14 @@ export class GroupMemberRepo {
   // Privacy-safe: explicit opt-in (publicRoster=1) + visible group; selects only display name/photo/leader, never contact/demographic.
   public async loadPublicForGroup(churchId: string, groupId: string) {
     return getDb().selectFrom("groupMembers as gm")
-      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb(sql.ref<number>("p.removed"), "=", 0), eb("p.removed", "is", null)])))
       .innerJoin("groups as g", "g.id", "gm.groupId")
       .select(["gm.id", "gm.personId", "gm.leader", "p.displayName", "p.photoUpdated"])
       .where("gm.churchId", "=", churchId)
       .where("gm.groupId", "=", groupId)
-      .where("g.removed", "=", false as any)
-      .where("g.publicRoster", "=", true as any)
-      .where((eb) => eb.or([eb("g.archived", "is", null), eb("g.archived", "=", false as any)]))
+      .where("g.removed", "=", false)
+      .where("g.publicRoster", "=", true)
+      .where((eb) => eb.or([eb("g.archived", "is", null), eb("g.archived", "=", false)]))
       .orderBy("gm.leader", "desc")
       .orderBy("p.lastName")
       .orderBy("p.firstName")
@@ -117,7 +176,7 @@ export class GroupMemberRepo {
   public async loadForGroups(churchId: string, groupIds: string[]) {
     if (!groupIds.length) return [];
     return getDb().selectFrom("groupMembers as gm")
-      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb(sql.ref<number>("p.removed"), "=", 0), eb("p.removed", "is", null)])))
       .selectAll("gm")
       .select(["p.photoUpdated", "p.displayName", "p.firstName", "p.lastName", "p.email"])
       .where("gm.churchId", "=", churchId)
@@ -135,7 +194,7 @@ export class GroupMemberRepo {
       .select("g.name as groupName")
       .where("gm.churchId", "=", churchId)
       .where("gm.personId", "=", personId)
-      .where("g.removed", "=", 0 as any)
+      .where(sql.ref<number>("g.removed"), "=", 0)
       .orderBy("g.name")
       .execute();
   }
@@ -147,12 +206,12 @@ export class GroupMemberRepo {
       .selectAll("gm")
       .select(["g.name", "g.tags"])
       .where("gm.personId", "in", peopleIds)
-      .where("g.removed", "=", false as any)
+      .where("g.removed", "=", false)
       .execute();
   }
 
   public async loadHealthSummary(churchId: string) {
-    const rows = await sql<any>`SELECT gm.groupId,
+    const rows = await sql<HealthSummaryRow>`SELECT gm.groupId,
         COUNT(*) AS memberCount,
         SUM(CASE WHEN gm.leader = 1 THEN 1 ELSE 0 END) AS leaderCount,
         AVG(TIMESTAMPDIFF(YEAR, p.birthDate, CURDATE())) AS averageAge,
@@ -167,13 +226,13 @@ export class GroupMemberRepo {
 
   public async loadDemographicsForGroup(churchId: string, groupId: string) {
     const db = getDb();
-    const genderRows = await sql<any>`SELECT COALESCE(NULLIF(TRIM(p.gender), ''), 'Unassigned') AS name, COUNT(*) AS count
+    const genderRows = await sql<NameCountRow>`SELECT COALESCE(NULLIF(TRIM(p.gender), ''), 'Unassigned') AS name, COUNT(*) AS count
       FROM groupMembers gm
       INNER JOIN people p ON p.id = gm.personId AND IFNULL(p.removed, 0) = 0
       WHERE gm.churchId = ${churchId} AND gm.groupId = ${groupId}
       GROUP BY name ORDER BY count DESC`.execute(db);
 
-    const ageRows = await sql<any>`SELECT
+    const ageRows = await sql<AgeGenderCountRow>`SELECT
         CASE
           WHEN age BETWEEN 0 AND 3 THEN '0-3'
           WHEN age BETWEEN 4 AND 11 THEN '4-11'
@@ -199,7 +258,7 @@ export class GroupMemberRepo {
     ];
     const ageMap: { [group: string]: { group: string; female: number; male: number; unassigned: number } } = {};
     order.forEach((g) => (ageMap[g] = { group: g, female: 0, male: 0, unassigned: 0 }));
-    (ageRows.rows as any[]).forEach((r) => {
+    ageRows.rows.forEach((r) => {
       const bucket = ageMap[r.ageGroup];
       if (!bucket) return;
       const g = String(r.gender).toLowerCase();
@@ -208,7 +267,7 @@ export class GroupMemberRepo {
     });
 
     return {
-      gender: (genderRows.rows as any[]).map((r) => ({ name: r.name as string, count: Number(r.count) })),
+      gender: genderRows.rows.map((r) => ({ name: r.name, count: Number(r.count) })),
       ageGroups: order.map((g) => ageMap[g])
     };
   }
@@ -223,7 +282,7 @@ export class GroupMemberRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): GroupMember {
+  protected rowToModel(row: GroupMemberRow): GroupMember {
     const result: GroupMember = {
       id: row.id,
       churchId: row.churchId,
@@ -259,20 +318,20 @@ export class GroupMemberRepo {
     return result;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: GroupMemberRow) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: GroupMemberRow[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }
 
-  public convertAllToPublicModel(churchId: string, data: any[]) {
+  public convertAllToPublicModel(churchId: string, data: PublicMemberRow[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => {
-      const result: any = {
+      const result: PublicMember = {
         id: d.personId,
         name: { display: d.displayName },
         photo: PersonHelper.getPhotoPath(churchId, { id: d.personId, photoUpdated: d.photoUpdated })
@@ -282,13 +341,13 @@ export class GroupMemberRepo {
     });
   }
 
-  public convertAllToBasicModel(churchId: string, data: any[]) {
+  public convertAllToBasicModel(churchId: string, data: GroupMemberRow[]) {
     const result: GroupMember[] = [];
     data.forEach((d) => result.push(this.convertToBasicModel(churchId, d)));
     return result;
   }
 
-  public convertToBasicModel(_churchId: string, data: any) {
+  public convertToBasicModel(_churchId: string, data: GroupMemberRow) {
     const result = { id: data.id, groupId: data.groupId, personId: data.personId, displayName: data.displayName };
     return result;
   }

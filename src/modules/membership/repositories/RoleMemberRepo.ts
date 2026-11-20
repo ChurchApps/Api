@@ -18,7 +18,7 @@ export class RoleMemberRepo {
       roleId: model.roleId,
       userId: model.userId,
       addedBy: model.addedBy,
-      dateAdded: sql`NOW()` as any
+      dateAdded: sql<Date>`NOW()`
     }).execute();
     return model;
   }
@@ -27,7 +27,7 @@ export class RoleMemberRepo {
     await getDb().updateTable("roleMembers").set({
       roleId: model.roleId,
       userId: model.userId,
-      dateAdded: model.dateAdded as any,
+      dateAdded: model.dateAdded,
       addedBy: model.addedBy
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
@@ -55,7 +55,7 @@ export class RoleMemberRepo {
       .execute() as Promise<RoleMember[]>;
   }
 
-  public async delete(id: string, churchId: string): Promise<any> {
+  public async delete(id: string, churchId: string): Promise<void> {
     await getDb().deleteFrom("roleMembers").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
@@ -89,7 +89,7 @@ export class RoleMemberRepo {
       .having(sql`COUNT(DISTINCT rm.userId)`, "=", 1)
       .having(sql`MAX(rm.userId = ${userId})`, "=", 1)
       .execute();
-    return rows.map((r: any) => r.churchId);
+    return rows.map((r) => r.churchId);
   }
 
   public async isSoleDomainAdmin(churchId: string, userId: string): Promise<boolean> {
@@ -110,6 +110,6 @@ export class RoleMemberRepo {
     return this.create(model);
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: RoleMember) { return data; }
+  public convertAllToModel(_churchId: string, data: RoleMember[]) { return data || []; }
 }
