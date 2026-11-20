@@ -1,6 +1,7 @@
 import "reflect-metadata";
+import express from "express";
 
-jest.mock("../GivingBaseController", () => ({ GivingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../GivingBaseController", () => ({ GivingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/Permissions.js", () => ({ Permissions: { donations: { edit: "donationsEdit" } } }));
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { membershipApi: "http://membership" } }));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: {} }));
@@ -17,22 +18,29 @@ jest.mock("../../../../shared/helpers/GatewayService.js", () => ({
 
 import { DonateController } from "../DonateController.js";
 import { GatewayService } from "../../../../shared/helpers/GatewayService.js";
+import { Donation, Gateway } from "../../models/index.js";
 
-const COMPLETE = { id: "DON1", status: "complete", transactionId: "pi_1" };
+type JsonResult = { obj: unknown; status: number };
 
-function makeController(donation: any, gateways: any[] = [{ id: "GAT1", provider: "Stripe" }], access = true) {
+const COMPLETE: Donation = { id: "DON1", status: "complete", transactionId: "pi_1" };
+
+function makeController(donation: Donation | null, gateways: Gateway[] = [{ id: "GAT1", provider: "Stripe" }], access = true) {
   const controller = new DonateController();
   const updateStatus = jest.fn();
-  (controller as any).repos = {
-    donation: { load: jest.fn(async () => donation), updateStatus },
-    gateway: { loadAll: jest.fn(async () => gateways) }
-  };
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "CHU1", checkAccess: () => access });
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  const au = { churchId: "CHU1", checkAccess: () => access };
+  Object.assign(controller, {
+    repos: {
+      donation: { load: jest.fn(async () => donation), updateStatus },
+      gateway: { loadAll: jest.fn(async () => gateways) }
+    },
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, updateStatus };
 }
 
-const refund = (controller: DonateController, donationId = "DON1") => (controller as any).refund({ params: { donationId } }, {});
+const params = (donationId: string) => ({ params: { donationId } } as express.Request<{ donationId: string }>);
+const refund = async (controller: DonateController, donationId = "DON1") => (await controller.refund(params(donationId), {} as express.Response)) as JsonResult;
 
 describe("DonateController refund", () => {
   beforeEach(() => {
@@ -43,7 +51,7 @@ describe("DonateController refund", () => {
 
   it("refunds a completed donation and marks the row refunded", async () => {
     const { controller, updateStatus } = makeController(COMPLETE);
-    const result: any = await refund(controller);
+    const result = await refund(controller);
     expect(GatewayService.refundDonation).toHaveBeenCalledWith(expect.objectContaining({ id: "GAT1" }), "pi_1");
     expect(updateStatus).toHaveBeenCalledWith("CHU1", "pi_1", "refunded");
     expect(result).toEqual({ success: true, refundId: "re_1" });
@@ -51,39 +59,39 @@ describe("DonateController refund", () => {
 
   it("rejects a caller without donations.edit", async () => {
     const { controller } = makeController(COMPLETE, undefined, false);
-    expect((await refund(controller) as any).status).toBe(401);
+    expect((await refund(controller)).status).toBe(401);
     expect(GatewayService.refundDonation).not.toHaveBeenCalled();
   });
 
   it("404s a donation that does not exist", async () => {
     const { controller } = makeController(null);
-    expect((await refund(controller) as any).status).toBe(404);
+    expect((await refund(controller)).status).toBe(404);
   });
 
   it("refuses a donation that is not complete", async () => {
     const { controller, updateStatus } = makeController({ ...COMPLETE, status: "failed" });
-    expect((await refund(controller) as any).status).toBe(400);
+    expect((await refund(controller)).status).toBe(400);
     expect(updateStatus).not.toHaveBeenCalled();
     expect(GatewayService.refundDonation).not.toHaveBeenCalled();
   });
 
   it("refuses a manually entered donation with no transaction id", async () => {
     const { controller } = makeController({ id: "DON1", status: "complete" });
-    expect((await refund(controller) as any).status).toBe(400);
+    expect((await refund(controller)).status).toBe(400);
     expect(GatewayService.refundDonation).not.toHaveBeenCalled();
   });
 
   it("refuses when no configured gateway supports refunds", async () => {
     (GatewayService.supportsRefund as jest.Mock).mockReturnValue(false);
     const { controller } = makeController(COMPLETE);
-    expect((await refund(controller) as any).status).toBe(400);
+    expect((await refund(controller)).status).toBe(400);
     expect(GatewayService.refundDonation).not.toHaveBeenCalled();
   });
 
   it("returns the gateway error and leaves the status alone when the refund fails", async () => {
     (GatewayService.refundDonation as jest.Mock).mockResolvedValue({ success: false, error: "Charge has already been refunded." });
     const { controller, updateStatus } = makeController(COMPLETE);
-    const result: any = await refund(controller);
+    const result = await refund(controller);
     expect(result.status).toBe(400);
     expect(result.obj).toEqual({ error: "Charge has already been refunded." });
     expect(updateStatus).not.toHaveBeenCalled();
@@ -92,12 +100,12 @@ describe("DonateController refund", () => {
 
 describe("DonateController retry", () => {
   it("refuses a failed donation with no transaction id instead of updating by an undefined id", async () => {
-    (GatewayService as any).supportsRetry = jest.fn(() => true);
-    (GatewayService as any).retryFailedPayment = jest.fn(async () => ({ success: true }));
+    const retryFailedPayment = jest.fn(async () => ({ success: true }));
+    Object.assign(GatewayService, { supportsRetry: jest.fn(() => true), retryFailedPayment });
     const { controller, updateStatus } = makeController({ id: "DON1", status: "failed" });
-    const result: any = await (controller as any).retry({ params: { donationId: "DON1" } }, {});
+    const result = (await controller.retry(params("DON1"), {} as express.Response)) as JsonResult;
     expect(result.status).toBe(400);
-    expect((GatewayService as any).retryFailedPayment).not.toHaveBeenCalled();
+    expect(retryFailedPayment).not.toHaveBeenCalled();
     expect(updateStatus).not.toHaveBeenCalled();
   });
 });

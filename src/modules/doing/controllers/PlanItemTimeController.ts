@@ -1,33 +1,33 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
-import { PlanItemTime } from "../models/index.js";
+import { PlanItem, PlanItemTime } from "../models/index.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
 
 @controller("/doing/planItemTimes")
 export class PlanItemTimeController extends DoingBaseController {
   @httpGet("/plan/:planId")
-  public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.planItemTime.loadByPlanId(au.churchId, planId);
     });
   }
 
   @httpGet("/planItem/:planItemId")
-  public async getForPlanItem(@requestParam("planItemId") planItemId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPlanItem(@requestParam("planItemId") planItemId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.planItemTime.loadByPlanItemId(au.churchId, planItemId);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, PlanItemTime[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, PlanItemTime[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       for (const pit of req.body) {
-        const planItem: any = await this.repos.planItem.load(au.churchId, pit.planItemId || "");
+        const planItem: PlanItem | null = await this.repos.planItem.load(au.churchId, pit.planItemId || "");
         if (!planItem || !await PlanAuth.canEditPlan(au, planItem.planId)) return this.json({}, 401);
-        const existing: any = pit.id ? await this.repos.planItemTime.load(au.churchId, pit.id) : null;
-        const existingItem: any = existing ? await this.repos.planItem.load(au.churchId, existing.planItemId || "") : null;
+        const existing: PlanItemTime | null = pit.id ? await this.repos.planItemTime.load(au.churchId, pit.id) : null;
+        const existingItem: PlanItem | null = existing ? await this.repos.planItem.load(au.churchId, existing.planItemId || "") : null;
         if (existingItem && !await PlanAuth.canEditPlan(au, existingItem.planId)) return this.json({}, 401);
       }
       const promises: Promise<PlanItemTime>[] = [];
@@ -40,11 +40,11 @@ export class PlanItemTimeController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const pit: any = await this.repos.planItemTime.load(au.churchId, id);
+      const pit: PlanItemTime | null = await this.repos.planItemTime.load(au.churchId, id);
       if (pit) {
-        const planItem: any = await this.repos.planItem.load(au.churchId, pit.planItemId);
+        const planItem: PlanItem | null = await this.repos.planItem.load(au.churchId, pit.planItemId);
         if (!planItem || !await PlanAuth.canEditPlan(au, planItem.planId)) return this.json({}, 401);
         await this.repos.planItemTime.delete(au.churchId, id);
       }

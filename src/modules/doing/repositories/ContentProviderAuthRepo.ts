@@ -65,15 +65,15 @@ export class ContentProviderAuthRepo {
     return row ? this.rowToModel(row) : null;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: ContentProviderAuth) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: ContentProviderAuth[]) {
     return (data || []).map(row => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): ContentProviderAuth {
+  protected rowToModel(row: ContentProviderAuth): ContentProviderAuth {
     return {
       id: row.id,
       churchId: row.churchId,

@@ -1,12 +1,18 @@
 import "reflect-metadata";
-jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { plans: { edit: "plansEdit" } } }));
 const mockGetProvider = jest.fn();
 jest.mock("@churchapps/content-providers", () => ({ getProvider: (id: string) => mockGetProvider(id) }));
 const mockGetAuth = jest.fn(async () => ({ access_token: "x", refresh_token: "{}" }));
 jest.mock("../../helpers/ProviderAuthHelper.js", () => ({ ProviderAuthHelper: { getAuth: () => mockGetAuth() } }));
 
+import express from "express";
+import { AuthenticatedUser, IPermission } from "@churchapps/apihelper";
+import { Repos } from "../../repositories/index.js";
 import { ProviderProxyController } from "../ProviderProxyController.js";
+
+const req = (r: Partial<express.Request>) => r as express.Request;
+const res = {} as express.Response;
 
 // LAN providers (FreeShow) are reached by the TV on the church network; the cloud proxy must not
 // make requests to whatever address is stored in their auth.
@@ -15,8 +21,8 @@ const cloudProvider = () => ({ requiresAuth: false, authTypes: ["none"], browse:
 
 function makeController() {
   const controller = new ProviderProxyController();
-  (controller as any).repos = {};
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", checkAccess: () => true });
+  controller.repos = {} as Repos;
+  controller.actionWrapper = async (_req, _res, action) => action({ churchId: "c1", checkAccess: (_perm: IPermission): boolean => true } as AuthenticatedUser);
   return controller;
 }
 
@@ -26,13 +32,13 @@ describe("ProviderProxyController with a LAN provider", () => {
   it.each(routes)("%s refuses it without calling the provider", async (route) => {
     const provider = lanProvider();
     mockGetProvider.mockReturnValue(provider);
-    await expect((makeController() as any)[route]({ body: { providerId: "freeshow", path: "/x" } }, {})).rejects.toMatchObject({ status: 400 });
+    await expect(makeController()[route](req({ body: { providerId: "freeshow", path: "/x" } }), res)).rejects.toMatchObject({ status: 400 });
     expect(provider[route]).not.toHaveBeenCalled();
   });
 
   it("still proxies a cloud provider", async () => {
     const provider = cloudProvider();
     mockGetProvider.mockReturnValue(provider);
-    expect(await (makeController() as any).browse({ body: { providerId: "lessonschurch", path: "/" } }, {})).toEqual([{ id: "f1" }]);
+    expect(await makeController().browse(req({ body: { providerId: "lessonschurch", path: "/" } }), res)).toEqual([{ id: "f1" }]);
   });
 });

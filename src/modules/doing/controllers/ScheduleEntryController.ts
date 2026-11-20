@@ -7,7 +7,7 @@ import { Permissions } from "../../../shared/helpers/index.js";
 @controller("/doing/scheduleEntries")
 export class ScheduleEntryController extends DoingBaseController {
   @httpGet("/group/:screenGroupId")
-  public async getByScreenGroup(@requestParam("screenGroupId") screenGroupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByScreenGroup(@requestParam("screenGroupId") screenGroupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.scheduleEntry.loadByScreenGroupId(au.churchId, screenGroupId);
@@ -16,7 +16,7 @@ export class ScheduleEntryController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.scheduleEntry.load(au.churchId, id);
@@ -25,7 +25,7 @@ export class ScheduleEntryController extends DoingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.scheduleEntry.loadAll(au.churchId);
@@ -34,7 +34,7 @@ export class ScheduleEntryController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, ScheduleEntry[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, ScheduleEntry[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const promises: Promise<ScheduleEntry>[] = [];
@@ -45,7 +45,7 @@ export class ScheduleEntryController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       await this.repos.scheduleEntry.delete(au.churchId, id);

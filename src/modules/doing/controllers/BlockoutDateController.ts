@@ -7,7 +7,7 @@ import { Permissions } from "../../../shared/helpers/index.js";
 @controller("/doing/blockoutDates")
 export class BlockoutDateController extends DoingBaseController {
   @httpGet("/ids")
-  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = req.query.ids as string;
       const ids = idsString.split(",");
@@ -16,21 +16,21 @@ export class BlockoutDateController extends DoingBaseController {
   }
 
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.blockoutDate.loadForPerson(au.churchId, au.personId);
     });
   }
 
   @httpGet("/upcoming")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.blockoutDate.loadUpcoming(au.churchId);
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.blockoutDate.load(au.churchId, id);
       return this.repos.blockoutDate.convertToModel(au.churchId, data);
@@ -38,7 +38,7 @@ export class BlockoutDateController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, BlockoutDate[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, BlockoutDate[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const canEditOthers = au.checkAccess(Permissions.plans.edit);
       const promises: Promise<BlockoutDate>[] = [];
@@ -58,7 +58,7 @@ export class BlockoutDateController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const blockoutDate = (await this.repos.blockoutDate.load(au.churchId, id)) as BlockoutDate;
       if (!blockoutDate) return {};

@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { AutomationExecution } from "../models/index.js";
 import { getDb } from "../db/index.js";
+import { mysqlValue } from "./sqlValues.js";
 
 @injectable()
 export class AutomationExecutionRepo {
@@ -24,10 +25,10 @@ export class AutomationExecutionRepo {
       eventType: model.eventType || null,
       status: model.status,
       attemptCount: model.attemptCount ?? 0,
-      nextAttemptAt: (model.nextAttemptAt ? DateHelper.toMysqlDate(model.nextAttemptAt) : null) as any,
+      nextAttemptAt: model.nextAttemptAt ? mysqlValue<Date>(DateHelper.toMysqlDate(model.nextAttemptAt)) : null,
       lastError: model.lastError || null,
-      dateCreated: sql`now()` as any,
-      dateCompleted: (model.dateCompleted ? DateHelper.toMysqlDate(model.dateCompleted) : null) as any
+      dateCreated: sql<Date>`now()`,
+      dateCompleted: model.dateCompleted ? mysqlValue<Date>(DateHelper.toMysqlDate(model.dateCompleted)) : null
     }).execute();
     return model;
   }
@@ -36,9 +37,9 @@ export class AutomationExecutionRepo {
     await getDb().updateTable("automationExecutions").set({
       status: model.status,
       attemptCount: model.attemptCount ?? 0,
-      nextAttemptAt: (model.nextAttemptAt ? DateHelper.toMysqlDate(model.nextAttemptAt) : null) as any,
+      nextAttemptAt: model.nextAttemptAt ? mysqlValue<Date>(DateHelper.toMysqlDate(model.nextAttemptAt)) : null,
       lastError: model.lastError || null,
-      dateCompleted: (model.dateCompleted ? DateHelper.toMysqlDate(model.dateCompleted) : null) as any
+      dateCompleted: model.dateCompleted ? mysqlValue<Date>(DateHelper.toMysqlDate(model.dateCompleted)) : null
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -69,7 +70,7 @@ export class AutomationExecutionRepo {
   public async loadDuePending(limit = 100) {
     return getDb().selectFrom("automationExecutions").selectAll()
       .where("status", "=", "pending")
-      .where("nextAttemptAt", "<=", sql`now()` as any)
+      .where("nextAttemptAt", "<=", sql<Date>`now()`)
       .orderBy("nextAttemptAt")
       .limit(limit)
       .execute();
@@ -77,7 +78,7 @@ export class AutomationExecutionRepo {
 
   public async setStatusForTrigger(churchId: string, triggerId: string, fromStatus: string, toStatus: string) {
     await getDb().updateTable("automationExecutions")
-      .set({ status: toStatus, nextAttemptAt: (toStatus === "pending" ? DateHelper.toMysqlDate(new Date()) : null) as any })
+      .set({ status: toStatus, nextAttemptAt: toStatus === "pending" ? mysqlValue<Date>(DateHelper.toMysqlDate(new Date())) : null })
       .where("churchId", "=", churchId)
       .where("triggerId", "=", triggerId)
       .where("status", "=", fromStatus)
@@ -88,7 +89,7 @@ export class AutomationExecutionRepo {
   public async purgeOld(days = 90) {
     await getDb().deleteFrom("automationExecutions")
       .where("status", "in", ["success", "failed"])
-      .where("dateCreated", "<", sql`date_sub(now(), interval ${days} day)` as any)
+      .where("dateCreated", "<", sql<Date>`date_sub(now(), interval ${days} day)`)
       .execute();
   }
 }

@@ -8,7 +8,7 @@ import { PlanAuth } from "../../../shared/helpers/index.js";
 @controller("/doing/plantemplates")
 export class PlanTemplateController extends DoingBaseController {
   @httpGet("/ministry/:ministryId")
-  public async getForMinistry(@requestParam("ministryId") ministryId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getForMinistry(@requestParam("ministryId") ministryId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
       return await this.repos.planTemplate.loadByMinistryId(au.churchId, ministryId);
@@ -16,9 +16,9 @@ export class PlanTemplateController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const template: any = await this.repos.planTemplate.load(au.churchId, id);
+      const template: PlanTemplate | null = await this.repos.planTemplate.load(au.churchId, id);
       if (!template) return this.json({}, 404);
       if (!await PlanAuth.canEditMinistry(au, template.ministryId)) return this.json({}, 401);
       return template;
@@ -26,11 +26,11 @@ export class PlanTemplateController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, PlanTemplate[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, PlanTemplate[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       for (const item of req.body) {
         if (!await PlanAuth.canEditMinistry(au, item.ministryId)) return this.json({}, 401);
-        const existing: any = item.id ? await this.repos.planTemplate.load(au.churchId, item.id) : null;
+        const existing: PlanTemplate | null = item.id ? await this.repos.planTemplate.load(au.churchId, item.id) : null;
         if (existing && !await PlanAuth.canEditMinistry(au, existing.ministryId)) return this.json({}, 401);
       }
       const promises = req.body.map((item) => { item.churchId = au.churchId; return this.repos.planTemplate.save(item); });
@@ -39,13 +39,13 @@ export class PlanTemplateController extends DoingBaseController {
   }
 
   @httpPost("/fromPlan/:planId")
-  public async fromPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, { id?: string; name?: string; ministryId?: string }>, res: express.Response): Promise<any> {
+  public async fromPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, { id?: string; name?: string; ministryId?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, planId)) return this.json({}, 401);
       const template: PlanTemplate = { id: req.body.id, churchId: au.churchId, ministryId: req.body.ministryId, name: req.body.name };
       // Overwrite path: refresh an existing template's snapshot, keeping its name/ministry.
       if (req.body.id) {
-        const existing: any = await this.repos.planTemplate.load(au.churchId, req.body.id);
+        const existing: PlanTemplate | null = await this.repos.planTemplate.load(au.churchId, req.body.id);
         if (!existing) return this.json({}, 404);
         if (!await PlanAuth.canEditMinistry(au, existing.ministryId)) return this.json({}, 401);
         template.ministryId = template.ministryId || existing.ministryId;
@@ -58,9 +58,9 @@ export class PlanTemplateController extends DoingBaseController {
   }
 
   @httpPost("/apply/:id")
-  public async apply(@requestParam("id") id: string, req: express.Request<{}, {}, { planIds: string[]; serviceOrder?: boolean; positions?: boolean }>, res: express.Response): Promise<any> {
+  public async apply(@requestParam("id") id: string, req: express.Request<{}, {}, { planIds: string[]; serviceOrder?: boolean; positions?: boolean }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const template: any = await this.repos.planTemplate.load(au.churchId, id);
+      const template: PlanTemplate | null = await this.repos.planTemplate.load(au.churchId, id);
       if (!template) return this.json({}, 404);
       const planIds = req.body.planIds || [];
       for (const planId of planIds) {
@@ -76,9 +76,9 @@ export class PlanTemplateController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const template: any = await this.repos.planTemplate.load(au.churchId, id);
+      const template: PlanTemplate | null = await this.repos.planTemplate.load(au.churchId, id);
       if (!template) return this.json({}, 404);
       if (!await PlanAuth.canEditMinistry(au, template.ministryId)) return this.json({}, 401);
       await this.repos.planTemplate.delete(au.churchId, id);

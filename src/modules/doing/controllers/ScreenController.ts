@@ -6,15 +6,16 @@ import { Permissions } from "../../../shared/helpers/index.js";
 import { getMessagingModuleGateway } from "../../../shared/modules/index.js";
 import { ScreenGroup } from "../models/index.js";
 import { ScreenManifestHelper } from "../helpers/ScreenManifestHelper.js";
+import { ScreenDevice } from "./types.js";
 
 const SCREEN_CONTENT_TYPE = "freeplayScreen";
 
 @controller("/doing/screens")
 export class ScreenController extends DoingBaseController {
-  private async loadDevice(deviceId: string, req: express.Request): Promise<any | null> {
+  private async loadDevice(deviceId: string, req: express.Request): Promise<ScreenDevice | null> {
     const provided = req.header("x-device-secret");
     if (!provided) return null;
-    const device = await getMessagingModuleGateway().loadDeviceByDeviceId(deviceId);
+    const device: ScreenDevice | null = await getMessagingModuleGateway().loadDeviceByDeviceId(deviceId);
     if (!device?.secret || !device.churchId) return null;
     const expected = Buffer.from(device.secret);
     const actual = Buffer.from(provided);
@@ -22,7 +23,7 @@ export class ScreenController extends DoingBaseController {
   }
 
   @httpGet("/manifest/:deviceId")
-  public async manifest(@requestParam("deviceId") deviceId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async manifest(@requestParam("deviceId") deviceId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const device = await this.loadDevice(deviceId, req);
       if (!device) return this.json({}, 401);
@@ -34,7 +35,7 @@ export class ScreenController extends DoingBaseController {
   }
 
   @httpPost("/status/:deviceId")
-  public async status(@requestParam("deviceId") deviceId: string, req: express.Request<{}, {}, unknown>, res: express.Response): Promise<any> {
+  public async status(@requestParam("deviceId") deviceId: string, req: express.Request<{}, {}, unknown>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const device = await this.loadDevice(deviceId, req);
       if (!device) return this.json({}, 401);
@@ -44,7 +45,7 @@ export class ScreenController extends DoingBaseController {
   }
 
   @httpGet("/timeZone")
-  public async timeZone(req: express.Request, res: express.Response): Promise<any> {
+  public async timeZone(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       return { timeZone: await ScreenManifestHelper.churchTimeZone(au.churchId) };
@@ -52,13 +53,13 @@ export class ScreenController extends DoingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
-      const devices = await getMessagingModuleGateway().loadDevicesByApp(au.churchId, "FreePlay");
+      const devices: ScreenDevice[] = await getMessagingModuleGateway().loadDevicesByApp(au.churchId, "FreePlay");
       const groups: ScreenGroup[] = this.repos.screenGroup.convertAllToModel(au.churchId, await this.repos.screenGroup.loadAll(au.churchId));
       const groupNames = new Map(groups.map((g) => [g.id, g.name]));
-      return devices.map((d: any) => {
+      return devices.map((d) => {
         const screenGroupId = d.contentType === SCREEN_CONTENT_TYPE ? d.contentId : null;
         return {
           id: d.id,

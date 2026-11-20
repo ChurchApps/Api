@@ -1,9 +1,12 @@
 import { controller, httpPost, httpGet } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
-import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models/index.js";
+import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund, Gateway, Customer, Fund } from "../models/index.js";
+import { ReceiptFund } from "../helpers/ReceiptHelper.js";
+import { ChargeRequest, DonationFundInput, DonationInterval, GatewayError, GatewayPaymentData, MembershipLookupRepos, MembershipSettingRow, SubscribeRequest } from "./types.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { DunningHelper } from "../helpers/DunningHelper.js";
@@ -25,13 +28,13 @@ export class DonateController extends GivingBaseController {
    * Get available payment gateways for a church
    */
   @httpGet("/gateways/:churchId")
-  public async getGateways(req: express.Request<{ churchId: string }>, res: express.Response): Promise<any> {
+  public async getGateways(req: express.Request<{ churchId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public donation widget keyed by the public churchId in the URL
       const churchId = req.params.churchId;
       if (!churchId) return this.json({ error: "Missing churchId" }, 400);
 
-      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
+      const gateways: Gateway[] = await this.repos.gateway.loadAll(churchId);
 
       const publicGateways = gateways.map(gateway => GivingBaseController.toPublicGateway(gateway));
 
@@ -40,7 +43,7 @@ export class DonateController extends GivingBaseController {
   }
 
   @httpPost("/client-token")
-  public async clientToken(req: express.Request<{}, {}, { churchId?: string; provider?: string; gatewayId?: string }>, res: express.Response): Promise<any> {
+  public async clientToken(req: express.Request<{}, {}, { churchId?: string; provider?: string; gatewayId?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       try {
         // authz-exempt: public donate flow; cross-checked against au.churchId with a 403 on mismatch
@@ -73,12 +76,12 @@ export class DonateController extends GivingBaseController {
       gatewayId?: string;
       amount?: number;
       currency?: string;
-      funds?: any[];
+      funds?: DonationFundInput[];
       notes?: string;
       description?: string
     }>,
     res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       try {
         // authz-exempt: public donate flow; cross-checked against au.churchId with a 403 on mismatch
@@ -103,7 +106,7 @@ export class DonateController extends GivingBaseController {
         // PayPal custom_id limited (~127 chars); keep compact.
         let customId = "";
         try {
-          const minimalFunds = funds.map((f: any) => ({ id: f.id, amount: f.amount }));
+          const minimalFunds = funds.map((f) => ({ id: f.id, amount: f.amount }));
           const encoded = JSON.stringify(minimalFunds);
           customId = encoded.length <= 120 ? encoded : ""; // avoid exceeding limit
         } catch {
@@ -129,7 +132,7 @@ export class DonateController extends GivingBaseController {
     });
   }
   @httpPost("/log")
-  public async log(req: express.Request<{}, {}, { donation: Donation; fundData: { id: string; amount: number } }>, res: express.Response): Promise<any> {
+  public async log(req: express.Request<{}, {}, { donation: Donation; fundData: { id: string; amount: number } }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       const { donation, fundData } = req.body;
@@ -139,13 +142,13 @@ export class DonateController extends GivingBaseController {
   }
 
   @httpPost("/webhook/:provider")
-  public async webhook(req: express.Request<{ provider: string }, {}, any>, res: express.Response): Promise<any> {
+  public async webhook(req: express.Request<{ provider: string }, {}, unknown>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: provider webhook; churchId from query, request authenticated by gateway signature
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "Missing churchId parameter" }, 400);
 
-      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
+      const gateways: Gateway[] = await this.repos.gateway.loadAll(churchId);
       if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
 
       const provider = req.params.provider?.toLowerCase();
@@ -249,7 +252,7 @@ export class DonateController extends GivingBaseController {
   }
 
   @httpPost("/retry/:donationId")
-  public async retry(req: express.Request<{ donationId: string }>, res: express.Response): Promise<any> {
+  public async retry(req: express.Request<{ donationId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({ error: "Unauthorized" }, 401);
 
@@ -258,7 +261,7 @@ export class DonateController extends GivingBaseController {
       if (donation.status !== "failed") return this.json({ error: "Only failed donations can be retried" }, 400);
       if (!donation.transactionId) return this.json({ error: "This donation has no gateway transaction to retry" }, 400);
 
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateways: Gateway[] = await this.repos.gateway.loadAll(au.churchId);
       const gateway = gateways.find((g) => GatewayService.supportsRetry(g));
       if (!gateway) return this.json({ error: "This gateway does not support retrying failed payments" }, 400);
 
@@ -272,16 +275,16 @@ export class DonateController extends GivingBaseController {
   }
 
   @httpPost("/refund/:donationId")
-  public async refund(req: express.Request<{ donationId: string }>, res: express.Response): Promise<any> {
+  public async refund(req: express.Request<{ donationId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({ error: "Unauthorized" }, 401);
 
-      const donation = (await this.repos.donation.load(au.churchId, req.params.donationId)) as any;
+      const donation = (await this.repos.donation.load(au.churchId, req.params.donationId)) as Donation | null;
       if (!donation) return this.json({ error: "Donation not found" }, 404);
       if ((donation.status || "complete") !== "complete") return this.json({ error: "Only completed donations can be refunded" }, 400);
       if (!donation.transactionId) return this.json({ error: "This donation has no gateway transaction to refund" }, 400);
 
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateways: Gateway[] = await this.repos.gateway.loadAll(au.churchId);
       const gateway = gateways.find((g) => GatewayService.supportsRefund(g));
       if (!gateway) return this.json({ error: "This gateway does not support refunds" }, 400);
 
@@ -299,7 +302,7 @@ export class DonateController extends GivingBaseController {
   public async replayStripeEvents(
     req: express.Request<{}, {}, { startDate: string; endDate: string; dryRun?: boolean }>,
     res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({ error: "Unauthorized" }, 401);
 
@@ -364,7 +367,7 @@ export class DonateController extends GivingBaseController {
           }
 
           // Secondary check: look for matching donation by amount, date, and person
-          const customerData = event.customerId ? await this.repos.customer.load(au.churchId, event.customerId) as any : null;
+          const customerData: Customer | null = event.customerId ? await this.repos.customer.load(au.churchId, event.customerId) : null;
           const personId = customerData?.personId || null;
           const existingDonation = await this.repos.donation.findMatchingDonation(au.churchId, event.amount, event.created, personId);
           if (existingDonation) {
@@ -378,8 +381,8 @@ export class DonateController extends GivingBaseController {
             try {
               await GatewayService.importReplayEvent(gateway, au.churchId, event, this.repos);
               results.push({ ...base, status: "imported" });
-            } catch (err: any) {
-              results.push({ ...base, status: "error", error: err.message || "Unknown error" });
+            } catch (err) {
+              results.push({ ...base, status: "error", error: (err as GatewayError).message || "Unknown error" });
             }
           }
         }
@@ -394,16 +397,16 @@ export class DonateController extends GivingBaseController {
         };
 
         return { dryRun, summary, results };
-      } catch (err: any) {
+      } catch (err) {
         console.error("Error replaying Stripe events:", err);
-        return this.json({ error: err.message || "Failed to fetch Stripe events" }, 500);
+        return this.json({ error: (err as GatewayError).message || "Failed to fetch Stripe events" }, 500);
       }
     });
   }
 
   // authz-exempt: self-service — donor charges their own supplied payment token, scoped to au.churchId (body churchId only a fallback)
   @httpPost("/charge")
-  public async charge(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async charge(req: express.Request<{}, {}, ChargeRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const donationData = req.body;
       const churchId = au.churchId || donationData.churchId;
@@ -456,8 +459,9 @@ export class DonateController extends GivingBaseController {
               anonymous: donationData.anonymous
             };
             await GatewayService.logDonation(gateway, churchId, logData, this.repos, "complete");
-          } catch (logErr: any) {
-            console.error("Charge: Failed to log donation:", logErr?.message || logErr, logErr?.stack);
+          } catch (logErr) {
+            const err = logErr as Error | null;
+            console.error("Charge: Failed to log donation:", err?.message || logErr, err?.stack);
           }
         }
 
@@ -478,7 +482,7 @@ export class DonateController extends GivingBaseController {
   }
 
   @httpPost("/subscribe")
-  public async subscribe(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async subscribe(req: express.Request<{}, {}, SubscribeRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // authz-exempt: public donate flow; churchId prefers au.churchId, body value only a fallback
       const {
@@ -510,7 +514,7 @@ export class DonateController extends GivingBaseController {
       const normalizedCurrency = rawCurrency.toLowerCase();
 
       try {
-        const subscriptionData = {
+        const subscriptionData: GatewayPaymentData = {
           id,
           amount,
           currency: normalizedCurrency,
@@ -521,7 +525,7 @@ export class DonateController extends GivingBaseController {
           interval,
           notes,
           person,
-          name: bankName || person?.name?.display || person?.name || "",
+          name: bankName || (person?.name as { display?: string } | undefined)?.display || person?.name || "",
           email: person?.email || "",
           expiry_month,
           expiry_year,
@@ -589,7 +593,7 @@ export class DonateController extends GivingBaseController {
   }
 
   @httpPost("/fee")
-  public async calculateFee(req: express.Request<{}, {}, { type?: string; provider?: string; gatewayId?: string; amount: number; currency?: string }>, res: express.Response): Promise<any> {
+  public async calculateFee(req: express.Request<{}, {}, { type?: string; provider?: string; gatewayId?: string; amount: number; currency?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const { type, provider, gatewayId, amount, currency } = req.body;
       // authz-exempt: public donate widget; fee calc keyed by public churchId.
@@ -633,9 +637,9 @@ export class DonateController extends GivingBaseController {
   private sendEmails = async (
     to: string,
     church: { name?: string; subDomain?: string; churchURL?: string; logo?: string },
-    funds: any[],
+    funds: ReceiptFund[],
     amount?: number,
-    interval?: { interval_count: number; interval: string },
+    interval?: DonationInterval,
     billingCycleAnchor?: number,
     donationType: "recurring" | "one-time" = "recurring",
     currency: string = "USD"
@@ -669,27 +673,27 @@ export class DonateController extends GivingBaseController {
   };
 
   // The receipt names the church, logo and funds from our records, never from the request body.
-  private async receiptContext(churchId: string, funds: any[]) {
+  private async receiptContext(churchId: string, funds: DonationFundInput[]) {
     if (!churchId) return null;
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const church: any = await membershipRepos.church.loadById(churchId);
+    const membershipRepos = await RepoManager.getRepos<MembershipLookupRepos>("membership");
+    const church = await membershipRepos.church.loadById(churchId);
     if (!church) return null;
-    const named = await Promise.all((funds || []).map(async (f: any) => ({ ...f, name: ((await this.repos.fund.load(churchId, f.id)) as any)?.name || "" })));
-    const settings: any[] = await membershipRepos.setting.loadMulipleChurches(["logoLight"], [churchId]).catch((): any[] => []);
+    const named = await Promise.all((funds || []).map(async (f) => ({ ...f, name: ((await this.repos.fund.load(churchId, f.id)) as Fund | null)?.name || "" })));
+    const settings: MembershipSettingRow[] = await membershipRepos.setting.loadMulipleChurches(["logoLight"], [churchId]).catch((): MembershipSettingRow[] => []);
     const storedLogo = settings?.[0]?.value;
     const logo = typeof storedLogo === "string" && /^https:\/\//i.test(storedLogo) ? storedLogo : undefined;
     return { church: { name: church.name, subDomain: church.subDomain, logo }, funds: named };
   }
 
   // Funds must exist in this church; hidden funds stay allowed because giving links can target them.
-  private async validateFundIds(churchId: string, funds: any[]): Promise<string | null> {
+  private async validateFundIds(churchId: string, funds: DonationFundInput[]): Promise<string | null> {
     for (const f of funds || []) {
       if (f?.id && !(await this.repos.fund.load(churchId, String(f.id)))) return "Invalid fund";
     }
     return null;
   }
 
-  private savedMethodAllowed(data: any, gateway: any, au: any, canEdit: boolean): Promise<boolean> {
+  private savedMethodAllowed(data: GatewayPaymentData, gateway: Gateway, au: AuthenticatedUser, canEdit: boolean): Promise<boolean> {
     return DonationRequestGuard.savedMethodAllowed(data, gateway, au, canEdit, this.repos, (customerId) => GatewayService.getCustomerCreatedAt(gateway, customerId));
   }
 
@@ -746,7 +750,7 @@ export class DonateController extends GivingBaseController {
   };
 
   @httpPost("/captcha-verify")
-  public async captchaVerify(req: express.Request<{}, {}, { token: string; churchId?: string }>, res: express.Response): Promise<any> {
+  public async captchaVerify(req: express.Request<{}, {}, { token: string; churchId?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         // authz-exempt: anonymous captcha check; churchId only narrows which church the issued pass is good for
@@ -767,7 +771,7 @@ export class DonateController extends GivingBaseController {
 
         // if its a custom domain, verify the domain exist in the DB
         const domainData = await Axios.get(`${Environment.membershipApi}/domains/public/lookup/${data.hostname.replace(".localhost", "")}`);
-        const domain: any = await domainData.data;
+        const domain: unknown = await domainData.data;
 
         if (domain) {
           return human();
@@ -787,7 +791,7 @@ export class DonateController extends GivingBaseController {
 
 
   @httpPost("/register-domain")
-  public async registerDomain(req: express.Request<{}, {}, { churchId?: string; domain?: string }>, res: express.Response): Promise<any> {
+  public async registerDomain(req: express.Request<{}, {}, { churchId?: string; domain?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public donate widget; the domain itself has to prove it belongs to the posted churchId
       const churchId = (req.body?.churchId || "").trim();
@@ -850,7 +854,7 @@ export class DonateController extends GivingBaseController {
   /**
    * Get gateway by provider name or ID using the centralized helper
    */
-  private async getGateway(churchId: string, provider?: string, gatewayId?: string): Promise<any> {
+  private async getGateway(churchId: string, provider?: string, gatewayId?: string): Promise<Gateway | null> {
     try {
       return await GatewayService.getGatewayForChurch(churchId, {
         provider,

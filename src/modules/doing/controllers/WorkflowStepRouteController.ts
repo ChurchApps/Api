@@ -7,7 +7,7 @@ import { Permissions } from "../../../shared/helpers/index.js";
 @controller("/doing/workflowStepRoutes")
 export class WorkflowStepRouteController extends DoingBaseController {
   @httpGet("/step/:stepId")
-  public async getForStep(@requestParam("stepId") stepId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForStep(@requestParam("stepId") stepId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflowStepRoute.loadForStep(au.churchId, stepId);
@@ -15,7 +15,7 @@ export class WorkflowStepRouteController extends DoingBaseController {
   }
 
   @httpGet("/workflow/:workflowId")
-  public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflowStepRoute.loadForWorkflow(au.churchId, workflowId);
@@ -23,7 +23,7 @@ export class WorkflowStepRouteController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, WorkflowStepRoute[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, WorkflowStepRoute[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const result: WorkflowStepRoute[] = [];
@@ -44,7 +44,7 @@ export class WorkflowStepRouteController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       // Tear down the route's condition tree before the route itself.

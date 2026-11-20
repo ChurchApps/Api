@@ -2,11 +2,12 @@ import { controller, httpDelete, httpGet, requestParam } from "inversify-express
 import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { Subscription } from "../models/index.js";
 
 @controller("/giving/subscriptionfunds")
 export class SubscriptionFundController extends GivingBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
       else return this.repos.subscriptionFunds.convertToModel(au.churchId, await this.repos.subscriptionFunds.load(au.churchId, id));
@@ -14,22 +15,22 @@ export class SubscriptionFundController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (req.query.subscriptionId !== undefined) {
         const subscriptionId = req.query.subscriptionId.toString();
         const subscriptionData = await this.repos.subscription.load(au.churchId, subscriptionId);
-        const permission = au.checkAccess(Permissions.donations.view) || (!!au.personId && (subscriptionData as any)?.personId === au.personId);
+        const permission = au.checkAccess(Permissions.donations.view) || (!!au.personId && (subscriptionData as Subscription | null)?.personId === au.personId);
         if (!permission) return this.json([], 401);
         else return await this.repos.subscriptionFunds.loadBySubscriptionId(au.churchId, req.query.subscriptionId.toString());
       }
       if (!au.checkAccess(Permissions.donations.view)) return this.json([], 401);
-      else return this.repos.subscriptionFunds.convertAllToModel(au.churchId, (await this.repos.subscriptionFunds.loadAll(au.churchId)) as any[]);
+      else return this.repos.subscriptionFunds.convertAllToModel(au.churchId, await this.repos.subscriptionFunds.loadAll(au.churchId));
     });
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json(null, 401);
       else {
@@ -40,9 +41,9 @@ export class SubscriptionFundController extends GivingBaseController {
   }
 
   @httpDelete("/subscription/:id")
-  public async deleteBySubscriptionId(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteBySubscriptionId(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const permission = au.checkAccess(Permissions.donations.edit) || (!!au.personId && ((await this.repos.subscription.load(au.churchId, id)) as any)?.personId === au.personId);
+      const permission = au.checkAccess(Permissions.donations.edit) || (!!au.personId && ((await this.repos.subscription.load(au.churchId, id)) as Subscription | null)?.personId === au.personId);
       if (!permission) return this.json(null, 401);
       else {
         await this.repos.subscriptionFunds.deleteBySubscriptionId(au.churchId, id);

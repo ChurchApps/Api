@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Plan } from "../models/index.js";
 import { getDb } from "../db/index.js";
+import { mysqlValue } from "./sqlValues.js";
 
 @injectable()
 export class PlanRepo {
@@ -19,7 +20,7 @@ export class PlanRepo {
       campusId: model.campusId,
       planTypeId: model.planTypeId,
       name: model.name,
-      serviceDate: (model.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]) as any,
+      serviceDate: mysqlValue<Date>(model.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]),
       notes: model.notes,
       serviceOrder: model.serviceOrder,
       contentType: model.contentType,
@@ -43,7 +44,7 @@ export class PlanRepo {
       campusId: model.campusId,
       planTypeId: model.planTypeId,
       name: model.name,
-      serviceDate: (model.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]) as any,
+      serviceDate: mysqlValue<Date>(model.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]),
       notes: model.notes,
       serviceOrder: model.serviceOrder,
       contentType: model.contentType,
@@ -85,8 +86,8 @@ export class PlanRepo {
     return getDb().selectFrom("plans").selectAll()
       .where("churchId", "=", churchId)
       .where("planTypeId", "=", planTypeId)
-      .where("serviceDate", ">=", (from.toISOString().split("T")[0]) as any)
-      .where("serviceDate", "<=", (to.toISOString().split("T")[0]) as any)
+      .where("serviceDate", ">=", mysqlValue<Date>(from.toISOString().split("T")[0]))
+      .where("serviceDate", "<=", mysqlValue<Date>(to.toISOString().split("T")[0]))
       .execute();
   }
 
@@ -106,8 +107,8 @@ export class PlanRepo {
   public async load7Days(churchId: string) {
     return getDb().selectFrom("plans").selectAll()
       .where("churchId", "=", churchId)
-      .where("serviceDate", ">=", sql`CURDATE()` as any)
-      .where("serviceDate", "<=", sql`CURDATE() + INTERVAL 7 DAY` as any)
+      .where("serviceDate", ">=", sql<Date>`CURDATE()`)
+      .where("serviceDate", "<=", sql<Date>`CURDATE() + INTERVAL 7 DAY`)
       .orderBy("serviceDate", "desc")
       .execute();
   }
@@ -124,7 +125,7 @@ export class PlanRepo {
     // One-day grace so a screen can still pull up yesterday's service (Sunday's lesson on Monday)
     return (await getDb().selectFrom("plans").selectAll()
       .where("planTypeId", "=", planTypeId)
-      .where("serviceDate", ">=", sql`CURDATE() - INTERVAL 1 DAY` as any)
+      .where("serviceDate", ">=", sql<Date>`CURDATE() - INTERVAL 1 DAY`)
       .orderBy("serviceDate")
       .limit(1)
       .executeTakeFirst()) ?? null;
@@ -139,11 +140,11 @@ export class PlanRepo {
       .selectAll("p")
       .distinct()
       .where("p.churchId", "=", churchId)
-      .where("pos.allowSelfSignup", "=", true as any)
+      .where("pos.allowSelfSignup", "=", true)
       // Plans whose type was deleted are orphaned; plans that never had a type still show (#1324).
       .where((eb) => eb.or([eb("p.planTypeId", "is", null), eb("pt.id", "is not", null)]))
-      .where((eb) => eb.or([eb("p.prepared", "is", null), eb("p.prepared", "=", false as any)]))
-      .where("p.serviceDate", ">=", sql`CURDATE()` as any)
+      .where((eb) => eb.or([eb("p.prepared", "is", null), eb("p.prepared", "=", false)]))
+      .where("p.serviceDate", ">=", sql<Date>`CURDATE()`)
       .orderBy("p.serviceDate", "asc")
       .execute();
   }

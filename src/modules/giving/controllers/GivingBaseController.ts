@@ -2,6 +2,8 @@ import { BaseController } from "../../../shared/infrastructure/index.js";
 import { ExchangeRateHelper } from "../../../shared/helpers/ExchangeRateHelper.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { Repos } from "../repositories/index.js";
+import { Gateway } from "../models/index.js";
+import { GatewayInput, MembershipLookupRepos, MembershipSettingRow, PublicGateway } from "./types.js";
 
 export class GivingBaseController extends BaseController {
   public repos: Repos;
@@ -11,8 +13,8 @@ export class GivingBaseController extends BaseController {
   }
 
   // What donors (and anyone without settings.edit) may see of a gateway: no keys, only the sandbox flag from settings.
-  public static toPublicGateway(gateway: any) {
-    const base: any = {
+  public static toPublicGateway(gateway: GatewayInput) {
+    const base: PublicGateway = {
       id: gateway.id,
       provider: gateway.provider,
       publicKey: gateway.publicKey,
@@ -34,7 +36,7 @@ export class GivingBaseController extends BaseController {
   // The church currency is the first gateway's currency, else the church's "currency" setting, else usd
   // (same rule the apps use via CurrencyHelper.loadCurrency). Rates always come from the server-side cache, never from the request.
   protected async loadChurchRates(churchId: string) {
-    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
+    const gateways: Gateway[] = await this.repos.gateway.loadAll(churchId);
     let currency = gateways[0]?.currency || "";
     if (!currency) currency = await this.loadChurchCurrencySetting(churchId);
     currency = (currency || "usd").toLowerCase();
@@ -45,8 +47,8 @@ export class GivingBaseController extends BaseController {
   // The church's "currency" membership setting, or "" when it is missing or the lookup fails.
   protected async loadChurchCurrencySetting(churchId: string): Promise<string> {
     try {
-      const membershipRepos = await RepoManager.getRepos<any>("membership");
-      const settings = (await membershipRepos.setting.loadMulipleChurches(["currency"], [churchId]).catch((): any[] => [])) as any[];
+      const membershipRepos = await RepoManager.getRepos<MembershipLookupRepos>("membership");
+      const settings = await membershipRepos.setting.loadMulipleChurches(["currency"], [churchId]).catch((): MembershipSettingRow[] => []);
       return settings[0]?.value || "";
     } catch {
       return "";

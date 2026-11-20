@@ -3,28 +3,30 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
+import { Customer, Gateway } from "../models/index.js";
+import { GatewayError } from "./types.js";
 
 @controller("/giving/customers")
 export class CustomerController extends GivingBaseController {
 
   @httpGet("/:id/subscriptions")
-  public async getSubscriptions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getSubscriptions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       let permission = au.checkAccess(Permissions.donations.viewSummary);
       if (!permission) {
         const customerData = await this.repos.customer.load(au.churchId, id);
         if (customerData) {
-          const customer = this.repos.customer.convertToModel(au.churchId, customerData as any);
+          const customer = this.repos.customer.convertToModel(au.churchId, customerData);
           permission = customer.personId === au.personId;
         }
       }
       if (!permission) return this.json({}, 401);
 
-      const customerRecord = await this.repos.customer.load(au.churchId, id) as any;
+      const customerRecord: Customer | null = await this.repos.customer.load(au.churchId, id);
       const personId = customerRecord?.personId || au.personId;
 
-      const allGateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
-      const allSubscriptions: any[] = [];
+      const allGateways: Gateway[] = await this.repos.gateway.loadAll(au.churchId);
+      const allSubscriptions: Record<string, unknown>[] = [];
 
       // If no gateways are configured, return empty array (church hasn't set up giving)
       if (!allGateways || allGateways.length === 0) {
@@ -45,19 +47,19 @@ export class CustomerController extends GivingBaseController {
           if (passedCustomer && passedCustomer.provider?.toLowerCase() === gw.provider?.toLowerCase()) {
             gatewayCustomerId = id;
           } else {
-            const providerCustomer = await this.repos.customer.loadByPersonAndProvider(au.churchId, personId, gw.provider) as any;
+            const providerCustomer: Customer | null = await this.repos.customer.loadByPersonAndProvider(au.churchId, personId, gw.provider);
             if (providerCustomer) gatewayCustomerId = providerCustomer.id;
           }
           if (!gatewayCustomerId) continue; // no customer on this provider, skip
 
           const gateway = await GatewayService.getGatewayForChurch(au.churchId, { gatewayId: gw.id }, this.repos.gateway);
 
-          let subs: any[];
+          let subs: Awaited<ReturnType<typeof GatewayService.listNormalizedSubscriptions>>;
           try {
             subs = await GatewayService.listNormalizedSubscriptions(gateway, gatewayCustomerId);
-          } catch (subErr: any) {
+          } catch (subErr) {
             // Customer doesn't exist on the provider — skip this gateway
-            if (subErr.response?.status === 404) {
+            if ((subErr as GatewayError).response?.status === 404) {
               console.warn(`Customer ${gatewayCustomerId} not found on ${gw.provider} for subscriptions, skipping.`);
               continue;
             }
@@ -78,16 +80,16 @@ export class CustomerController extends GivingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const customer = await this.repos.customer.convertToModel(au.churchId, (await this.repos.customer.load(au.churchId, id)) as any);
+      const customer = await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, id));
       if (!au.checkAccess(Permissions.donations.viewSummary) && au.personId !== customer.personId) return this.json({}, 401);
       else return customer;
     });
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json([], 401);
       const data = await this.repos.customer.loadAll(au.churchId);
@@ -96,7 +98,7 @@ export class CustomerController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       await this.repos.customer.delete(au.churchId, id);

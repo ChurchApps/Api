@@ -65,7 +65,7 @@ export class WorkflowTriggerRepo {
       .where("churchId", "=", churchId)
       .where("triggerKind", "=", "event")
       .where("eventType", "=", eventType)
-      .where("active", "=", true as any)
+      .where("active", "=", true)
       .execute();
   }
 
@@ -76,16 +76,16 @@ export class WorkflowTriggerRepo {
       .distinct()
       .where("churchId", "=", churchId)
       .where("triggerKind", "=", "event")
-      .where("active", "=", true as any)
+      .where("active", "=", true)
       .execute();
-    return rows.map((r: any) => r.eventType).filter(Boolean);
+    return rows.map((r) => r.eventType).filter(Boolean);
   }
 
   // Scheduled rules across all churches — the pull path run by the cron/timer.
   public async loadScheduledAllChurches() {
     return getDb().selectFrom("workflowTriggers").selectAll()
       .where("triggerKind", "=", "schedule")
-      .where("active", "=", true as any)
+      .where("active", "=", true)
       .execute();
   }
 }

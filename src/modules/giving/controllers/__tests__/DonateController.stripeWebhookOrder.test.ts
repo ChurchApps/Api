@@ -1,6 +1,7 @@
 import "reflect-metadata";
+import express from "express";
 
-jest.mock("../GivingBaseController", () => ({ GivingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../GivingBaseController", () => ({ GivingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/Permissions.js", () => ({ Permissions: { donations: { edit: "donationsEdit" } } }));
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { membershipApi: "http://membership" } }));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: {} }));
@@ -16,8 +17,8 @@ jest.mock("../../../../shared/helpers/GatewayService.js", () => {
       verifyWebhook: jest.fn(),
       classifyWebhookEvent: jest.fn(() => ({ action: "donation", status: "complete" })),
       logEvent: jest.fn(),
-      logDonation: (_gateway: any, churchId: string, eventData: any, repos: any, status: any) => StripeHelper.logDonation("sk_test", churchId, eventData, repos, status),
-      updateDonationStatus: (_gateway: any, churchId: string, transactionId: string, status: any, repos: any) => StripeHelper.updateDonationStatus(churchId, transactionId, status, repos)
+      logDonation: (_gateway: unknown, churchId: string, eventData: unknown, repos: unknown, status: "pending" | "complete" | "failed") => StripeHelper.logDonation("sk_test", churchId, eventData, repos, status),
+      updateDonationStatus: (_gateway: unknown, churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: unknown) => StripeHelper.updateDonationStatus(churchId, transactionId, status, repos)
     }
   };
 });
@@ -26,11 +27,13 @@ import { DonateController } from "../DonateController.js";
 import { GatewayService } from "../../../../shared/helpers/GatewayService.js";
 import { StripeHelper } from "../../../../shared/helpers/StripeHelper.js";
 import { StripeGatewayProvider } from "../../../../shared/helpers/gateways/StripeGatewayProvider.js";
+import { GatewayConfig } from "../../../../shared/helpers/gateways/IGatewayProvider.js";
+import { Donation } from "../../models/index.js";
 
 // One one-time card gift: Stripe sends charge.succeeded and payment_intent.succeeded for it.
 const charge = { id: "ch_1", object: "charge", payment_intent: "pi_1", amount: 12301, currency: "usd", customer: "cus_1", created: 1762600000, metadata: {} };
 const paymentIntent = { id: "pi_1", object: "payment_intent", latest_charge: "ch_1", amount: 12301, amount_received: 12301, currency: "usd", customer: "cus_1", created: 1762600000, metadata: {} };
-const events: Record<string, any> = {
+const events: Record<string, { eventId: string; eventType: string; eventData: Record<string, unknown> }> = {
   charge: { eventId: "evt_charge", eventType: "charge.succeeded", eventData: charge },
   paymentIntent: { eventId: "evt_pi", eventType: "payment_intent.succeeded", eventData: paymentIntent },
   // A source-based charge from before PaymentIntents: charge.succeeded is its only event.
@@ -38,38 +41,43 @@ const events: Record<string, any> = {
 };
 
 function makeController() {
-  const rows: any[] = [];
+  const rows: Donation[] = [];
   const controller = new DonateController();
-  (controller as any).repos = {
+  const repos = {
     gateway: { loadAll: jest.fn(async () => [{ id: "GAT1", provider: "Stripe" }]) },
-    eventLog: { loadByProviderId: jest.fn(async () => null) },
+    eventLog: { loadByProviderId: jest.fn(async (): Promise<null> => null) },
     customer: { load: jest.fn(async () => ({ personId: "PER1" })) },
     donationBatch: { getOrCreateCurrent: jest.fn(async () => ({ id: "BAT1" })) },
     fund: { getOrCreateGeneral: jest.fn(async () => ({ id: "FUN1" })) },
     donation: {
       loadByTransactionId: jest.fn(async (_c: string, id: string) => rows.find((r) => r.transactionId === id) || null),
-      save: jest.fn(async (d: any) => { rows.push(d); }),
-      updateStatus: jest.fn(async (_c: string, id: string, status: string) => { rows.filter((r) => r.transactionId === id).forEach((r) => { r.status = status; }); })
+      save: jest.fn(async (d: Donation) => { rows.push(d); }),
+      updateStatus: jest.fn(async (_c: string, id: string, status: Donation["status"]) => { rows.filter((r) => r.transactionId === id).forEach((r) => { r.status = status; }); })
     }
   };
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos,
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action(),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, rows };
 }
 
 async function deliver(controller: DonateController, key: string) {
   // Run the provider's real skip rules so the test sees which events it lets through.
   (GatewayService.verifyWebhook as jest.Mock).mockImplementationOnce(async () => {
-    jest.spyOn(StripeHelper, "verifySignature").mockResolvedValueOnce({ id: events[key].eventId, type: events[key].eventType, data: { object: events[key].eventData } } as any);
-    return new StripeGatewayProvider().verifyWebhookSignature({ privateKey: "sk_test", webhookKey: "whsec_test" } as any, { "stripe-signature": "sig" }, {});
+    // The fixture is only the slice of a Stripe event the provider reads.
+    const helper: { verifySignature: (...args: never[]) => Promise<unknown> } = StripeHelper;
+    jest.spyOn(helper, "verifySignature").mockResolvedValueOnce({ id: events[key].eventId, type: events[key].eventType, data: { object: events[key].eventData } });
+    return new StripeGatewayProvider().verifyWebhookSignature({ privateKey: "sk_test", webhookKey: "whsec_test" } as GatewayConfig, { "stripe-signature": "sig" }, {});
   });
-  const req: any = { params: { provider: "stripe" }, query: { churchId: "CHU1" }, headers: {}, body: { id: events[key].eventId }, protocol: "https", hostname: "api", get: () => undefined };
-  return (controller as any).webhook(req, {});
+  const req: Partial<express.Request<{ provider: string }>> = { params: { provider: "stripe" }, query: { churchId: "CHU1" }, headers: {}, body: { id: events[key].eventId }, protocol: "https", hostname: "api", get: (): undefined => undefined };
+  return controller.webhook(req as express.Request<{ provider: string }>, {} as express.Response);
 }
 
 describe("DonateController Stripe webhook: one-time card gift", () => {
   beforeEach(() => {
-    jest.spyOn(StripeHelper, "getPaymentDetails").mockResolvedValue({ method: "Card", methodDetails: "visa ****4242" } as any);
+    jest.spyOn(StripeHelper, "getPaymentDetails").mockResolvedValue({ method: "Card", methodDetails: "visa ****4242" });
   });
 
   it("records one donation when charge.succeeded arrives before payment_intent.succeeded", async () => {

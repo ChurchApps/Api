@@ -36,13 +36,13 @@ export class ProviderProxyController extends DoingBaseController {
   private getProviderOrError(providerId: string): Provider {
     const provider = getProvider(providerId) as unknown as Provider | null;
     if (!provider) {
-      const err: any = new Error(`Unknown provider: ${providerId}`);
+      const err: Error & { status?: number } = new Error(`Unknown provider: ${providerId}`);
       err.status = 400;
       throw err;
     }
     // LAN providers (FreeShow) are reached by the device on the church network, never from the cloud.
     if (provider.authTypes?.includes("network_discovery")) {
-      const err: any = new Error(`Provider is only reachable on the local network: ${providerId}`);
+      const err: Error & { status?: number } = new Error(`Provider is only reachable on the local network: ${providerId}`);
       err.status = 400;
       throw err;
     }
@@ -51,7 +51,7 @@ export class ProviderProxyController extends DoingBaseController {
 
   // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/browse")
-  public async browse(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
+  public async browse(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
@@ -72,7 +72,7 @@ export class ProviderProxyController extends DoingBaseController {
 
   // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/getPresentations")
-  public async getPresentations(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
+  public async getPresentations(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
@@ -94,7 +94,7 @@ export class ProviderProxyController extends DoingBaseController {
 
   // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/getPlaylist")
-  public async getPlaylist(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
+  public async getPlaylist(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path, resolution } = req.body;
@@ -121,7 +121,7 @@ export class ProviderProxyController extends DoingBaseController {
 
   // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/getInstructions")
-  public async getInstructions(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
+  public async getInstructions(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
@@ -146,7 +146,7 @@ export class ProviderProxyController extends DoingBaseController {
 
   // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/getExpandedInstructions")
-  public async getExpandedInstructions(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
+  public async getExpandedInstructions(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;

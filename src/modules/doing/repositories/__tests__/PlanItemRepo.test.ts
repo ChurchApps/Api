@@ -4,21 +4,22 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "ge
 
 import { getDb } from "../../db/index.js";
 import { PlanItemRepo } from "../PlanItemRepo.js";
+import type { PlanItem } from "../../models/index.js";
 
 function recordingDb() {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy = new Proxy<Record<string, unknown>>({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => [];
       if (prop === "executeTakeFirst") return async () => null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
 
-const firstArg = (calls: { method: string; args: any[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
+const firstArg = (calls: { method: string; args: unknown[] }[], method: string) => calls.find((c) => c.method === method)?.args[0] as Partial<PlanItem> | undefined;
 
 describe("PlanItemRepo positionId", () => {
   afterEach(() => jest.restoreAllMocks());

@@ -25,22 +25,23 @@ jest.mock("@churchapps/apihelper", () => {
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { getDb } from "../../db/index.js";
 import { ContentProviderAuthRepo } from "../ContentProviderAuthRepo.js";
+import type { ContentProviderAuth } from "../../models/index.js";
 
 // Records calls on a Kysely chain and returns the given rows from execute/executeTakeFirst.
-function recordingDb(rows: any[] = []) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+function recordingDb(rows: Partial<ContentProviderAuth>[] = []) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy = new Proxy<Record<string, unknown>>({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => rows;
       if (prop === "executeTakeFirst") return async () => rows[0];
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
 
-const baseModel = () => ({ churchId: "c1", ministryId: "m1", providerId: "dropbox", accessToken: "sl.access-token", refreshToken: "refresh-token", tokenType: "Bearer", scope: "files.content.read" });
+const baseModel = (): ContentProviderAuth => ({ churchId: "c1", ministryId: "m1", providerId: "dropbox", accessToken: "sl.access-token", refreshToken: "refresh-token", tokenType: "Bearer", scope: "files.content.read" });
 
 // Issue #1400: content provider tokens were stored as plain text.
 describe("ContentProviderAuthRepo token encryption", () => {
@@ -49,10 +50,10 @@ describe("ContentProviderAuthRepo token encryption", () => {
   it("encrypts both tokens on create and leaves the caller's model in plain text", async () => {
     const { proxy, calls } = recordingDb();
     (getDb as jest.Mock).mockReturnValue(proxy);
-    const model: any = baseModel();
+    const model = baseModel();
     const saved = await new ContentProviderAuthRepo().save(model);
 
-    const values = calls.find((c) => c.method === "values")!.args[0];
+    const values = calls.find((c) => c.method === "values")?.args[0] as ContentProviderAuth;
     expect(values.accessToken).not.toBe("sl.access-token");
     expect(values.accessToken).toContain("|");
     expect(values.refreshToken).not.toBe("refresh-token");
@@ -65,10 +66,10 @@ describe("ContentProviderAuthRepo token encryption", () => {
   it("encrypts both tokens on update", async () => {
     const { proxy, calls } = recordingDb();
     (getDb as jest.Mock).mockReturnValue(proxy);
-    const model: any = { ...baseModel(), id: "a1" };
+    const model = { ...baseModel(), id: "a1" };
     await new ContentProviderAuthRepo().save(model);
 
-    const set = calls.find((c) => c.method === "set")!.args[0];
+    const set = calls.find((c) => c.method === "set")?.args[0] as ContentProviderAuth;
     expect(EncryptionHelper.decrypt(set.accessToken)).toBe("sl.access-token");
     expect(EncryptionHelper.decrypt(set.refreshToken)).toBe("refresh-token");
     expect(model.accessToken).toBe("sl.access-token");
@@ -77,8 +78,8 @@ describe("ContentProviderAuthRepo token encryption", () => {
   it("keeps an empty refresh token empty", async () => {
     const { proxy, calls } = recordingDb();
     (getDb as jest.Mock).mockReturnValue(proxy);
-    await new ContentProviderAuthRepo().save({ ...baseModel(), refreshToken: "" } as any);
-    expect(calls.find((c) => c.method === "values")!.args[0].refreshToken).toBe("");
+    await new ContentProviderAuthRepo().save({ ...baseModel(), refreshToken: "" });
+    expect((calls.find((c) => c.method === "values")?.args[0] as ContentProviderAuth).refreshToken).toBe("");
   });
 
   it("decrypts tokens on load", async () => {
@@ -86,14 +87,14 @@ describe("ContentProviderAuthRepo token encryption", () => {
     (getDb as jest.Mock).mockReturnValue(recordingDb([row]).proxy);
     const repo = new ContentProviderAuthRepo();
 
-    const one: any = await repo.load("c1", "a1");
+    const one = await repo.load("c1", "a1");
     expect(one.accessToken).toBe("sl.access-token");
     expect(one.refreshToken).toBe("refresh-token");
 
-    const byProvider: any = await repo.loadChurchLevelByProvider("c1", "dropbox");
+    const byProvider = await repo.loadChurchLevelByProvider("c1", "dropbox");
     expect(byProvider.accessToken).toBe("sl.access-token");
 
-    const all: any[] = await repo.loadByMinistry("c1", "m1");
+    const all = await repo.loadByMinistry("c1", "m1");
     expect(all[0].accessToken).toBe("sl.access-token");
     expect(repo.convertAllToModel("c1", all)[0].refreshToken).toBe("refresh-token");
   });
@@ -101,7 +102,7 @@ describe("ContentProviderAuthRepo token encryption", () => {
   it("returns legacy plain-text tokens unchanged", async () => {
     const row = { id: "a1", churchId: "c1", providerId: "gdrive", accessToken: "ya29.legacy", refreshToken: "1//legacy", expiresAt: new Date("2026-10-27T12:00:00Z") };
     (getDb as jest.Mock).mockReturnValue(recordingDb([row]).proxy);
-    const loaded: any = await new ContentProviderAuthRepo().loadByMinistryAndProvider("c1", "m1", "gdrive");
+    const loaded = await new ContentProviderAuthRepo().loadByMinistryAndProvider("c1", "m1", "gdrive");
     expect(loaded.accessToken).toBe("ya29.legacy");
     expect(loaded.refreshToken).toBe("1//legacy");
     expect(loaded.expiresAt).toEqual(new Date("2026-10-27T12:00:00Z"));

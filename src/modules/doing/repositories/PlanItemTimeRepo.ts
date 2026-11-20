@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { PlanItemTime } from "../models/index.js";
 import { getDb } from "../db/index.js";
+import { mysqlValue } from "./sqlValues.js";
 
 @injectable()
 export class PlanItemTimeRepo {
@@ -11,12 +12,12 @@ export class PlanItemTimeRepo {
 
   private async create(model: PlanItemTime): Promise<PlanItemTime> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("planItemTimes").values({ id: model.id, churchId: model.churchId, planItemId: model.planItemId, timeId: model.timeId, excluded: model.excluded ? 1 : 0, positionId: model.positionId || null } as any).execute();
+    await getDb().insertInto("planItemTimes").values({ id: model.id, churchId: model.churchId, planItemId: model.planItemId, timeId: model.timeId, excluded: mysqlValue<boolean>(model.excluded ? 1 : 0), positionId: model.positionId || null }).execute();
     return model;
   }
 
   private async update(model: PlanItemTime): Promise<PlanItemTime> {
-    await getDb().updateTable("planItemTimes").set({ planItemId: model.planItemId, timeId: model.timeId, excluded: model.excluded ? 1 : 0, positionId: model.positionId || null } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("planItemTimes").set({ planItemId: model.planItemId, timeId: model.timeId, excluded: mysqlValue<boolean>(model.excluded ? 1 : 0), positionId: model.positionId || null }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -30,7 +31,7 @@ export class PlanItemTimeRepo {
 
   public async deleteByPlanId(churchId: string, planId: string) {
     const itemIds = await getDb().selectFrom("planItems").select("id").where("churchId", "=", churchId).where("planId", "=", planId).execute();
-    const ids = itemIds.map((r: any) => r.id).filter(Boolean);
+    const ids = itemIds.map((r) => r.id).filter(Boolean);
     if (ids.length === 0) return;
     await getDb().deleteFrom("planItemTimes").where("churchId", "=", churchId).where("planItemId", "in", ids).execute();
   }

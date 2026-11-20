@@ -8,15 +8,15 @@ import { EventLog } from "../models/index.js";
 export class EventLogController extends GivingBaseController {
 
   @httpGet("/type/:type")
-  public async getByType(@requestParam("type") type: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByType(@requestParam("type") type: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json([], 401);
-      return this.repos.eventLog.convertAllToModel(au.churchId, (await this.repos.eventLog.loadByType(au.churchId, type)) as any[]);
+      return this.repos.eventLog.convertAllToModel(au.churchId, await this.repos.eventLog.loadByType(au.churchId, type));
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
       const data = await this.repos.eventLog.load(au.churchId, id);
@@ -25,7 +25,7 @@ export class EventLogController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json([], 401);
       const data = await this.repos.eventLog.loadAll(au.churchId);
@@ -34,7 +34,7 @@ export class EventLogController extends GivingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, EventLog[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, EventLog[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       const promises: Promise<EventLog>[] = [];
@@ -45,7 +45,7 @@ export class EventLogController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       await this.repos.eventLog.delete(au.churchId, id);
