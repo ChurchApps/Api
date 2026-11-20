@@ -16,11 +16,13 @@ jest.mock("../../modules/index.js", () => ({
   })
 }));
 
+import type { AuthenticatedUser } from "@churchapps/apihelper";
 import { PlanAuth } from "../PlanAuth.js";
 
 function au(overrides: { hasEditAccess?: boolean; personId?: string | null } = {}) {
   const { hasEditAccess = false, personId = "person1" } = overrides;
-  return { checkAccess: jest.fn().mockReturnValue(hasEditAccess), churchId: "church1", personId } as any;
+  const user: Partial<AuthenticatedUser> = { checkAccess: jest.fn().mockReturnValue(hasEditAccess), churchId: "church1", personId };
+  return user as AuthenticatedUser;
 }
 
 beforeEach(() => {

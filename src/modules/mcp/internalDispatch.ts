@@ -4,6 +4,7 @@
 // runs in Lambda where loopback HTTP is not available.
 
 import { EventEmitter } from "events";
+import { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "http";
 import { Socket } from "net";
 import { Application } from "express";
 import { URL } from "url";
@@ -17,8 +18,8 @@ export function setExpressApp(app: Application) {
 export interface DispatchInput {
   method: string;
   path: string;
-  query?: Record<string, any>;
-  body?: any;
+  query?: Record<string, unknown>;
+  body?: unknown;
   authorization?: string;
   clientIp?: string;
 }
@@ -26,8 +27,59 @@ export interface DispatchInput {
 export interface DispatchResult {
   status: number;
   headers: Record<string, string>;
-  body: any;
+  body: unknown;
   truncated: boolean;
+}
+
+// The parts of an IncomingMessage / express.Request that the in-process fake fills in.
+interface FakeRequest extends EventEmitter {
+  method: string;
+  url: string;
+  originalUrl?: string;
+  headers: IncomingHttpHeaders;
+  body?: unknown;
+  _body?: boolean;
+  socket: Socket;
+  connection?: Socket;
+  httpVersion: string;
+  complete: boolean;
+  readable: boolean;
+  aborted: boolean;
+  ip?: string;
+  ips?: string[];
+  protocol?: string;
+  secure?: boolean;
+  hostname?: string;
+  app?: Application | null;
+}
+
+// The parts of a ServerResponse / express.Response that Express handlers call, plus the capture buffers.
+// Members a plain ServerResponse lacks are optional so the fake can be handed to Express as one.
+interface FakeResponse extends EventEmitter {
+  statusCode: number;
+  _headers?: Record<string, string>;
+  _chunks?: Buffer[];
+  _byteLength?: number;
+  _truncated?: boolean;
+  _finished?: boolean;
+  headersSent: boolean;
+  app?: Application | null;
+  setHeader: (name: string, value: unknown) => FakeResponse;
+  getHeader: (name: string) => string;
+  removeHeader: (name: string) => void;
+  getHeaders: () => Record<string, string>;
+  status?: (code: number) => FakeResponse;
+  type?: (t: string) => FakeResponse;
+  set?: (field: string | Record<string, unknown>, value?: unknown) => FakeResponse;
+  header?: (field: string | Record<string, unknown>, value?: unknown) => FakeResponse;
+  write: (chunk: unknown) => boolean;
+  end: (chunk?: unknown) => FakeResponse;
+  send?: (body: unknown) => FakeResponse;
+  json?: (body: unknown) => FakeResponse;
+  sendStatus?: (code: number) => FakeResponse;
+  location?: (loc: string) => FakeResponse;
+  redirect?: (codeOrLoc: number | string, loc?: string) => FakeResponse;
+  _parsedBody?: () => unknown;
 }
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -49,7 +101,7 @@ export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
     res.on("finish", resolve);
     res.on("error", reject);
     try {
-      (expressApp as any)(req, res);
+      expressApp(req as IncomingMessage, res as ServerResponse);
     } catch (err) {
       reject(err);
     }
@@ -63,7 +115,7 @@ export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
   };
 }
 
-function buildUrl(path: string, query?: Record<string, any>): string {
+function buildUrl(path: string, query?: Record<string, unknown>): string {
   if (!query || Object.keys(query).length === 0) return path;
   const u = new URL("http://internal" + (path.startsWith("/") ? path : "/" + path));
   for (const [k, v] of Object.entries(query)) {
@@ -74,8 +126,8 @@ function buildUrl(path: string, query?: Record<string, any>): string {
   return u.pathname + u.search;
 }
 
-function makeRequest(method: string, url: string, body: any, authorization: string | undefined, isLambda: boolean, clientIp?: string): any {
-  const req: any = new EventEmitter();
+function makeRequest(method: string, url: string, body: unknown, authorization: string | undefined, isLambda: boolean, clientIp?: string): FakeRequest {
+  const req = new EventEmitter() as FakeRequest;
   req.method = method;
   req.url = url;
   req.originalUrl = url;
@@ -109,8 +161,8 @@ function makeRequest(method: string, url: string, body: any, authorization: stri
   return req;
 }
 
-function makeResponse(): any {
-  const res: any = new EventEmitter();
+function makeResponse(): FakeResponse {
+  const res = new EventEmitter() as FakeResponse;
   res.statusCode = 200;
   res._headers = {} as Record<string, string>;
   res._chunks = [] as Buffer[];
@@ -120,7 +172,7 @@ function makeResponse(): any {
   res.headersSent = false;
   res.app = expressApp;
 
-  res.setHeader = (name: string, value: any) => {
+  res.setHeader = (name: string, value: unknown) => {
     res._headers[name.toLowerCase()] = String(value);
     return res;
   };
@@ -131,7 +183,7 @@ function makeResponse(): any {
   res.status = (code: number) => { res.statusCode = code; return res; };
   res.type = (t: string) => { res.setHeader("content-type", t); return res; };
 
-  res.set = res.header = function (field: any, value?: any) {
+  res.set = res.header = function (field: string | Record<string, unknown>, value?: unknown) {
     if (typeof field === "object") {
       for (const [k, v] of Object.entries(field)) res.setHeader(k, v);
     } else {
@@ -140,7 +192,7 @@ function makeResponse(): any {
     return res;
   };
 
-  const appendChunk = (chunk: any) => {
+  const appendChunk = (chunk: unknown) => {
     if (chunk === undefined || chunk === null) return;
     const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
     const remaining = MAX_BODY_BYTES - res._byteLength;
@@ -155,9 +207,9 @@ function makeResponse(): any {
     }
   };
 
-  res.write = (chunk: any) => { appendChunk(chunk); return true; };
+  res.write = (chunk: unknown) => { appendChunk(chunk); return true; };
 
-  res.end = (chunk?: any) => {
+  res.end = (chunk?: unknown) => {
     if (chunk !== undefined) appendChunk(chunk);
     if (res._finished) return res;
     res._finished = true;
@@ -166,7 +218,7 @@ function makeResponse(): any {
     return res;
   };
 
-  res.send = (body: any) => {
+  res.send = (body: unknown) => {
     if (body === undefined || body === null) return res.end();
     if (Buffer.isBuffer(body)) return res.end(body);
     if (typeof body === "string") return res.end(body);
@@ -174,7 +226,7 @@ function makeResponse(): any {
     return res.end(JSON.stringify(body));
   };
 
-  res.json = (body: any) => {
+  res.json = (body: unknown) => {
     res.setHeader("content-type", "application/json");
     return res.end(JSON.stringify(body));
   };
@@ -185,7 +237,7 @@ function makeResponse(): any {
   };
 
   res.location = (loc: string) => { res.setHeader("location", loc); return res; };
-  res.redirect = (codeOrLoc: any, loc?: string) => {
+  res.redirect = (codeOrLoc: number | string, loc?: string) => {
     if (typeof codeOrLoc === "number") {
       res.statusCode = codeOrLoc;
       res.setHeader("location", loc);

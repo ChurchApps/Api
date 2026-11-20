@@ -78,9 +78,9 @@ export class MigrationRunner {
 
   private static async liveSchema(moduleName: string): Promise<LiveSchema> {
     const db = KyselyPool.getDb(moduleName);
-    const tables = await sql<any>`SELECT TABLE_NAME AS t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'`.execute(db);
-    const cols = await sql<any>`SELECT TABLE_NAME AS t, COLUMN_NAME AS c, COLUMN_TYPE AS ty, IS_NULLABLE AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()`.execute(db);
-    const idx = await sql<any>`SELECT DISTINCT TABLE_NAME AS t, INDEX_NAME AS i FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()`.execute(db);
+    const tables = await sql<{ t: string }>`SELECT TABLE_NAME AS t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'`.execute(db);
+    const cols = await sql<{ t: string; c: string; ty: string; n: string }>`SELECT TABLE_NAME AS t, COLUMN_NAME AS c, COLUMN_TYPE AS ty, IS_NULLABLE AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()`.execute(db);
+    const idx = await sql<{ t: string; i: string }>`SELECT DISTINCT TABLE_NAME AS t, INDEX_NAME AS i FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()`.execute(db);
     return {
       tables: new Set(tables.rows.map((r) => r.t)),
       columns: new Map(cols.rows.map((r) => [`${r.t}.${r.c}`, { type: String(r.ty).toLowerCase(), nullable: r.n === "YES" }])),
@@ -99,8 +99,8 @@ export class MigrationRunner {
       const allowed = rerun.filter((r) => migrations.some((m) => m.name === r && m.state === "partial"));
       const { names, blocked } = suggestBaseline(migrations, allowed);
       return { module: moduleName, migrations, suggested: names, blocked };
-    } catch (e: any) {
-      return { module: moduleName, migrations: [], suggested: [], error: e?.message || String(e) };
+    } catch (e) {
+      return { module: moduleName, migrations: [], suggested: [], error: (e as Error | undefined)?.message || String(e) };
     }
   }
 
@@ -116,7 +116,7 @@ export class MigrationRunner {
     const same = names.length === found.suggested.length && names.every((n, i) => n === found.suggested[i]);
     if (!same) return { module: moduleName, recorded: [], error: "The schema no longer matches what was reviewed; check again" };
     if (!names.length) return { module: moduleName, recorded: [] };
-    const db = KyselyPool.getDb<any>(moduleName);
+    const db = KyselyPool.getDb<{ kysely_migration: { name: string; timestamp: string } }>(moduleName);
     await sql`CREATE TABLE IF NOT EXISTS kysely_migration (name varchar(255) NOT NULL PRIMARY KEY, timestamp varchar(255) NOT NULL)`.execute(db);
     await sql`CREATE TABLE IF NOT EXISTS kysely_migration_lock (id varchar(255) NOT NULL PRIMARY KEY, is_locked int NOT NULL DEFAULT 0)`.execute(db);
     await sql`INSERT IGNORE INTO kysely_migration_lock (id, is_locked) VALUES ('migration_lock', 0)`.execute(db);
@@ -137,8 +137,8 @@ export class MigrationRunner {
         lastApplied: last ? { name: last.name, at: last.executedAt.toISOString() } : undefined,
         noHistory: all.length > 0 && done.length === 0
       };
-    } catch (e: any) {
-      return { module: moduleName, applied: 0, pending: [], error: e?.message || String(e) };
+    } catch (e) {
+      return { module: moduleName, applied: 0, pending: [], error: (e as Error | undefined)?.message || String(e) };
     }
   }
 
@@ -164,9 +164,9 @@ export class MigrationRunner {
       const { error, results } = await this.migrator(moduleName).migrateToLatest();
       const applied = (results || []).filter((r) => r.status === "Success").map((r) => r.migrationName);
       const failed = (results || []).find((r) => r.status === "Error")?.migrationName;
-      return { module: moduleName, applied, failed, error: error ? (error as any)?.message || String(error) : undefined };
-    } catch (e: any) {
-      return { module: moduleName, applied: [], error: e?.message || String(e) };
+      return { module: moduleName, applied, failed, error: error ? (error as Error | undefined)?.message || String(error) : undefined };
+    } catch (e) {
+      return { module: moduleName, applied: [], error: (e as Error | undefined)?.message || String(e) };
     }
   }
 }

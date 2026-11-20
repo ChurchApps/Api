@@ -4,9 +4,9 @@ import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 
 @injectable()
 export class ReportRepo {
-  public async run(moduleName: string, rawSql: string, parameters: any[]): Promise<any[]> {
+  public async run(moduleName: string, rawSql: string, parameters: unknown[]): Promise<Record<string, unknown>[]> {
     const db = KyselyPool.getDb(moduleName);
     const result = await db.executeQuery(CompiledQuery.raw(rawSql, parameters));
-    return result.rows as any[];
+    return result.rows as Record<string, unknown>[];
   }
 }

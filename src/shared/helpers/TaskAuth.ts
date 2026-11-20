@@ -1,6 +1,7 @@
+import { IPermission } from "@churchapps/apihelper";
 import { Permissions } from "./Permissions.js";
 
-type TaskViewer = { personId?: string; groupIds?: string[]; checkAccess: (p: any) => boolean };
+type TaskViewer = { personId?: string; groupIds?: string[]; checkAccess: (p: IPermission) => boolean };
 type TaskRef = { associatedWithType?: string; associatedWithId?: string; createdByType?: string; createdById?: string; assignedToType?: string; assignedToId?: string };
 
 // One rule for who can open a workflow card: doing (/doing/tasks) and messaging (card notes) both use it.

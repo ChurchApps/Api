@@ -9,19 +9,20 @@ jest.mock("../../modules/messaging/index.js", () => ({ initializeNotificationDel
 jest.mock("../../modules/bridge/helpers/AutomationHelper.js", () => ({ AutomationHelper: {} }));
 jest.mock("../../shared/infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ conversation: { cleanup } })) } }));
 
-import { handle30MinTimer } from "../timer-handler";
+import { ScheduledEvent, Context } from "aws-lambda";
+import { handle30MinTimer } from "../timer-handler.js";
 
 describe("handle30MinTimer", () => {
   it("runs the conversation cleanup job", async () => {
     jest.spyOn(console, "log").mockImplementation(() => undefined);
-    await handle30MinTimer({} as any, {} as any);
+    await handle30MinTimer({} as ScheduledEvent, {} as Context);
     expect(jobNames).toContain("conversationCleanup");
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
   it("resumes waiting workflow cards every 30 minutes, not once a day", async () => {
     jest.spyOn(console, "log").mockImplementation(() => undefined);
-    await handle30MinTimer({} as any, {} as any);
+    await handle30MinTimer({} as ScheduledEvent, {} as Context);
     expect(jobNames).toContain("workflowSnoozed");
   });
 });

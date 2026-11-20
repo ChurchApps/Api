@@ -30,10 +30,10 @@ const safe = async (label: string, fn: () => Promise<unknown>): Promise<void> =>
 
 // Runs the same handlers as the Lambda timers so both schedulers stay in sync.
 const timers = () => import("../../lambda/timer-handler.js");
-const runThirtyMinute = async () => (await timers()).handle30MinTimer(null as any, null as any);
-const runMidnight = async () => (await timers()).handleMidnightTimer(null as any, null as any);
-const runScheduledTasks = async () => (await timers()).handleScheduledTasks(null as any, null as any);
-const runWebhookDeliveries = async () => (await timers()).handleWebhookTimer(null as any, null as any);
+const runThirtyMinute = async () => (await timers()).handle30MinTimer(null, null);
+const runMidnight = async () => (await timers()).handleMidnightTimer(null, null);
+const runScheduledTasks = async () => (await timers()).handleScheduledTasks(null, null);
+const runWebhookDeliveries = async () => (await timers()).handleWebhookTimer(null, null);
 
 export const startRailwayCron = (): void => {
   if (!process.env.RAILWAY_ENVIRONMENT && !process.env.SELF_HOSTED) return;

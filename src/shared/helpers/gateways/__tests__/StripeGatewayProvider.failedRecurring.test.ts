@@ -6,6 +6,7 @@ jest.mock("../../Environment", () => ({ Environment: { membershipApi: "http://te
 import Stripe from "stripe";
 import { StripeGatewayProvider } from "../StripeGatewayProvider";
 import { GatewayConfig } from "../IGatewayProvider";
+import type { Donation } from "../../../../modules/giving/models";
 
 const config = { privateKey: "sk_test" } as GatewayConfig;
 
@@ -26,7 +27,7 @@ describe("StripeGatewayProvider failed recurring payments", () => {
     const makeRepos = () => ({
       customer: { load: jest.fn().mockResolvedValue({ personId: "per1" }) },
       donationBatch: { getOrCreateCurrent: jest.fn().mockResolvedValue({ id: "batch1" }) },
-      donation: { save: jest.fn().mockImplementation(async (d: any) => ({ ...d, id: "don1" })) },
+      donation: { save: jest.fn().mockImplementation(async (d: Donation) => ({ ...d, id: "don1" })) },
       fundDonation: { save: jest.fn().mockResolvedValue({}) },
       subscriptionFunds: { loadForSubscriptionLog: jest.fn().mockResolvedValue([{ id: "f1", amount: 25 }]) },
       fund: { getOrCreateGeneral: jest.fn().mockResolvedValue({ id: "general" }) }

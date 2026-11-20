@@ -1,5 +1,6 @@
 jest.mock("../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
 
+import express from "express";
 import { dispatch, setExpressApp } from "../internalDispatch.js";
 import { makeApiCallHandler } from "../tools/apiCall.js";
 import { LoginRateLimiter } from "../../membership/helpers/LoginRateLimiter.js";
@@ -7,10 +8,10 @@ import { LoginRateLimiter } from "../../membership/helpers/LoginRateLimiter.js";
 describe("MCP api_call", () => {
   let seenIp = "";
   beforeAll(() => {
-    setExpressApp(((req: any, res: any) => {
+    setExpressApp(((req: express.Request, res: express.Response) => {
       seenIp = LoginRateLimiter.getClientIp(req);
       res.json({ ok: true });
-    }) as any);
+    }) as express.Application);
   });
 
   it("carries the outer caller's ip into the dispatched request", async () => {
@@ -27,7 +28,7 @@ describe("MCP api_call", () => {
   it.each(["/membership/users/login", "/membership/users/verifyCode", "/membership/users/forgot", "/membership/users/register", "/mcp"])("refuses credential endpoint %s", async (path) => {
     seenIp = "untouched";
     const handler = makeApiCallHandler(() => "Bearer x", () => "198.51.100.4");
-    const result: any = await handler({ method: "POST", path });
+    const result = await handler({ method: "POST", path });
     expect(result.isError).toBe(true);
     expect(seenIp).toBe("untouched");
   });
@@ -35,16 +36,16 @@ describe("MCP api_call", () => {
   it.each(["/membership/users/mfa/status", "/membership/users/mfa/setup", "/membership/users/mfa/enable", "/membership/users/mfa/disable", "/membership/users/mfa/reset/u1"])("refuses the two-factor endpoint %s", async (path) => {
     seenIp = "untouched";
     const handler = makeApiCallHandler(() => "Bearer x", () => "198.51.100.4");
-    const result: any = await handler({ method: "POST", path });
+    const result = await handler({ method: "POST", path });
     expect(result.isError).toBe(true);
     expect(seenIp).toBe("untouched");
   });
 
   it("does not leak internal error messages", async () => {
-    setExpressApp((() => { throw new Error("secret db host 10.0.0.5"); }) as any);
+    setExpressApp(((_req: express.Request, _res: express.Response): void => { throw new Error("secret db host 10.0.0.5"); }) as express.Application);
     jest.spyOn(console, "error").mockImplementation(() => {});
     const handler = makeApiCallHandler(() => "Bearer x");
-    const result: any = await handler({ method: "GET", path: "/membership/people" });
+    const result = await handler({ method: "GET", path: "/membership/people" });
     expect(result.content[0].text).not.toContain("10.0.0.5");
     (console.error as jest.Mock).mockRestore();
   });

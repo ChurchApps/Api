@@ -10,8 +10,8 @@ export interface SafePostResult {
 // POSTs to a church-supplied URL without following redirects, and validates the IP actually
 // being connected to (not a separate pre-flight lookup) so DNS rebinding can't reach internal hosts.
 export class SafeHttp {
-  public static guardedLookup(hostname: string, options: any, callback: any): void {
-    dns.lookup(hostname, options, (err: any, address: any, family?: number) => {
+  public static guardedLookup(hostname: string, options: dns.LookupOptions, callback: (err: NodeJS.ErrnoException | null, address: string | dns.LookupAddress[], family?: number) => void): void {
+    dns.lookup(hostname, options, (err, address, family) => {
       if (err) return callback(err, address, family);
       const list: { address: string }[] = Array.isArray(address) ? address : [{ address }];
       if (list.length === 0 || list.some((a) => UrlValidator.isPrivateIp(a.address))) {
@@ -35,7 +35,7 @@ export class SafeHttp {
       const req = https.request(url, {
         method: "POST",
         headers: { ...headers, "Content-Length": Buffer.byteLength(body).toString() },
-        lookup: SafeHttp.guardedLookup as any,
+        lookup: SafeHttp.guardedLookup,
         timeout: timeoutMs
       }, (res) => {
         let text = "";

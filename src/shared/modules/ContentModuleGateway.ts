@@ -1,25 +1,36 @@
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { civilDate, civilISO, CivilOccurrence } from "../helpers/CivilDate.js";
+import type { Repos as ContentRepos } from "../../modules/content/repositories/index.js";
+import type { ContentDatabase } from "../../modules/content/db/DatabaseTypes.js";
+import type { Event, EventBooking, EventRsvp, Registration, RegistrationMember } from "../../modules/content/models/index.js";
+
+// The fields the recurrence engine reads from an event.
+interface RecurringEventSource {
+  start: Date | string;
+  end: Date | string;
+  recurrenceRule?: string;
+  exceptionDates?: Array<Date | string>;
+}
 
 // Gateway: the only seam through which other modules read content data.
 export interface ContentModuleGateway {
-  loadRegistrationsByPerson(churchId: string, personId: string): Promise<any[]>;
-  loadRegistrationMembersByPerson(churchId: string, personId: string): Promise<any[]>;
-  loadEventRsvpsByPerson(churchId: string, personId: string): Promise<any[]>;
-  loadEventBookingsByPerson(churchId: string, personId: string): Promise<any[]>;
-  loadEvent(churchId: string, eventId: string): Promise<any | null>;
+  loadRegistrationsByPerson(churchId: string, personId: string): Promise<Registration[]>;
+  loadRegistrationMembersByPerson(churchId: string, personId: string): Promise<RegistrationMember[]>;
+  loadEventRsvpsByPerson(churchId: string, personId: string): Promise<EventRsvp[]>;
+  loadEventBookingsByPerson(churchId: string, personId: string): Promise<EventBooking[]>;
+  loadEvent(churchId: string, eventId: string): Promise<Event | null>;
   // Events of a group that collect registration answers through a form.
   loadEventsForGroup(churchId: string, groupId: string): Promise<{ id: string; title: string; start: Date; groupId: string; formId: string }[]>;
   // Expand a recurring event's occurrences in the window to civil-local dates.
   // Lives here (not in messaging) so the recurrence engine stays inside content.
-  expandEventOccurrences(event: any, from: Date, to: Date): Promise<CivilOccurrence[]>;
+  expandEventOccurrences(event: RecurringEventSource, from: Date, to: Date): Promise<CivilOccurrence[]>;
   // Cascade-delete all content owned by a non-primary site (membership calls this on site delete).
   deleteSiteContent(churchId: string, siteId: string): Promise<void>;
 }
 
 class ContentModuleGatewayDb implements ContentModuleGateway {
   private async repos() {
-    return RepoManager.getRepos<any>("content");
+    return RepoManager.getRepos<ContentRepos>("content");
   }
 
   public async loadRegistrationsByPerson(churchId: string, personId: string) {
@@ -29,7 +40,7 @@ class ContentModuleGatewayDb implements ContentModuleGateway {
   // Lazy-load so importers of this gateway don't transitively pull Environment at module scope.
   private async db() {
     const { KyselyPool } = await import("../infrastructure/KyselyPool.js");
-    return KyselyPool.getDb<any>("content");
+    return KyselyPool.getDb<ContentDatabase>("content");
   }
 
   public async loadRegistrationMembersByPerson(churchId: string, personId: string) {
@@ -71,7 +82,7 @@ class ContentModuleGatewayDb implements ContentModuleGateway {
       .execute();
   }
 
-  public async expandEventOccurrences(event: any, from: Date, to: Date): Promise<CivilOccurrence[]> {
+  public async expandEventOccurrences(event: RecurringEventSource, from: Date, to: Date): Promise<CivilOccurrence[]> {
     const { RecurrenceHelper } = await import("../../modules/content/helpers/RecurrenceHelper.js");
     const occ = RecurrenceHelper.getOccurrences(event, from, to, 200) as { start: Date }[];
     return occ.map((o) => ({ startLocalDate: civilDate(o.start), startLocalISO: civilISO(o.start) }));
@@ -82,16 +93,16 @@ class ContentModuleGatewayDb implements ContentModuleGateway {
     if (!siteId) throw new Error("deleteSiteContent requires a non-empty siteId");
     // Lazy-load so importers of this gateway don't transitively pull Environment at module scope.
     const { KyselyPool } = await import("../infrastructure/KyselyPool.js");
-    const pool = KyselyPool.getDb<any>("content");
+    const pool = KyselyPool.getDb<ContentDatabase>("content");
 
     // Destructive multi-table cascade — one transaction so a mid-sequence failure rolls back cleanly.
-    await pool.transaction().execute(async (db: any) => {
+    await pool.transaction().execute(async (db) => {
       // 1. Pages owned by the site → their sections/elements/history/posts.
       const pageRows = await db.selectFrom("pages").select("id").where("churchId", "=", churchId).where("siteId", "=", siteId).execute();
-      const pageIds = pageRows.map((r: any) => r.id);
+      const pageIds = pageRows.map((r) => r.id);
       if (pageIds.length > 0) {
         const sectionRows = await db.selectFrom("sections").select("id").where("churchId", "=", churchId).where("pageId", "in", pageIds).execute();
-        const sectionIds = sectionRows.map((r: any) => r.id);
+        const sectionIds = sectionRows.map((r) => r.id);
         if (sectionIds.length > 0) {
           await db.deleteFrom("elements").where("churchId", "=", churchId).where("sectionId", "in", sectionIds).execute();
           await db.deleteFrom("sections").where("churchId", "=", churchId).where("id", "in", sectionIds).execute();
@@ -102,12 +113,12 @@ class ContentModuleGatewayDb implements ContentModuleGateway {
 
       // 2. Blocks owned by the site → their sections/elements/history.
       const blockRows = await db.selectFrom("blocks").select("id").where("churchId", "=", churchId).where("siteId", "=", siteId).execute();
-      const blockIds = blockRows.map((r: any) => r.id);
+      const blockIds = blockRows.map((r) => r.id);
       if (blockIds.length > 0) {
         const blockSectionRows = await db.selectFrom("sections").select("id").where("churchId", "=", churchId).where("blockId", "in", blockIds).execute();
-        const blockSectionIds = blockSectionRows.map((r: any) => r.id);
+        const blockSectionIds = blockSectionRows.map((r) => r.id);
         await db.deleteFrom("elements").where("churchId", "=", churchId)
-          .where((eb: any) => eb.or([
+          .where((eb) => eb.or([
             eb("blockId", "in", blockIds),
             eb("sectionId", "in", blockSectionIds.length > 0 ? blockSectionIds : [""])
           ])).execute();

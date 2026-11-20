@@ -26,7 +26,7 @@ describe("MessagingModuleGateway.sendTemplatedEmail", () => {
   });
 
   it("returns false without notifying when the recipient has no email", async () => {
-    const result = await getMessagingModuleGateway().sendTemplatedEmail("c1", "p1", "t1", { email: "" } as any, "Church");
+    const result = await getMessagingModuleGateway().sendTemplatedEmail("c1", "p1", "t1", { email: "" }, "Church");
     expect(result).toBe(false);
     expect(createNotificationsMock).not.toHaveBeenCalled();
   });

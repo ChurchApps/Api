@@ -1,5 +1,8 @@
-import { KyselyPool } from "./KyselyPool.js";
-import { BaseController } from "./BaseController.js";
+import { Kysely } from "kysely";
+import { DynamicDatabase, KyselyPool } from "./KyselyPool.js";
+import { BaseController, EntitySnapshot } from "./BaseController.js";
+import type { Repos as MembershipRepos } from "../../modules/membership/repositories/index.js";
+import type { AuditLog, Batch } from "../../modules/membership/models/index.js";
 
 export interface UndoResult {
   restored: number;
@@ -8,9 +11,17 @@ export interface UndoResult {
   status: "undone" | "partial";
 }
 
+// The JSON stored in auditLogs.details by BaseController's audit pipeline.
+interface AuditDetails {
+  op?: string;
+  before?: EntitySnapshot | null;
+  after?: EntitySnapshot | null;
+  truncated?: boolean;
+}
+
 interface ParsedRow {
-  row: any;
-  details: any;
+  row: AuditLog;
+  details: AuditDetails;
   op?: "create" | "update" | "delete";
   truncated: boolean;
 }
@@ -19,19 +30,19 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
 // JSON round-trips lose Date objects and drop nothing, but Kysely .set()/.values() silently
 // drop `undefined` — so a cleared column would survive a restore. Force undefined -> null.
-function reviveValue(v: any): any {
+function reviveValue(v: unknown): unknown {
   if (v === undefined) return null;
   if (typeof v === "string" && ISO_DATE.test(v)) { const d = new Date(v); if (!isNaN(d.getTime())) return d; }
   return v;
 }
 
-function nullify(obj: any): any {
-  const out: Record<string, any> = {};
+function nullify(obj: EntitySnapshot): EntitySnapshot {
+  const out: EntitySnapshot = {};
   for (const [k, v] of Object.entries(obj)) out[k] = reviveValue(v);
   return out;
 }
 
-async function restoreOrInsert(db: any, table: string, churchId: string, id: string, before: any) {
+async function restoreOrInsert(db: Kysely<DynamicDatabase>, table: string, churchId: string, id: string, before: EntitySnapshot) {
   const existing = await db.selectFrom(table).select("id").where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst();
   const values = nullify(before);
   if (existing) await db.updateTable(table).set(values).where("id", "=", id).where("churchId", "=", churchId).execute();
@@ -40,7 +51,7 @@ async function restoreOrInsert(db: any, table: string, churchId: string, id: str
 
 // Only an explicit create marker (or a legacy _deleted/before signal) is trusted; a _saved row
 // with no before-image and no marker must never be inferred as a create — that would hard-delete.
-function rowOp(row: any, details: any): "create" | "update" | "delete" | undefined {
+function rowOp(row: AuditLog, details: AuditDetails): "create" | "update" | "delete" | undefined {
   if (details?.op === "create" || details?.op === "update" || details?.op === "delete") return details.op;
   if (typeof row.action === "string" && row.action.endsWith("_deleted")) return "delete";
   if (details?.before) return "update";
@@ -50,7 +61,7 @@ function rowOp(row: any, details: any): "create" | "update" | "delete" | undefin
 export class BatchUndoHelper {
   // Groups the batch's audit rows per entity and reverses each entity ONCE to its pre-batch
   // state, skipping entities modified after the batch (conflict guard).
-  public static async undo(membershipRepos: any, churchId: string, batch: any, undoUserId: string): Promise<UndoResult> {
+  public static async undo(membershipRepos: MembershipRepos, churchId: string, batch: Batch, undoUserId: string): Promise<UndoResult> {
     const rows = await membershipRepos.auditLog.loadForBatch(churchId, batch.id); // chronological asc
     const result: UndoResult = { restored: 0, skippedConflicts: [], failed: [], status: "undone" };
     const { AuditLogHelper } = await import("../../modules/membership/helpers/AuditLogHelper.js");
@@ -59,7 +70,7 @@ export class BatchUndoHelper {
     const order: string[] = [];
     for (const row of rows) {
       if (!row.entityId) { result.failed.push({ entityType: row.entityType, entityId: row.entityId, reason: "no entityId" }); continue; }
-      let details: any = {};
+      let details: AuditDetails = {};
       try { details = row.details ? JSON.parse(row.details) : {}; } catch { /* treat as empty */ }
       const key = `${row.module}|${row.entityType}|${row.entityId}`;
       if (!groups.has(key)) { groups.set(key, []); order.push(key); }
@@ -86,7 +97,7 @@ export class BatchUndoHelper {
       const undoKind: "created" | "updated" | "deleted" = isCreate ? "created" : (hasDelete ? "deleted" : "updated");
 
       try {
-        const db = KyselyPool.getDb<any>(config.dbModule);
+        const db = KyselyPool.getDb<DynamicDatabase>(config.dbModule);
         const table = config.table;
         // onUndo hooks may restore from `after` (e.g. groupMember natural key), so they run
         // before the generic before-image requirement.
@@ -94,7 +105,7 @@ export class BatchUndoHelper {
         if (config.onUndo) handled = await config.onUndo({ db, membershipRepos, churchId, entityId, before: earliestBefore, after: latestAfter, undoKind });
         if (!handled) {
           if (undoKind === "created") {
-            await db.deleteFrom(table as any).where("id", "=", entityId).where("churchId", "=", churchId).execute();
+            await db.deleteFrom(table).where("id", "=", entityId).where("churchId", "=", churchId).execute();
           } else if (earliestBefore) {
             // restoreOrInsert (not plain update) so update-then-hard-delete still restores.
             await restoreOrInsert(db, table, churchId, entityId, earliestBefore);
@@ -107,7 +118,7 @@ export class BatchUndoHelper {
         await AuditLogHelper.log(membershipRepos, churchId, undoUserId, latest.category || latest.entityType, `${latest.entityType}_undone`, latest.entityType, entityId, { undoneFrom: batch.id }, undefined, latest.module);
         result.restored++;
       } catch (e) {
-        result.failed.push({ entityType: latest.entityType, entityId, reason: String((e as any)?.message || e) });
+        result.failed.push({ entityType: latest.entityType, entityId, reason: String((e as { message?: string })?.message || e) });
       }
     }
 

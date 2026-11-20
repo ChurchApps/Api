@@ -1,4 +1,6 @@
 import { RepoManager } from "../infrastructure/RepoManager.js";
+import type { Repos as MessagingRepos } from "../../modules/messaging/repositories/index.js";
+import type { Repos as MembershipRepos } from "../../modules/membership/repositories/index.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_DAILY = 2000;
@@ -34,9 +36,9 @@ export class ChurchEmailLimiter {
   static async reserve(churchId: string, contentType: string, recipients: EmailReservation[]): Promise<string[] | null> {
     if (recipients.length === 0) return [];
     if (recipients.length > await this.remaining(churchId)) return null;
-    const messaging = await RepoManager.getRepos<any>("messaging");
+    const messaging = await RepoManager.getRepos<MessagingRepos>("messaging");
     const rows = await messaging.deliveryLog.createMany(recipients.map((r) => ({ churchId, personId: r.personId, contentType, contentId: r.contentId, deliveryMethod: "email", deliveryAddress: r.address, success: true })));
-    const ids: string[] = rows.map((r: any) => r.id);
+    const ids: string[] = rows.map((r) => r.id);
     if ((await this.check(churchId)).remaining < 0) {
       await messaging.deliveryLog.deleteIds(churchId, ids);
       return null;
@@ -45,13 +47,13 @@ export class ChurchEmailLimiter {
   }
 
   static async settle(churchId: string, id: string, success: boolean, errorMessage?: string) {
-    const messaging = await RepoManager.getRepos<any>("messaging");
+    const messaging = await RepoManager.getRepos<MessagingRepos>("messaging");
     await messaging.deliveryLog.markAttempt(churchId, id, success, errorMessage);
   }
 
   private static async check(churchId: string): Promise<ChurchEmailStatus> {
-    const membership = await RepoManager.getRepos<any>("membership");
-    const messaging = await RepoManager.getRepos<any>("messaging");
+    const membership = await RepoManager.getRepos<MembershipRepos>("membership");
+    const messaging = await RepoManager.getRepos<MessagingRepos>("messaging");
     const church = await membership.church.loadById(churchId);
     if (!church?.emailApprovedDate || church.archivedDate) return { approved: false, paused: false, remaining: 0 };
     if (await this.isPaused(messaging, churchId)) return { approved: true, paused: true, remaining: 0 };
@@ -65,7 +67,7 @@ export class ChurchEmailLimiter {
   }
 
   // SES review thresholds are 0.1% complaints / 5% bounces account-wide; pause a church well before it drags us there.
-  private static async isPaused(messaging: any, churchId: string): Promise<boolean> {
+  private static async isPaused(messaging: MessagingRepos, churchId: string): Promise<boolean> {
     const weekAgo = new Date(Date.now() - 7 * DAY_MS);
     const [complaints, bounces, sent] = await Promise.all([
       messaging.deliveryLog.countByMethodSince(churchId, "sesComplaint", weekAgo),

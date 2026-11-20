@@ -2,7 +2,7 @@ import { NotificationService } from "../NotificationService";
 
 describe("NotificationService", () => {
   beforeEach(() => {
-    NotificationService.register(null as any);
+    NotificationService.register(null);
   });
 
   it("throws if used before registration", async () => {

@@ -20,9 +20,9 @@ describe("Environment.init secret checks", () => {
     process.env.GOCURRICULUM_CLIENT_SECRET = "x";
     process.env.GOOGLE_DRIVE_CLIENT_SECRET = "x";
     process.env.ONEDRIVE_CLIENT_SECRET = "x";
-    jest.spyOn(Environment as any, "initBase").mockResolvedValue({ appName: "API" });
-    jest.spyOn(Environment as any, "initializeDatabaseConnections").mockResolvedValue(undefined);
-    jest.spyOn(Environment as any, "initializeAppConfigs").mockResolvedValue(undefined);
+    jest.spyOn(Environment, "initBase").mockResolvedValue({ appName: "API" });
+    jest.spyOn(Environment, "initializeDatabaseConnections").mockResolvedValue(undefined);
+    jest.spyOn(Environment, "initializeAppConfigs").mockResolvedValue(undefined);
   });
 
   afterEach(() => {

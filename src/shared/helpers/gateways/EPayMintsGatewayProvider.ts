@@ -1,8 +1,17 @@
 import express from "express";
 import Axios from "axios";
-import { EPayMintsHelper } from "../EPayMintsHelper.js";
+import { EPayMintsHelper, EPayMintsEventData, EPayMintsResult, EPayMintsWebhookBody } from "../EPayMintsHelper.js";
 import { Environment } from "../Environment.js";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities } from "./IGatewayProvider.js";
+import {
+  IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities, GatewayPaymentRequest, GatewaySubscriptionUpdate,
+  GivingRepos, GatewayObject
+} from "./IGatewayProvider.js";
+
+interface EPayMintsCustomerInput {
+  email?: string;
+  name?: string;
+  phone?: string;
+}
 
 export class EPayMintsGatewayProvider implements IGatewayProvider {
   readonly name = "epaymints";
@@ -40,7 +49,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     // May be a no-op if webhooks aren't supported
   }
 
-  async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any): Promise<WebhookResult> {
+  async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: EPayMintsWebhookBody): Promise<WebhookResult> {
     try {
       // ePayMints may not support webhooks; this is a placeholder
       const signature = headers["x-epaymints-signature"] as string;
@@ -66,12 +75,12 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     }
   }
 
-  async processCharge(config: GatewayConfig, donationData: any): Promise<ChargeResult> {
+  async processCharge(config: GatewayConfig, donationData: GatewayPaymentRequest): Promise<ChargeResult> {
     try {
       const settings = this.parseSettings(config);
       const environment = this.resolveEnvironment(config, settings);
       const terminalId = this.requireTerminalId(settings, config.gatewayId);
-      let payment: any;
+      let payment: EPayMintsResult;
 
       if (donationData.paymentMethod === "ach" || donationData.achData) {
         // Process ACH payment
@@ -120,13 +129,13 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     }
   }
 
-  async createSubscription(_config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
+  async createSubscription(_config: GatewayConfig, _subscriptionData: GatewayPaymentRequest): Promise<SubscriptionResult> {
     // ePayMints typically doesn't support native subscriptions
     // This would need to be handled via scheduled payments or external logic
     throw new Error("ePayMints does not support native subscription creation. Use scheduled payments instead.");
   }
 
-  async updateSubscription(_config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
+  async updateSubscription(_config: GatewayConfig, _subscriptionData: GatewaySubscriptionUpdate): Promise<SubscriptionResult> {
     throw new Error("ePayMints does not support subscription updates");
   }
 
@@ -169,7 +178,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     return EPayMintsHelper.calculateFees(amount, paymentMethod, customFixedFee, customPercentFee);
   }
 
-  async logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void> {
+  async logEvent(churchId: string, event: EPayMintsWebhookBody, eventData: EPayMintsEventData, repos: GivingRepos): Promise<void> {
     await EPayMintsHelper.logEvent(churchId, event, eventData, repos);
   }
 
@@ -178,7 +187,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     return `epaymints-terminal-${churchId}`;
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, _status?: "pending" | "complete"): Promise<any> {
+  async logDonation(config: GatewayConfig, churchId: string, eventData: EPayMintsEventData, repos: GivingRepos, _status?: "pending" | "complete") {
     const settings = this.parseSettings(config);
     this.requireTerminalId(settings, config.gatewayId);
     const environment = this.resolveEnvironment(config, settings);
@@ -192,7 +201,9 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
   }
 
   // Customer management (limited support)
-  async createCustomer(config: GatewayConfig, customerData: any): Promise<string> {
+  // Called through IGatewayProvider.createCustomer, which passes the email string.
+  async createCustomer(config: GatewayConfig, customerData: string | EPayMintsCustomerInput): Promise<string> {
+    const input = typeof customerData === "string" ? {} : customerData;
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     const terminalId = this.requireTerminalId(settings, config.gatewayId);
@@ -200,38 +211,38 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
       config.privateKey,
       environment,
       {
-        email: customerData.email,
-        name: customerData.name,
-        phone: customerData.phone,
+        email: input.email,
+        name: input.name,
+        phone: input.phone,
         terminalId
       }
     );
   }
 
-  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<any> {
+  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<GatewayObject[]> {
     // ePayMints doesn't support native subscriptions
     return [];
   }
 
-  async getCustomerPaymentMethods(_config: GatewayConfig, _customerId: string): Promise<any> {
+  async getCustomerPaymentMethods(_config: GatewayConfig, _customerId: string): Promise<GatewayObject[]> {
     // ePayMints doesn't support stored payment methods/vault
     return [];
   }
 
   // Payment method management (not supported)
-  async attachPaymentMethod(): Promise<any> {
+  async attachPaymentMethod(): Promise<never> {
     throw new Error("ePayMints does not support payment method storage/vault");
   }
 
-  async detachPaymentMethod(): Promise<any> {
+  async detachPaymentMethod(): Promise<never> {
     throw new Error("ePayMints does not support payment method storage/vault");
   }
 
-  async updateCard(): Promise<any> {
+  async updateCard(): Promise<never> {
     throw new Error("ePayMints does not support stored payment methods");
   }
 
-  async createBankAccount(config: GatewayConfig, customerId: string, options: any): Promise<any> {
+  async createBankAccount(config: GatewayConfig, customerId: string, options: { routingNumber?: string; accountNumber?: string }) {
     // ePayMints supports ACH but not as stored payment methods
     // ACH details are passed per transaction
     const settings = this.parseSettings(config);
@@ -246,15 +257,15 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     };
   }
 
-  async updateBank(): Promise<any> {
+  async updateBank(): Promise<never> {
     throw new Error("ePayMints does not support bank account updates - ACH details are per-transaction");
   }
 
-  async verifyBank(): Promise<any> {
+  async verifyBank(): Promise<never> {
     throw new Error("ePayMints bank account verification handled per-transaction");
   }
 
-  async deleteBankAccount(): Promise<any> {
+  async deleteBankAccount(): Promise<never> {
     throw new Error("ePayMints does not store bank accounts for deletion");
   }
 
@@ -266,7 +277,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     return terminalId || config.publicKey;
   }
 
-  async createOrder(): Promise<any> {
+  async createOrder(): Promise<never> {
     throw new Error("ePayMints uses direct payment processing, not order-based flow");
   }
 
@@ -280,7 +291,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
   }
 
   // Transaction status checking
-  async getTransactionStatus(config: GatewayConfig, transactionId: string): Promise<any> {
+  async getTransactionStatus(config: GatewayConfig, transactionId: string): Promise<EPayMintsResult> {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     const terminalId = this.requireTerminalId(settings, config.gatewayId);
@@ -293,7 +304,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
   }
 
   // Refund processing
-  async createRefund(config: GatewayConfig, refundData: any): Promise<any> {
+  async createRefund(config: GatewayConfig, refundData: { transactionId: string; amount?: number; reason?: string }): Promise<EPayMintsResult> {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     const terminalId = this.requireTerminalId(settings, config.gatewayId);

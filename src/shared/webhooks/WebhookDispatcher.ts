@@ -2,6 +2,28 @@ import { Webhook } from "../../modules/membership/models/index.js";
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { formatForConnector } from "./WebhookFormatters.js";
 import { InternalEventBus } from "../events/InternalEventBus.js";
+import type { Repos as MembershipRepos } from "../../modules/membership/repositories/index.js";
+
+// Id fields a payload may carry, plus the names enrich() fills in from them.
+interface EnrichablePayload {
+  personId?: string;
+  contentType?: string;
+  contentId?: string;
+  personName?: string;
+  personEmail?: string;
+  groupId?: string;
+  groupName?: string;
+  formId?: string;
+  formName?: string;
+  [key: string]: unknown;
+}
+
+// The lookups enrich() makes; the membership repos satisfy it.
+export interface EnrichRepos {
+  person: { load(churchId: string, id: string): Promise<{ displayName?: string; firstName?: string; lastName?: string; email?: string } | undefined> };
+  group: { load(churchId: string, id: string): Promise<{ name?: string } | undefined> };
+  form: { load(churchId: string, id: string): Promise<{ name?: string } | undefined> };
+}
 
 // emit() never throws — webhook failures must never break the originating operation.
 export class WebhookDispatcher {
@@ -12,11 +34,11 @@ export class WebhookDispatcher {
     WebhookDispatcher.cache.delete(churchId);
   }
 
-  public static async emit(churchId: string, event: string, payload: any): Promise<void> {
+  public static async emit(churchId: string, event: string, payload: unknown): Promise<void> {
     try {
       if (!churchId) return;
       await InternalEventBus.publish(churchId, event, payload);
-      const repos = await RepoManager.getRepos<any>("membership");
+      const repos = await RepoManager.getRepos<MembershipRepos>("membership");
       const hooks = await WebhookDispatcher.getHooks(repos, churchId);
       if (hooks.length === 0) return;
       const matching = hooks.filter((h) => Array.isArray(h.events) && h.events.includes(event));
@@ -55,10 +77,10 @@ export class WebhookDispatcher {
     "list.member.removed": { person: true }
   };
 
-  private static async enrich(repos: any, churchId: string, event: string, payload: any): Promise<any> {
+  private static async enrich(repos: EnrichRepos, churchId: string, event: string, payload: unknown): Promise<unknown> {
     const wants = WebhookDispatcher.ENRICH[event];
     if (!wants || !payload || typeof payload !== "object") return payload;
-    const out = { ...payload };
+    const out: EnrichablePayload = { ...(payload as EnrichablePayload) };
     try {
       const personId = out.personId || (out.contentType === "person" ? out.contentId : null);
       if (wants.person && personId && (!out.personName || !out.personEmail)) {
@@ -82,7 +104,7 @@ export class WebhookDispatcher {
     return out;
   }
 
-  private static async getHooks(repos: any, churchId: string): Promise<Webhook[]> {
+  private static async getHooks(repos: MembershipRepos, churchId: string): Promise<Webhook[]> {
     const entry = WebhookDispatcher.cache.get(churchId);
     if (entry && entry.expires > Date.now()) return entry.hooks;
     const hooks: Webhook[] = await repos.webhook.loadActiveByChurch(churchId);

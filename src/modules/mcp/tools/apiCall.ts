@@ -18,7 +18,7 @@ export const apiCallSchema = {
 };
 
 export function makeApiCallHandler(getAuthorization: () => string | undefined, getClientIp: () => string = () => "", getPrincipal: () => McpPrincipal | undefined = () => undefined) {
-  return async (args: { method: string; path: string; query?: Record<string, any>; body?: any }) => {
+  return async (args: { method: string; path: string; query?: Record<string, unknown>; body?: unknown }) => {
     const path = args.path.startsWith("/") ? args.path : "/" + args.path;
     if (BLOCKLIST.some((re) => re.test(path))) {
       return {
@@ -59,9 +59,9 @@ export function makeApiCallHandler(getAuthorization: () => string | undefined, g
         isError: result.status >= 400,
         content: [{ type: "text" as const, text }]
       };
-    } catch (err: any) {
+    } catch (err) {
       console.error("MCP api_call dispatch failed:", err);
-      const timedOut = /timed out/i.test(err?.message || "");
+      const timedOut = /timed out/i.test((err as Error | undefined)?.message || "");
       return {
         isError: true,
         content: [{ type: "text" as const, text: timedOut ? "Internal dispatch timed out." : "Internal dispatch failed." }]
@@ -70,7 +70,7 @@ export function makeApiCallHandler(getAuthorization: () => string | undefined, g
   };
 }
 
-async function callLessons(args: { method: string; query?: Record<string, any>; body?: any }, path: string, principal: McpPrincipal | undefined) {
+async function callLessons(args: { method: string; query?: Record<string, unknown>; body?: unknown }, path: string, principal: McpPrincipal | undefined) {
   if (!principal?.id || !principal?.churchId) {
     return { isError: true, content: [{ type: "text" as const, text: "This MCP session has no signed-in user to forward to FreePlay." }] };
   }
@@ -78,9 +78,10 @@ async function callLessons(args: { method: string; query?: Record<string, any>; 
     const result = await forwardToLessons({ method: args.method, path, query: args.query, body: args.body, principal });
     const text = JSON.stringify({ status: result.status, truncated: result.truncated || undefined, body: result.body }, null, 2);
     return { isError: result.status >= 400, content: [{ type: "text" as const, text }] };
-  } catch (err: any) {
+  } catch (err) {
     console.error("MCP api_call lessons forward failed:", err);
-    const timedOut = err?.name === "TimeoutError" || /timed? ?out/i.test(err?.message || "");
+    const e = err as Error | undefined;
+    const timedOut = e?.name === "TimeoutError" || /timed? ?out/i.test(e?.message || "");
     return { isError: true, content: [{ type: "text" as const, text: timedOut ? "FreePlay request timed out." : "FreePlay request failed." }] };
   }
 }

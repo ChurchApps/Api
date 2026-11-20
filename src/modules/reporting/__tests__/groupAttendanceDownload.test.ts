@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { GroupAttendanceDownloadHelper } from "../helpers/GroupAttendanceDownloadHelper";
+import { GroupAttendanceDownloadHelper } from "../helpers/GroupAttendanceDownloadHelper.js";
+import { Report } from "../models/index.js";
 
 const loadReport = (keyName: string) => JSON.parse(fs.readFileSync(path.join(process.cwd(), "reports", keyName + ".json"), "utf8"));
 
@@ -10,11 +11,11 @@ describe("group attendance reports", () => {
     const sql = (report.queries?.[0]?.sqlLines || []).join("\n");
 
     it(`${keyName} takes a start and end date instead of a single week`, () => {
-      const keys = report.parameters.map((p: any) => p.keyName);
+      const keys = report.parameters.map((p: { keyName: string }) => p.keyName);
       expect(keys).toEqual(expect.arrayContaining(["startDate", "endDate"]));
       expect(keys).not.toContain("week");
-      expect(report.parameters.find((p: any) => p.keyName === "startDate")).toMatchObject({ source: "date", defaultValue: "lastSunday" });
-      expect(report.parameters.find((p: any) => p.keyName === "endDate")).toMatchObject({ source: "date", defaultValue: "today" });
+      expect(report.parameters.find((p: { keyName: string }) => p.keyName === "startDate")).toMatchObject({ source: "date", defaultValue: "lastSunday" });
+      expect(report.parameters.find((p: { keyName: string }) => p.keyName === "endDate")).toMatchObject({ source: "date", defaultValue: "today" });
     });
 
     it(`${keyName} filters sessions from startDate through the whole endDate`, () => {
@@ -34,7 +35,7 @@ describe("group attendance reports", () => {
 });
 
 describe("GroupAttendanceDownloadHelper.combine", () => {
-  const buildReport = () => ({
+  const buildReport = (): Report => ({
     queries: [
       {
         keyName: "main",
@@ -51,31 +52,31 @@ describe("GroupAttendanceDownloadHelper.combine", () => {
   });
 
   it("gives each dated session of a service time its own column", () => {
-    const rows = GroupAttendanceDownloadHelper.combine(buildReport() as any);
+    const rows = GroupAttendanceDownloadHelper.combine(buildReport());
     expect(Object.keys(rows[0])).toEqual(["displayName", "groupName", "Sunday - 9:00 AM (2024-03-09)", "Sunday - 9:00 AM (2024-03-16)", "personId", "groupId"]);
   });
 
   it("marks present/absent per session date", () => {
-    const rows = GroupAttendanceDownloadHelper.combine(buildReport() as any);
-    const bob = rows.find((r: any) => r.displayName === "Bob" && r.groupName === "Choir");
+    const rows = GroupAttendanceDownloadHelper.combine(buildReport());
+    const bob = rows.find((r) => r.displayName === "Bob" && r.groupName === "Choir");
     expect(bob["Sunday - 9:00 AM (2024-03-09)"]).toBe("absent");
     expect(bob["Sunday - 9:00 AM (2024-03-16)"]).toBe("present");
-    const annYouth = rows.find((r: any) => r.displayName === "Ann" && r.groupName === "Youth");
+    const annYouth = rows.find((r) => r.displayName === "Ann" && r.groupName === "Youth");
     expect(annYouth["Sunday - 9:00 AM (2024-03-09)"]).toBe("absent");
   });
 
   it("labels a session with no service time by its date alone", () => {
-    const report: any = buildReport();
+    const report = buildReport();
     report.queries[0].value.push({ serviceName: null, serviceTimeName: null, serviceId: null, serviceTimeId: null, groupId: "g1", personId: "p2", sessionDate: "2024-03-20" });
     const rows = GroupAttendanceDownloadHelper.combine(report);
-    const bob = rows.find((r: any) => r.displayName === "Bob" && r.groupName === "Choir");
+    const bob = rows.find((r) => r.displayName === "Bob" && r.groupName === "Choir");
     expect(Object.keys(bob)).toContain("2024-03-20");
     expect(bob["2024-03-20"]).toBe("present");
     expect(Object.keys(bob).some((k) => k.includes("null"))).toBe(false);
   });
 
   it("sorts rows by group, then last name, first name", () => {
-    const rows = GroupAttendanceDownloadHelper.combine(buildReport() as any);
-    expect(rows.map((r: any) => r.groupName + "/" + r.displayName)).toEqual(["Choir/Bob", "Choir/Ann", "Youth/Ann"]);
+    const rows = GroupAttendanceDownloadHelper.combine(buildReport());
+    expect(rows.map((r) => r.groupName + "/" + r.displayName)).toEqual(["Choir/Bob", "Choir/Ann", "Youth/Ann"]);
   });
 });

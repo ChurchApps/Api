@@ -26,7 +26,7 @@ export class UniqueIdHelper {
     return id;
   }
 
-  static isMissing(value: any): boolean {
+  static isMissing(value: unknown): boolean {
     return value === undefined || value === null || value === "";
   }
 }

@@ -1,10 +1,113 @@
 import express from "express";
 import crypto from "crypto";
 import { AbstractExperimentalGatewayProvider } from "./AbstractExperimentalGatewayProvider.js";
-import { GatewayConfig, WebhookResult, ChargeResult, SubscriptionResult, ProviderCapabilities, WebhookEventClassification } from "./IGatewayProvider.js";
+import {
+  GatewayConfig, WebhookResult, ChargeResult, SubscriptionResult, ProviderCapabilities, WebhookEventClassification, GatewayPaymentRequest,
+  GatewaySubscriptionUpdate, GatewayPerson, GatewayInterval, GivingRepos, GatewayObject, GatewayWebhookData, GatewayAttachOptions, GatewayAttachBody,
+  LocalMethodRecord, NormalizedPaymentMethod, NormalizedSubscription, FundAllocation
+} from "./IGatewayProvider.js";
 import Axios from "axios";
 import { Environment } from "../Environment.js";
-import { Donation, DonationBatch, EventLog, FundDonation } from "../../../modules/giving/models/index.js";
+import { Customer, Donation, DonationBatch, EventLog, FundDonation } from "../../../modules/giving/models/index.js";
+import type { Repos as MembershipRepos } from "../../../modules/membership/repositories/Repos.js";
+import type { Person } from "../../../modules/membership/models/index.js";
+
+// A transaction object inside an NMI webhook event body.
+interface NmiTransaction {
+  id?: string;
+  transaction_id?: string;
+  transactionid?: string;
+  customer_vault_id?: string;
+  amount?: string;
+  check_account?: string;
+  cc_last_4?: string;
+  cc_number_masked?: string;
+  cc_type?: string;
+  card_type?: string;
+  created_at?: string;
+}
+
+interface NmiEventBody extends NmiTransaction {
+  transaction?: NmiTransaction;
+}
+
+interface NmiWebhookPayload {
+  event_id?: string;
+  event_type?: string;
+  event_time?: string;
+  event_body?: NmiEventBody;
+}
+
+// Charge/webhook data as logged by logEvent/logDonation, plus fields the charge route merges in.
+interface KingdomFundingEventData extends GatewayWebhookData {
+  reference_number?: string;
+  customer_vault_id?: string;
+  auth_amount?: string | number;
+  amount?: string | number;
+  authcode?: string;
+  last_4?: string;
+  cc_number?: string;
+  card_type?: string;
+  paymentType?: string;
+  type?: string;
+  account_type?: string;
+  check_account?: string;
+  created_at?: string;
+  timestamp?: string;
+  eventType?: string;
+  eventCategory?: string;
+  providerEventId?: string;
+  transaction?: NmiTransaction;
+  customer?: { customer_id?: string };
+  customer_id?: string;
+  person?: GatewayPerson;
+  anonymous?: boolean;
+  notes?: string;
+  funds?: FundAllocation[];
+  subscriptionFunds?: FundAllocation[];
+  fundId?: string;
+}
+
+interface KingdomFundingSubscriptionData extends GatewayObject {
+  customerId?: string;
+  paymentMethodId?: string;
+  nextRunDate?: string;
+  initialChargeRef?: string;
+}
+
+// A recurring schedule from the NMI Query API, named the way the giving controllers read it.
+interface NmiSubscription extends GatewayObject {
+  amount: number;
+  frequency: string;
+  active: boolean;
+  next_run_date: string;
+  nextRunDate: string;
+  payment_method_id: string;
+  customer_id: string;
+  customer_vault_id: string;
+  created_at?: string;
+}
+
+// A vaulted payment method, from attachPaymentMethod or the NMI Query API.
+interface NmiVaultMethod extends GatewayObject {
+  customer_vault_id?: string;
+  billing_id?: string;
+  type?: string;
+  card_type?: string;
+  last_4?: string;
+  last4?: string;
+  account_type?: string;
+  routing_number?: string;
+  account_number?: string;
+  expiry?: string;
+}
+
+// Axios / thrown errors as read here.
+interface HttpErrorLike {
+  message?: string;
+  statusCode?: number;
+  response?: { status?: number; data?: string | { error_message?: string } };
+}
 
 /**
  * KingdomFunding payment gateway provider — backed by NMI (Network Merchants Inc.).
@@ -66,22 +169,22 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   // Charge-time vaulting: saveCard vaults the nonce (creating the vault customer in the same
   // call — a bare add_customer without payment data is rejected by NMI), then charges the
   // saved method; saved-method requests arrive as bare numeric PM ids.
-  async prepareCharge(config: GatewayConfig, donationData: any, repos: any): Promise<void> {
+  async prepareCharge(config: GatewayConfig, donationData: GatewayPaymentRequest, repos: GivingRepos): Promise<void> {
     if (donationData.saveCard) {
       try {
-        const personName = donationData.person?.name || donationData.name || "";
+        const personName = (donationData.person?.name as string) || donationData.name || "";
         const personId = donationData.person?.id;
 
         let customerId: string | undefined;
         if (personId) {
-          const existingCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name) as any;
+          const existingCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name);
           if (existingCustomer) customerId = existingCustomer.id;
         }
 
         const nonceToken = donationData.token || donationData.id || "";
         const nonceSource = nonceToken.startsWith("nonce-") ? nonceToken : `nonce-${nonceToken}`;
 
-        const attachOptions: any = {
+        const attachOptions: GatewayAttachOptions = {
           source: nonceSource,
           name: personName,
           personId
@@ -94,12 +197,12 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
           attachOptions.expiry_year = ey;
         }
 
-        let pm: any;
+        let pm: NmiVaultMethod;
         try {
           pm = await this.attachPaymentMethod(config, nonceSource, attachOptions);
-        } catch (attachErr: any) {
+        } catch (attachErr) {
           // Stale local customer record: retry without it so a fresh vault is created from the token.
-          const status = attachErr.response?.status || attachErr.statusCode;
+          const status = (attachErr as HttpErrorLike).response?.status || (attachErr as HttpErrorLike).statusCode;
           if (status === 404 && customerId) {
             console.log(`Customer ${customerId} not found on the gateway, vaulting a fresh one...`);
             delete attachOptions.customerId;
@@ -126,16 +229,18 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
             methodType: donationData.type === "check" ? "bank" : "card",
             displayName: `${cardType} ****${last4}`,
             metadata: { card_type: cardType, last_4: last4 }
-          } as any);
+          });
 
           donationData.paymentMethodId = String(savedPmId);
           donationData.customerId = customerId;
           delete donationData.id; // Remove nonce so processCharge uses pm-{id}
           delete donationData.token;
         }
-      } catch (saveCardErr: any) {
+      } catch (err) {
+        const saveCardErr = err as HttpErrorLike;
+        const responseData = saveCardErr.response?.data as { error_message?: string };
         // Never log raw response body; can contain donor PII (billing name, last_4, AVS zip).
-        console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.status || "", saveCardErr.response?.data?.error_message || saveCardErr.message);
+        console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.status || "", responseData?.error_message || saveCardErr.message);
         // Fall through — charge will proceed with original nonce
       }
     }
@@ -149,16 +254,17 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   // Reuse the person's existing vault customer so schedules attach to it.
-  async prepareSubscription(config: GatewayConfig, subscriptionData: any, person: any, repos: any): Promise<void> {
+  async prepareSubscription(config: GatewayConfig, subscriptionData: GatewayPaymentRequest, person: GatewayPerson, repos: GivingRepos): Promise<void> {
     if (person?.id && !subscriptionData.customerId) {
-      const existing = await repos.customer.loadByPersonAndProvider(config.churchId, person.id, this.name) as any;
+      const existing = await repos.customer.loadByPersonAndProvider(config.churchId, person.id, this.name);
       if (existing?.id) subscriptionData.customerId = existing.id;
     }
   }
 
   // Persist the vault customer created during subscription; the returned id is stored on the local row.
-  async finalizeSubscription(config: GatewayConfig, result: SubscriptionResult, subscriptionData: any, person: any, repos: any): Promise<string | undefined> {
-    const customerId = result.data?.customerId ? String(result.data.customerId) : subscriptionData.customerId;
+  async finalizeSubscription(config: GatewayConfig, result: SubscriptionResult, subscriptionData: GatewayPaymentRequest, person: GatewayPerson, repos: GivingRepos): Promise<string | undefined> {
+    const resultData = result.data as KingdomFundingSubscriptionData;
+    const customerId = resultData?.customerId ? String(resultData.customerId) : subscriptionData.customerId;
     if (customerId && person?.id) {
       try {
         await repos.customer.save({ id: customerId, churchId: config.churchId, personId: person.id, provider: this.name });
@@ -167,23 +273,23 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     return customerId;
   }
 
-  async verifySubscriptionOwnership(config: GatewayConfig, subscriptionId: string, personId: string, repos: any): Promise<boolean> {
+  async verifySubscriptionOwnership(config: GatewayConfig, subscriptionId: string, personId: string, repos: GivingRepos): Promise<boolean> {
     const schedule = await this.getSubscription(config, subscriptionId).catch((): null => null);
     const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
     if (!remoteCustomerId) return false;
-    const ownerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name).catch((): null => null) as any;
+    const ownerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name).catch((): null => null);
     return !!ownerCustomer && String(ownerCustomer.id) === remoteCustomerId;
   }
 
   // The attach flow keys saved methods to the provider-scoped customer, not the request-supplied id.
-  async resolveCustomerForAttach(config: GatewayConfig, personId: string | undefined, _requestCustomerId: string | undefined, repos: any): Promise<string | undefined> {
+  async resolveCustomerForAttach(config: GatewayConfig, personId: string | undefined, _requestCustomerId: string | undefined, repos: GivingRepos): Promise<string | undefined> {
     if (!personId) return undefined;
-    const providerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name) as any;
+    const providerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name);
     return providerCustomer?.id || undefined;
   }
 
-  buildAttachOptions(customerId: string, tokenId: string, body: any): any {
-    const opts: any = { customer: customerId, customerId, personId: body.personId };
+  buildAttachOptions(customerId: string, tokenId: string, body: GatewayAttachBody): GatewayAttachOptions {
+    const opts: GatewayAttachOptions = { customer: customerId, customerId, personId: body.personId };
     if (body.routing_number && body.account_number) {
       opts.routing_number = body.routing_number;
       opts.account_number = body.account_number;
@@ -199,7 +305,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     return opts;
   }
 
-  buildLocalMethodRecord(pm: any, body: any, _tokenId: string): { methodType: string; displayName: string; metadata: any } | null {
+  buildLocalMethodRecord(pm: NmiVaultMethod, body: GatewayAttachBody, _tokenId: string): LocalMethodRecord | null {
     const isBank = pm?.type === "check"
       || pm?.account_type
       || !!pm?.routing_number
@@ -235,52 +341,52 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   // Detach, cascading active recurring schedules tied to the method when the gateway refuses.
-  async deletePaymentMethod(config: GatewayConfig, paymentMethodId: string, customerId: string, repos: any): Promise<void> {
+  async deletePaymentMethod(config: GatewayConfig, paymentMethodId: string, customerId: string, repos: GivingRepos): Promise<void> {
     try {
       await this.detachPaymentMethod(config, paymentMethodId);
-    } catch (detachErr: any) {
-      const msg = detachErr?.message || "";
+    } catch (detachErr) {
+      const msg = (detachErr as Error)?.message || "";
       if (!msg.includes("active recurring")) throw detachErr;
       try {
         const schedules = await this.getCustomerSubscriptions(config, customerId);
-        const activeSchedules = (schedules || []).filter((s: any) => s.payment_method_id?.toString() === paymentMethodId && s.active !== false);
+        const activeSchedules = (schedules || []).filter((s) => s.payment_method_id?.toString() === paymentMethodId && s.active !== false);
         for (const schedule of activeSchedules) {
           try {
             await this.cancelSubscription(config, schedule.id.toString());
             await repos.subscription.delete(config.churchId, schedule.id.toString()).catch(() => { });
-          } catch (cancelErr: any) {
-            console.error("[PM Delete] Failed to cancel schedule", schedule.id, cancelErr.message);
+          } catch (cancelErr) {
+            console.error("[PM Delete] Failed to cancel schedule", schedule.id, (cancelErr as Error).message);
           }
         }
         await this.detachPaymentMethod(config, paymentMethodId);
-      } catch (retryErr: any) {
+      } catch (retryErr) {
         // Could not delete from the gateway — proceed to clean up locally only
-        console.warn("[PM Delete] Could not delete PM from provider, cleaning up local records only:", retryErr?.message || retryErr);
+        console.warn("[PM Delete] Could not delete PM from provider, cleaning up local records only:", (retryErr as Error)?.message || retryErr);
       }
     }
 
     // The vault is gone; drop the person→vault mapping too, or the next vaulting/subscribe
     // attempt reuses the dead vault id and fails.
     try {
-      const customerRecord = await repos.customer.load(config.churchId, customerId) as any;
+      const customerRecord = await repos.customer.load(config.churchId, customerId);
       if (customerRecord && (customerRecord.provider || "").toLowerCase() === this.name) {
         await repos.customer.delete(config.churchId, customerId);
       }
-    } catch (cleanupErr: any) {
-      console.warn("[PM Delete] Failed to remove local customer mapping:", cleanupErr?.message || cleanupErr);
+    } catch (cleanupErr) {
+      console.warn("[PM Delete] Failed to remove local customer mapping:", (cleanupErr as Error)?.message || cleanupErr);
     }
   }
 
   // Soft-delete model: a payment method only appears if it has a local gatewayPaymentMethods
   // record. Users can "delete" without revoking the card at the gateway (which would break
   // any other system using it).
-  async listNormalizedPaymentMethods(config: GatewayConfig, customer: any, repos: any): Promise<any[]> {
+  async listNormalizedPaymentMethods(config: GatewayConfig, customer: Customer | string, repos: GivingRepos): Promise<NormalizedPaymentMethod[]> {
     const raw = await this.getCustomerPaymentMethods(config, customer);
     if (!Array.isArray(raw)) return [];
     const customerId = typeof customer === "string" ? customer : customer?.id;
     const localRecords = await repos.gatewayPaymentMethod.loadByCustomer(config.churchId, config.gatewayId, customerId);
-    const localExternalIds = new Set(localRecords.map((r: any) => String(r.externalId)));
-    const normalized: any[] = [];
+    const localExternalIds = new Set(localRecords.map((r) => String(r.externalId)));
+    const normalized: NormalizedPaymentMethod[] = [];
     for (const pm of raw) {
       const pmId = String(pm.id);
       if (!localExternalIds.has(pmId)) continue; // soft-deleted by user
@@ -299,9 +405,9 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   // Normalize NMI recurring schedules to the Stripe-like shape the UI expects.
-  async listNormalizedSubscriptions(config: GatewayConfig, customerId: string): Promise<any[]> {
+  async listNormalizedSubscriptions(config: GatewayConfig, customerId: string): Promise<NormalizedSubscription[]> {
     const subs = await this.getCustomerSubscriptions(config, customerId);
-    const normalized: any[] = [];
+    const normalized: NormalizedSubscription[] = [];
     for (const sub of (Array.isArray(subs) ? subs : [])) {
       // The gateway marks cancelled/expired schedules active:false — skip those.
       if (!sub.active) continue;
@@ -355,7 +461,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * from config.privateKey. NMI returns HTTP 200 with response=2/3 for declines,
    * so only transport failures throw.
    */
-  private async nmiPost(config: GatewayConfig, params: Record<string, any>): Promise<Record<string, string>> {
+  private async nmiPost(config: GatewayConfig, params: Record<string, unknown>): Promise<Record<string, string>> {
     const body = new URLSearchParams();
     body.set("security_key", config.privateKey || "");
     for (const [k, v] of Object.entries(params)) {
@@ -400,7 +506,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   /** Build NMI billing fields from donationData.person / billing_info. */
-  private billingFields(donationData: any): Record<string, any> {
+  private billingFields(donationData: GatewayPaymentRequest): Record<string, string | undefined> {
     const person = donationData.person || {};
     const billing = donationData.billing_info || {};
     const first = billing.first_name || person.firstName || person.first_name;
@@ -414,7 +520,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   /** NMI expects amounts as a decimal string with 2 places, e.g. "10.00". */
-  private formatAmount(amount: any): string {
+  private formatAmount(amount: unknown): string {
     const n = Number(amount);
     return (isNaN(n) ? 0 : n).toFixed(2);
   }
@@ -448,7 +554,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   async verifyWebhookSignature(
     config: GatewayConfig,
     headers: express.Request["headers"],
-    body: any
+    body: unknown
   ): Promise<WebhookResult> {
     const signatureHeader = (headers["webhook-signature"] || "") as string;
     const webhookSecret = config.webhookKey;
@@ -490,7 +596,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     }
 
     // NMI webhook payload: { event_id, event_type, event_body }.
-    let payload: any;
+    let payload: NmiWebhookPayload;
     try {
       payload = JSON.parse(rawBody);
     } catch {
@@ -500,7 +606,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
     const nmiType: string = payload?.event_type || ""; // e.g. "transaction.sale.success", "check.status.settled"
     const eventId: string = payload?.event_id || "";
-    const eventBody: any = payload?.event_body || {};
+    const eventBody: NmiEventBody = payload?.event_body || {};
     const [category, action, result] = nmiType.split(".");
 
     // Map NMI event types onto the canonical strings DonateController keys on:
@@ -523,27 +629,28 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     const isCheck = category === "check" || !!txn.check_account;
     const last4 = txn.cc_last_4 || txn.cc_number_masked?.slice(-4) || (txn.check_account ? String(txn.check_account).slice(-4) : "");
 
+    const eventData: KingdomFundingEventData = {
+      ...eventBody,
+      id: transactionId,
+      reference_number: transactionId,
+      customer_vault_id: txn.customer_vault_id || eventBody.customer_vault_id,
+      auth_amount: txn.amount || eventBody.amount,
+      amount: txn.amount || eventBody.amount,
+      last_4: last4,
+      card_type: txn.cc_type || txn.card_type,
+      paymentType: isCheck ? "bank" : "card",
+      check_account: txn.check_account,
+      created_at: txn.created_at || payload.event_time,
+      eventType: canonicalType,
+      eventCategory: category,
+      providerEventId: eventId
+    };
     return {
       success: true,
       shouldProcess,
       eventType: canonicalType,
       eventId,
-      eventData: {
-        ...eventBody,
-        id: transactionId,
-        reference_number: transactionId,
-        customer_vault_id: txn.customer_vault_id || eventBody.customer_vault_id,
-        auth_amount: txn.amount || eventBody.amount,
-        amount: txn.amount || eventBody.amount,
-        last_4: last4,
-        card_type: txn.cc_type || txn.card_type,
-        paymentType: isCheck ? "bank" : "card",
-        check_account: txn.check_account,
-        created_at: txn.created_at || payload.event_time,
-        eventType: canonicalType,
-        eventCategory: category,
-        providerEventId: eventId
-      }
+      eventData
     };
   }
 
@@ -558,14 +665,14 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    *
    * A Collect.js payment_token already encodes card vs. ACH, so both flow through here.
    */
-  async processCharge(config: GatewayConfig, donationData: any): Promise<ChargeResult> {
+  async processCharge(config: GatewayConfig, donationData: GatewayPaymentRequest): Promise<ChargeResult> {
     const hasRawBank = donationData.routing_number && donationData.account_number;
     if ((donationData.type === "bank" || donationData.paymentType === "bank") && hasRawBank && !donationData.paymentMethodId) {
       return this.processBankCharge(config, donationData);
     }
 
     try {
-      const params: Record<string, any> = {
+      const params: Record<string, unknown> = {
         type: "sale",
         amount: this.formatAmount(donationData.amount),
         ...this.billingFields(donationData)
@@ -587,27 +694,29 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       const resp = await this.nmiPost(config, params);
 
       if (this.isApproved(resp)) {
+        const data: KingdomFundingEventData = {
+          ...resp,
+          status: "active",
+          reference_number: resp.transactionid,
+          auth_amount: params.amount as string,
+          authcode: resp.authcode,
+          last_4: resp.cc_number?.slice(-4),
+          card_type: resp.cc_type,
+          // Carry the payment type so logDonation labels ACH correctly — NMI's
+          // token-sale response doesn't echo bank details to infer it from.
+          paymentType: donationData.type === "bank" ? "bank" : "card"
+        };
         return {
           success: true,
           transactionId: resp.transactionid || "",
-          data: {
-            ...resp,
-            status: "active",
-            reference_number: resp.transactionid,
-            auth_amount: params.amount,
-            authcode: resp.authcode,
-            last_4: resp.cc_number?.slice(-4),
-            card_type: resp.cc_type,
-            // Carry the payment type so logDonation labels ACH correctly — NMI's
-            // token-sale response doesn't echo bank details to infer it from.
-            paymentType: donationData.type === "bank" ? "bank" : "card"
-          }
+          data
         };
       }
 
       console.error("KingdomFunding(NMI) processCharge declined:", this.errorText(resp));
       return { success: false, transactionId: "", data: { error: this.errorText(resp), ...resp } };
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as HttpErrorLike;
       const msg = error.response?.data || error.message || "Charge failed";
       console.error("KingdomFunding(NMI) processCharge error:", typeof msg === "string" ? msg.slice(0, 200) : JSON.stringify(msg));
       return { success: false, transactionId: "", data: { error: "Charge failed. Please try again." } };
@@ -620,9 +729,9 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * this raw path exists only as a legacy fallback for callers that send bank
    * numbers directly (no client-side tokenization).
    */
-  private async processBankCharge(config: GatewayConfig, donationData: any): Promise<ChargeResult> {
+  private async processBankCharge(config: GatewayConfig, donationData: GatewayPaymentRequest): Promise<ChargeResult> {
     try {
-      const params: Record<string, any> = {
+      const params: Record<string, unknown> = {
         type: "sale",
         amount: this.formatAmount(donationData.amount),
         payment: "check",
@@ -638,16 +747,17 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       const resp = await this.nmiPost(config, params);
 
       if (this.isApproved(resp)) {
+        const data: KingdomFundingEventData = { ...resp, status: "active", reference_number: resp.transactionid, auth_amount: params.amount as string, paymentType: "bank" };
         return {
           success: true,
           transactionId: resp.transactionid || "",
-          data: { ...resp, status: "active", reference_number: resp.transactionid, auth_amount: params.amount, paymentType: "bank" }
+          data
         };
       }
       console.error("KingdomFunding(NMI) processBankCharge declined:", this.errorText(resp));
       return { success: false, transactionId: "", data: { error: this.errorText(resp), ...resp } };
-    } catch (error: any) {
-      console.error("KingdomFunding(NMI) processBankCharge error:", error.message);
+    } catch (error) {
+      console.error("KingdomFunding(NMI) processBankCharge error:", (error as Error).message);
       return { success: false, transactionId: "", data: { error: "ACH charge failed. Please try again." } };
     }
   }
@@ -659,7 +769,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * or "one_month". Both must map correctly — getting this wrong bills donors at
    * the wrong cadence.
    */
-  private normalizeInterval(interval: any): { count: number; unit: "day" | "week" | "month" | "year" } {
+  private normalizeInterval(interval: GatewayInterval | string): { count: number; unit: "day" | "week" | "month" | "year" } {
     if (interval && typeof interval === "object") {
       const count = Math.max(1, Math.round(Number(interval.interval_count) || 1));
       return { count, unit: this.normalizeUnit(interval.interval || interval.frequency) };
@@ -686,7 +796,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     return legacy[s] || { count: 1, unit: this.normalizeUnit(s) };
   }
 
-  private normalizeUnit(unit: any): "day" | "week" | "month" | "year" {
+  private normalizeUnit(unit: unknown): "day" | "week" | "month" | "year" {
     const s = String(unit || "").toLowerCase().replace(/s$/, "");
     if (s === "day") return "day";
     if (s === "week") return "week";
@@ -698,7 +808,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * Map our frontend interval to NMI recurring frequency fields.
    * NMI uses EITHER day_frequency OR (month_frequency + day_of_month) — never both.
    */
-  private mapIntervalToNmi(interval: any, anchorDate: Date): Record<string, any> {
+  private mapIntervalToNmi(interval: GatewayInterval | string, anchorDate: Date): Record<string, number> {
     const { count, unit } = this.normalizeInterval(interval);
     const dayOfMonth = anchorDate.getDate();
     switch (unit) {
@@ -718,7 +828,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   /** Advance a date by one interval (used to schedule the next run after charging today). */
-  private advance(from: Date, interval: any): Date {
+  private advance(from: Date, interval: GatewayInterval | string): Date {
     const { count, unit } = this.normalizeInterval(interval);
     const next = new Date(from);
     switch (unit) {
@@ -736,10 +846,10 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    */
   private async vaultPaymentMethod(
     config: GatewayConfig,
-    opts: { token?: string; isBank?: boolean; name?: string; subscriptionData?: any }
+    opts: { token?: string; isBank?: boolean | string; name?: string; subscriptionData?: GatewayPaymentRequest }
   ): Promise<string | undefined> {
     const vaultId = crypto.randomUUID();
-    const params: Record<string, any> = {
+    const params: Record<string, unknown> = {
       customer_vault: "add_customer",
       customer_vault_id: vaultId,
       ...this.splitName(opts.name || ""),
@@ -776,9 +886,11 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    *   2. If it starts today, charge the vault immediately
    *   3. add_subscription against the customer_vault_id with a future start_date
    */
-  async createSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+  async createSubscription(config: GatewayConfig, subscriptionData: GatewayPaymentRequest): Promise<SubscriptionResult> {
     try {
-      const name = subscriptionData.name || subscriptionData.person?.name?.display || subscriptionData.person?.name || "Donor";
+      // person.name is either the display string or a name object.
+      const personName = subscriptionData.person?.name;
+      const name: string = subscriptionData.name || (personName as { display?: string })?.display || (personName as string) || "Donor";
       const amount = this.formatAmount(subscriptionData.amount);
       const token = subscriptionData.token || subscriptionData.id;
       const isBank = subscriptionData.type === "bank" || (subscriptionData.routing_number && subscriptionData.account_number);
@@ -841,32 +953,33 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         return { success: false, subscriptionId: "", data: { error: this.errorText(subResp) || "Recurring schedule creation failed" } };
       }
 
+      const data: KingdomFundingSubscriptionData = {
+        ...subResp,
+        status: "active",
+        customerId: String(customerVaultId),
+        paymentMethodId: String(customerVaultId),
+        nextRunDate: this.nmiDate(nextRun),
+        initialChargeRef: initialTxnId
+      };
       return {
         success: true,
         subscriptionId: subResp.subscription_id,
-        data: {
-          ...subResp,
-          status: "active",
-          customerId: String(customerVaultId),
-          paymentMethodId: String(customerVaultId),
-          nextRunDate: this.nmiDate(nextRun),
-          initialChargeRef: initialTxnId
-        }
+        data
       };
-    } catch (error: any) {
-      console.error("KingdomFunding(NMI) createSubscription error:", error.message);
+    } catch (error) {
+      console.error("KingdomFunding(NMI) createSubscription error:", (error as Error).message);
       return { success: false, subscriptionId: "", data: { error: "Subscription creation failed. Please try again." } };
     }
   }
 
-  async updateSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+  async updateSubscription(config: GatewayConfig, subscriptionData: GatewaySubscriptionUpdate): Promise<SubscriptionResult> {
     try {
       const subscriptionId = subscriptionData.subscriptionId || subscriptionData.id;
       if (!subscriptionId) {
         return { success: false, subscriptionId: "", data: { error: "Missing subscription ID" } };
       }
 
-      const params: Record<string, any> = { recurring: "update_subscription", subscription_id: subscriptionId };
+      const params: Record<string, unknown> = { recurring: "update_subscription", subscription_id: subscriptionId };
       if (subscriptionData.amount) params.plan_amount = this.formatAmount(subscriptionData.amount);
       if (subscriptionData.interval) {
         const existing = await this.getSubscription(config, String(subscriptionId));
@@ -881,8 +994,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         return { success: false, subscriptionId: String(subscriptionId), data: { error: this.errorText(resp) } };
       }
       return { success: true, subscriptionId: String(subscriptionId), data: resp };
-    } catch (error: any) {
-      console.error("KingdomFunding(NMI) updateSubscription error:", error.message);
+    } catch (error) {
+      console.error("KingdomFunding(NMI) updateSubscription error:", (error as Error).message);
       return { success: false, subscriptionId: subscriptionData.subscriptionId || "", data: { error: "Subscription update failed" } };
     }
   }
@@ -899,7 +1012,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * Refund (settled) or void (unsettled) a transaction. Pass type:"void" to force a
    * void; omit amount for a full refund.
    */
-  async processRefund(config: GatewayConfig, refundData: any): Promise<ChargeResult> {
+  async processRefund(config: GatewayConfig, refundData: { transactionId?: string; reference_number?: string; type?: string; amount?: number }): Promise<ChargeResult> {
     try {
       const transactionId = refundData.transactionId || refundData.reference_number;
       if (!transactionId) {
@@ -907,7 +1020,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       }
 
       const type = refundData.type === "void" ? "void" : "refund";
-      const params: Record<string, any> = { type, transactionid: transactionId };
+      const params: Record<string, unknown> = { type, transactionid: transactionId };
       if (type === "refund" && refundData.amount) params.amount = this.formatAmount(refundData.amount);
 
       const resp = await this.nmiPost(config, params);
@@ -915,8 +1028,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         return { success: true, transactionId: resp.transactionid || String(transactionId), data: resp };
       }
       return { success: false, transactionId: "", data: { error: this.errorText(resp), ...resp } };
-    } catch (error: any) {
-      console.error("KingdomFunding(NMI) processRefund error:", error.message);
+    } catch (error) {
+      console.error("KingdomFunding(NMI) processRefund error:", (error as Error).message);
       return { success: false, transactionId: "", data: { error: "Refund failed. Please try again." } };
     }
   }
@@ -950,15 +1063,16 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * The donor's billing address from their person record; some NMI merchant accounts
    * reject vault writes without one. Best-effort — returns {} when unavailable.
    */
-  private async lookupBillingAddress(churchId: string, personId?: string): Promise<Record<string, any>> {
+  private async lookupBillingAddress(churchId: string, personId?: string): Promise<Record<string, string>> {
     if (!personId) return {};
     try {
       // Lazy import avoids a static cycle between the gateway layer and module repos.
       const { RepoManager } = await import("../../infrastructure/RepoManager.js");
-      const membershipRepos = await RepoManager.getRepos<any>("membership");
-      const person = await membershipRepos.person.load(churchId, personId);
+      const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
+      // load() returns the raw people row, read here through the Person model.
+      const person = (await membershipRepos.person.load(churchId, personId)) as Person | null;
       const contact = person?.contactInfo || {};
-      const fields: Record<string, any> = {
+      const fields: Record<string, string> = {
         address1: contact.address1 || undefined,
         address2: contact.address2 || undefined,
         city: contact.city || undefined,
@@ -967,8 +1081,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       };
       Object.keys(fields).forEach((k) => fields[k] === undefined && delete fields[k]);
       return fields;
-    } catch (err: any) {
-      console.warn("KingdomFunding(NMI): billing address lookup failed (continuing without):", err?.message || err);
+    } catch (err) {
+      console.warn("KingdomFunding(NMI): billing address lookup failed (continuing without):", (err as Error)?.message || err);
       return {};
     }
   }
@@ -1004,13 +1118,13 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * by customer_vault_id. (One chargeable method per donor vault — multiple cards
    * would need billing_id selection at charge time; add when donors ask.)
    */
-  async attachPaymentMethod(config: GatewayConfig, paymentMethodId: string, options: any): Promise<any> {
+  async attachPaymentMethod(config: GatewayConfig, paymentMethodId: string, options: GatewayAttachOptions): Promise<NmiVaultMethod> {
     // Strip any legacy "nonce-" prefix (an Accept Blue convention the controllers still add);
     // NMI Collect.js payment_tokens are raw and a prefixed value is rejected.
     const rawToken = options.source || options.token || paymentMethodId;
     const token = rawToken ? String(rawToken).replace(/^nonce-/, "") : rawToken;
 
-    const methodParams: Record<string, any> = {};
+    const methodParams: Record<string, unknown> = {};
     if (options.routing_number) {
       methodParams.payment = "check";
       methodParams.checkname = options.name || "";
@@ -1027,7 +1141,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     // Billing address (explicit or looked up from the person record) — some NMI
     // accounts reject vault writes without it.
     if (options.address1) {
-      for (const k of ["address1", "address2", "city", "state", "zip"]) {
+      for (const k of ["address1", "address2", "city", "state", "zip"] as const) {
         if (options[k]) methodParams[k] = options[k];
       }
     } else {
@@ -1077,8 +1191,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * Remove a saved payment method. With a billing id we delete just that billing
    * record; otherwise we delete the whole vault customer.
    */
-  async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string, customerId?: string): Promise<any> {
-    const params: Record<string, any> = customerId
+  async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string, customerId?: string): Promise<Record<string, string>> {
+    const params: Record<string, unknown> = customerId
       ? { customer_vault: "delete_billing", customer_vault_id: customerId, billing_id: paymentMethodId }
       : { customer_vault: "delete_customer", customer_vault_id: paymentMethodId };
     const resp = await this.nmiPost(config, params);
@@ -1090,28 +1204,28 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   // NMI Query API returns XML; use light tag extraction to avoid an XML parser dependency.
-  async getSubscription(config: GatewayConfig, subscriptionId: string): Promise<any> {
+  async getSubscription(config: GatewayConfig, subscriptionId: string): Promise<NmiSubscription | null> {
     try {
       const resp = await this.nmiQuery(config, { report_type: "recurring", subscription_id: subscriptionId });
       const subs = parseNmiSubscriptions(typeof resp.data === "string" ? resp.data : "");
       return subs[0] || null;
-    } catch (error: any) {
-      console.error("KingdomFunding(NMI) getSubscription error:", error.message);
+    } catch (error) {
+      console.error("KingdomFunding(NMI) getSubscription error:", (error as Error).message);
       return null;
     }
   }
 
-  async getCustomerSubscriptions(config: GatewayConfig, customerId: string): Promise<any> {
+  async getCustomerSubscriptions(config: GatewayConfig, customerId: string): Promise<NmiSubscription[]> {
     try {
       const resp = await this.nmiQuery(config, { report_type: "recurring", customer_vault_id: customerId });
       return parseNmiSubscriptions(typeof resp.data === "string" ? resp.data : "");
-    } catch (error: any) {
-      console.error("KingdomFunding(NMI) getCustomerSubscriptions error:", error.message);
+    } catch (error) {
+      console.error("KingdomFunding(NMI) getCustomerSubscriptions error:", (error as Error).message);
       return [];
     }
   }
 
-  async getCustomerPaymentMethods(config: GatewayConfig, customer: any): Promise<any> {
+  async getCustomerPaymentMethods(config: GatewayConfig, customer: string | { id?: string; customerId?: string }): Promise<NmiVaultMethod[]> {
     try {
       const customerId = typeof customer === "string" ? customer : customer?.id || customer?.customerId;
       if (!customerId) return [];
@@ -1120,24 +1234,27 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       // vault) — also what we charge by — so key the returned method on the queried vault id,
       // matching the stored gatewayPaymentMethods row rather than the inner billing_id.
       return parseNmiVaultMethods(typeof resp.data === "string" ? resp.data : "", String(customerId));
-    } catch (error: any) {
-      console.error("KingdomFunding(NMI) getCustomerPaymentMethods error:", error.message);
+    } catch (error) {
+      console.error("KingdomFunding(NMI) getCustomerPaymentMethods error:", (error as Error).message);
       return [];
     }
   }
 
-  async logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void> {
+  // event is the raw webhook body (string/Buffer) or the charge result; only a parsed payload carries event_type/event_id.
+  async logEvent(churchId: string, event: unknown, eventData: KingdomFundingEventData, repos: GivingRepos): Promise<void> {
+    const payload = event as NmiWebhookPayload;
     try {
       const eventLog = new EventLog();
       eventLog.churchId = churchId;
-      eventLog.eventType = eventData?.eventType || event?.event_type || "unknown";
+      eventLog.eventType = eventData?.eventType || payload?.event_type || "unknown";
       eventLog.provider = "kingdomfunding";
       // Webhooks dedup on the NMI event id (DonateController looks it up by eventId); the charge path has only the transaction id.
-      eventLog.providerId = eventData?.providerEventId?.toString() || eventData?.id?.toString() || event?.event_id?.toString() || "";
+      eventLog.providerId = eventData?.providerEventId?.toString() || eventData?.id?.toString() || payload?.event_id?.toString() || "";
       eventLog.message = JSON.stringify(event);
       await repos.eventLog.save(eventLog);
     } catch (err) {
-      if ((err as any)?.errno === 1062 || (err as any)?.code === "ER_DUP_ENTRY") throw err;
+      const dbErr = err as { errno?: number; code?: string };
+      if (dbErr?.errno === 1062 || dbErr?.code === "ER_DUP_ENTRY") throw err;
       console.error("KingdomFunding(NMI) logEvent error:", err);
     }
   }
@@ -1150,9 +1267,9 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    */
   private async recoverFunds(
     churchId: string,
-    eventData: any,
+    eventData: KingdomFundingEventData,
     amount: number,
-    repos: any
+    repos: GivingRepos
   ): Promise<Array<{ fundId: string; amount: number }>> {
     try {
       const customerId = eventData.customer_vault_id
@@ -1161,14 +1278,14 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         || eventData.customer_id;
       if (customerId) {
         const subs = await repos.subscription.loadByCustomerId(churchId, String(customerId));
-        const candidates = Array.isArray(subs) ? subs : subs ? [subs] : [];
+        const candidates: { id?: string }[] = Array.isArray(subs) ? subs : subs ? [subs] : [];
         let best: { funds: Array<{ fundId: string; amount: number }>; gap: number } | null = null;
         for (const sub of candidates) {
           if (!sub?.id) continue;
-          const sfRaw = await repos.subscriptionFunds.loadBySubscriptionId(churchId, String(sub.id));
+          const sfRaw: FundAllocation[] = await repos.subscriptionFunds.loadBySubscriptionId(churchId, String(sub.id));
           const funds = (sfRaw || [])
-            .filter((f: any) => f.fundId)
-            .map((f: any) => ({ fundId: String(f.fundId), amount: Number(f.amount) || 0 }));
+            .filter((f) => f.fundId)
+            .map((f) => ({ fundId: String(f.fundId), amount: Number(f.amount) || 0 }));
           if (!funds.length) continue;
           const total = funds.reduce((s: number, f: { fundId: string; amount: number }) => s + f.amount, 0);
           // The charged amount may exceed the designated total when the donor covers fees;
@@ -1193,10 +1310,10 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   async logDonation(
     _config: GatewayConfig,
     churchId: string,
-    eventData: any,
-    repos: any,
+    eventData: KingdomFundingEventData,
+    repos: GivingRepos,
     status: "pending" | "complete" = "complete"
-  ): Promise<any> {
+  ) {
     try {
       const amount = Number(eventData.auth_amount || eventData.amount || eventData.transaction?.amount || 0);
 
@@ -1260,7 +1377,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       // Webhook-created donations (recurring auto-charges, ACH settlements) carry none, so
       // recover from the originating subscription — otherwise the money is recorded but left
       // unallocated and fund reports undercount.
-      let fundsArray: any[] = eventData.subscriptionFunds || eventData.funds || [];
+      let fundsArray: FundAllocation[] = eventData.subscriptionFunds || eventData.funds || [];
       if (fundsArray.length === 0 && eventData.fundId) {
         fundsArray = [{ fundId: eventData.fundId, amount }];
       }
@@ -1268,7 +1385,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         fundsArray = await this.recoverFunds(churchId, eventData, amount, repos);
       }
       const fundDonations: FundDonation[] = fundsArray
-        .map((fund: any) => ({ churchId, fundId: fund.fundId || fund.id || "", amount: fund.amount || 0 }))
+        .map((fund) => ({ churchId, fundId: fund.fundId || fund.id || "", amount: fund.amount || 0 }))
         .filter((fd: FundDonation) => fd.fundId);
       const savedDonation = await repos.donation.save(donation, fundDonations);
 
@@ -1283,7 +1400,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     churchId: string,
     transactionId: string,
     status: "pending" | "complete" | "failed",
-    repos: any
+    repos: GivingRepos
   ): Promise<void> {
     try {
       await repos.donation.updateStatus(churchId, transactionId, status);
@@ -1304,7 +1421,7 @@ function tag(xml: string, name: string): string {
   return m ? m[1].trim() : "";
 }
 
-function parseNmiSubscriptions(xml: string): any[] {
+function parseNmiSubscriptions(xml: string): NmiSubscription[] {
   const freqFromTags = (block: string): string => {
     const month = tag(block, "month_frequency");
     const day = tag(block, "day_frequency");
@@ -1335,7 +1452,7 @@ function parseNmiSubscriptions(xml: string): any[] {
   });
 }
 
-function parseNmiVaultMethods(xml: string, vaultId: string): any[] {
+function parseNmiVaultMethods(xml: string, vaultId: string): NmiVaultMethod[] {
   if (!vaultId || !xml) return [];
   // One chargeable method per donor vault: read the primary billing block (or the whole
   // response) and key it on the vault id we queried, so it matches the stored externalId.

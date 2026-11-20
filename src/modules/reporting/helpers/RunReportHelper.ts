@@ -21,9 +21,10 @@ export class RunReportHelper {
         const field = p.sourceKey.split(".")[1];
         report.queries.forEach((q) => {
           if (q.keyName === table && q.depth === depth && q.value) {
-            p.value = [];
+            const values: unknown[] = [];
+            p.value = values;
             q.value.forEach((v) => {
-              p.value.push(v[field]);
+              values.push(v[field]);
             });
           }
         });
@@ -44,7 +45,7 @@ export class RunReportHelper {
   }
 
   private static async runQuery(query: Query, report: Report) {
-    const parameters: any[] = [];
+    const parameters: unknown[] = [];
 
     const storedSql = query.sqlLines.join(" ");
 

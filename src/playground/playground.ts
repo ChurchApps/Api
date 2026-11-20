@@ -33,11 +33,11 @@ interface SubscriptionData {
   description?: string;
 }
 
-interface APIResponse<T = any> {
+interface APIResponse<T = unknown> {
   success: boolean;
   method?: string;
   provider?: string;
-  input?: any;
+  input?: unknown;
   result?: T;
   error?: string;
   message?: string;
@@ -51,13 +51,13 @@ interface FeeResult {
 interface ChargeResult {
   success: boolean;
   transactionId: string;
-  data: any;
+  data: unknown;
 }
 
 interface SubscriptionResult {
   success: boolean;
   subscriptionId: string;
-  data: any;
+  data: unknown;
 }
 
 interface WebhookResult {
@@ -110,7 +110,7 @@ function getSelectedProvider(): string {
 }
 
 // Helper function to display response
-function displayResponse(elementId: ResponseElementId, response: any, isError: boolean = false): void {
+function displayResponse(elementId: ResponseElementId, response: unknown, isError: boolean = false): void {
   const element = document.getElementById(elementId);
   if (!element) return;
 
@@ -135,7 +135,7 @@ function showLoading(elementId: ResponseElementId): void {
 }
 
 // Helper function to make API calls
-async function makeAPICall<T = any>(endpoint: string, data: any = null): Promise<T> {
+async function makeAPICall<T = unknown>(endpoint: string, data: unknown = null): Promise<T> {
   try {
     const options: RequestInit = {
       method: data ? "POST" : "GET",
@@ -550,17 +550,28 @@ function initializePage(): void {
 }
 
 // Attach functions to window object for HTML onclick handlers
+interface PlaygroundWindow extends Window {
+  testCalculateFees: typeof testCalculateFees;
+  testProcessCharge: typeof testProcessCharge;
+  testCreateCustomer: typeof testCreateCustomer;
+  testCreateSubscription: typeof testCreateSubscription;
+  testGenerateClientToken: typeof testGenerateClientToken;
+  testCreateWebhook: typeof testCreateWebhook;
+  testUpdateSubscription: typeof testUpdateSubscription;
+  testCancelSubscription: typeof testCancelSubscription;
+  testCreateProduct: typeof testCreateProduct;
+}
 console.log("Attaching functions to window object...");
-(window as any).testCalculateFees = testCalculateFees;
-(window as any).testProcessCharge = testProcessCharge;
-(window as any).testCreateCustomer = testCreateCustomer;
-(window as any).testCreateSubscription = testCreateSubscription;
-(window as any).testGenerateClientToken = testGenerateClientToken;
-(window as any).testCreateWebhook = testCreateWebhook;
-(window as any).testUpdateSubscription = testUpdateSubscription;
-(window as any).testCancelSubscription = testCancelSubscription;
-(window as any).testCreateProduct = testCreateProduct;
-console.log("Functions attached. testCalculateFees:", typeof (window as any).testCalculateFees);
+(window as PlaygroundWindow).testCalculateFees = testCalculateFees;
+(window as PlaygroundWindow).testProcessCharge = testProcessCharge;
+(window as PlaygroundWindow).testCreateCustomer = testCreateCustomer;
+(window as PlaygroundWindow).testCreateSubscription = testCreateSubscription;
+(window as PlaygroundWindow).testGenerateClientToken = testGenerateClientToken;
+(window as PlaygroundWindow).testCreateWebhook = testCreateWebhook;
+(window as PlaygroundWindow).testUpdateSubscription = testUpdateSubscription;
+(window as PlaygroundWindow).testCancelSubscription = testCancelSubscription;
+(window as PlaygroundWindow).testCreateProduct = testCreateProduct;
+console.log("Functions attached. testCalculateFees:", typeof (window as PlaygroundWindow).testCalculateFees);
 
 // Initialize when DOM is ready
 if (document.readyState === "loading") {

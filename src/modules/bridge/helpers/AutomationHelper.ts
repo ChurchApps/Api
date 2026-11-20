@@ -6,6 +6,13 @@ import { CalendarHelper } from "../../content/helpers/CalendarHelper.js";
 import { RecurrenceHelper } from "../../content/helpers/RecurrenceHelper.js";
 import { HolidayHelper } from "../../content/helpers/HolidayHelper.js";
 import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
+import type { Repos as MembershipRepos } from "../../membership/repositories/index.js";
+import type { Repos as ContentRepos } from "../../content/repositories/index.js";
+import type { AttendanceDatabase } from "../../attendance/db/DatabaseTypes.js";
+import type { Event } from "../../content/models/index.js";
+
+// Event rows always have start/end set; the model marks them optional.
+type ScheduledEvent = Event & { start: Date; end: Date };
 
 export class AutomationHelper {
   private static subdomainCache: { [key: string]: string } = {};
@@ -23,9 +30,9 @@ export class AutomationHelper {
   // Midnight job: for groups with attendanceReminders on, if a group event
   // occurred yesterday but no attendance session was recorded, nudge the leaders.
   public static async remindGroupAttendance(): Promise<number> {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const contentRepos = await RepoManager.getRepos<any>("content");
-    const attendanceDb = KyselyPool.getDb("attendance") as any;
+    const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
+    const contentRepos = await RepoManager.getRepos<ContentRepos>("content");
+    const attendanceDb = KyselyPool.getDb<AttendanceDatabase>("attendance");
 
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
@@ -33,16 +40,16 @@ export class AutomationHelper {
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
-    const groups = (await membershipRepos.group.loadAttendanceReminderGroups()) as any[];
+    const groups = await membershipRepos.group.loadAttendanceReminderGroups();
     const notifications: Notification[] = [];
 
     for (const group of groups) {
       try {
-        const events = (await contentRepos.event.loadForGroup(group.churchId, group.id)) as any[];
+        const events = (await contentRepos.event.loadForGroup(group.churchId, group.id)) as ScheduledEvent[];
         if (!events?.length) continue;
         await CalendarHelper.addExceptionDates(events, contentRepos);
         const metYesterday = events.some((ev) => {
-          const exceptions = (ev.exceptionDates || []).map((d: any) => HolidayHelper.toKey(new Date(d)));
+          const exceptions = (ev.exceptionDates || []).map((d: Date | string) => HolidayHelper.toKey(new Date(d)));
           return RecurrenceHelper.getOccurrences(ev, dayStart, dayEnd, 5).some((o) => !exceptions.includes(HolidayHelper.toKey(o.start)));
         });
         if (!metYesterday) continue;
@@ -55,7 +62,7 @@ export class AutomationHelper {
           .execute();
         if (sessions.length > 0) continue;
 
-        const leaders = (await membershipRepos.groupMember.loadLeadersForGroup(group.churchId, group.id)) as any[];
+        const leaders = await membershipRepos.groupMember.loadLeadersForGroup(group.churchId, group.id);
         const leaderIds = leaders.map((l) => l.personId).filter(Boolean);
         if (!leaderIds.length) continue;
 

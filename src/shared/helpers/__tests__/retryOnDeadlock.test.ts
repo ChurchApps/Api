@@ -10,7 +10,7 @@ describe("retryOnDeadlock", () => {
     const result = await retryOnDeadlock(async () => {
       n += 1;
       if (n < 3) {
-        const e: any = new Error("Deadlock found when trying to get lock");
+        const e: Error & { code?: string } = new Error("Deadlock found when trying to get lock");
         e.code = "ER_LOCK_DEADLOCK";
         throw e;
       }
@@ -21,7 +21,7 @@ describe("retryOnDeadlock", () => {
   });
 
   it("does not retry other errors", async () => {
-    const e: any = new Error("Unknown column");
+    const e: Error & { code?: string } = new Error("Unknown column");
     e.code = "ER_BAD_FIELD_ERROR";
     await expect(retryOnDeadlock(async () => { throw e; })).rejects.toBe(e);
   });

@@ -3,6 +3,7 @@ jest.mock("../../Environment", () => ({ Environment: { membershipApi: "http://te
 import { PayPalHelper } from "../../PayPalHelper";
 import { PayPalGatewayProvider } from "../PayPalGatewayProvider";
 import { GatewayConfig } from "../IGatewayProvider";
+import type { Donation, FundDonation } from "../../../../modules/giving/models";
 
 describe("PayPalGatewayProvider", () => {
   const provider = new PayPalGatewayProvider();
@@ -39,8 +40,8 @@ describe("PayPalGatewayProvider", () => {
     const makeRepos = () => ({
       customer: { load: jest.fn().mockResolvedValue(null) },
       donationBatch: { getOrCreateCurrent: jest.fn().mockResolvedValue({ id: "BAT1" }) },
-      donation: { save: jest.fn().mockImplementation(async (d: any) => ({ ...d, id: "DON1" })) },
-      fundDonation: { save: jest.fn().mockImplementation(async (f: any) => f) },
+      donation: { save: jest.fn().mockImplementation(async (d: Donation) => ({ ...d, id: "DON1" })) },
+      fundDonation: { save: jest.fn().mockImplementation(async (f: FundDonation) => f) },
       fund: { getOrCreateGeneral: jest.fn().mockResolvedValue({ id: "GEN" }) }
     });
 

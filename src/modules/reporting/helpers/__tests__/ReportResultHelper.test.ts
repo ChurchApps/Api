@@ -1,10 +1,11 @@
-jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: (arr: any[], key: string, value: any) => arr.find((a) => a[key] === value) } }));
+jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: (arr: Record<string, unknown>[], key: string, value: unknown) => arr.find((a) => a[key] === value) } }));
 
-import { ReportResultHelper } from "../ReportResultHelper";
+import { ReportResultHelper } from "../ReportResultHelper.js";
+import { Report } from "../../models/index.js";
 
 describe("ReportResultHelper.combineResults", () => {
   it("joins each main row to its own related rows by joinConditions", () => {
-    const report: any = {
+    const report: Report = {
       queries: [
         { keyName: "main", value: [{ groupId: "g1", personId: "p1" }, { groupId: "g2", personId: "p2" }] },
         { keyName: "people", joinConditions: [{ parent: "personId", child: "id" }], value: [{ id: "p1", displayName: "Ann" }, { id: "p2", displayName: "Bob" }] },
@@ -17,7 +18,7 @@ describe("ReportResultHelper.combineResults", () => {
   });
 
   it("leaves main rows untouched by queries without joinConditions", () => {
-    const report: any = { queries: [{ keyName: "groups", value: [{ id: "g1" }] }, { keyName: "main", value: [{ week: "2026-01-04", visits: 3 }] }] };
+    const report: Report = { queries: [{ keyName: "groups", value: [{ id: "g1" }] }, { keyName: "main", value: [{ week: "2026-01-04", visits: 3 }] }] };
     expect(ReportResultHelper.combineResults(report)).toEqual([{ week: "2026-01-04", visits: 3 }]);
   });
 });

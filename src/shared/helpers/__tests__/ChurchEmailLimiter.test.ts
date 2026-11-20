@@ -1,11 +1,13 @@
 jest.mock("../../infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: jest.fn() } }));
 
+import { SNSEvent } from "aws-lambda";
 import { RepoManager } from "../../infrastructure/RepoManager.js";
+import { Church } from "../../../modules/membership/models/index.js";
 import { ChurchEmailLimiter } from "../ChurchEmailLimiter.js";
 import { handleSesFeedback, parseFeedback } from "../../../lambda/ses-feedback-handler.js";
 
 interface Opts {
-  church?: any;
+  church?: Partial<Church> | null;
   sent?: number;
   sentWeek?: number;
   best?: Record<string, number>;
@@ -14,13 +16,13 @@ interface Opts {
 }
 
 function setup(o: Opts) {
-  const repos: any = {
+  const repos: { church: { loadById: jest.Mock }; deliveryLog: Record<string, jest.Mock> } = {
     church: { loadById: jest.fn(async (id: string) => (id === "archived" ? { id, archivedDate: new Date() } : o.church === undefined ? { id, emailApprovedDate: new Date() } : o.church)) },
     deliveryLog: {
       countChurchEmailsSince: jest.fn(async (_id: string, since: Date) => (Date.now() - since.getTime() > 2 * 86400000 ? (o.sentWeek ?? 0) : (o.sent ?? 0))),
       bestChurchEmailDay: jest.fn(async (id: string) => o.best?.[id] ?? 0),
       countByMethodSince: jest.fn(async (_id: string, method: string) => (method === "sesComplaint" ? (o.complaints ?? 0) : (o.bounces ?? 0))),
-      createMany: jest.fn(async (rows: any[]) => rows.map((r, i) => ({ ...r, id: "r" + i }))),
+      createMany: jest.fn(async (rows: Record<string, unknown>[]) => rows.map((r, i) => ({ ...r, id: "r" + i }))),
       deleteIds: jest.fn(async () => undefined)
     }
   };
@@ -84,9 +86,9 @@ describe("ChurchEmailLimiter.reserve", () => {
 
   it("backs out when a concurrent send pushed the church over after the rows went in", async () => {
     const repos = setup({ sent: 100 });
-    repos.deliveryLog.createMany.mockImplementation(async (rows: any[]) => {
+    repos.deliveryLog.createMany.mockImplementation(async (rows: Record<string, unknown>[]) => {
       repos.deliveryLog.countChurchEmailsSince.mockResolvedValue(100 + rows.length + 40);
-      return rows.map((r: any, i: number) => ({ ...r, id: "r" + i }));
+      return rows.map((r, i) => ({ ...r, id: "r" + i }));
     });
     expect(await ChurchEmailLimiter.reserve("c1", "email", recipients(20))).toBeNull();
     expect(repos.deliveryLog.deleteIds).toHaveBeenCalledWith("c1", expect.arrayContaining(["r0", "r19"]));
@@ -111,7 +113,7 @@ describe("handleSesFeedback", () => {
     const good = JSON.stringify({ notificationType: "Complaint", complaint: { complainedRecipients: [{ emailAddress: "a@x.com" }] }, mail: { timestamp: new Date().toISOString() } });
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
-    await handleSesFeedback({ Records: [{ Sns: { Message: "not json" } }, { Sns: { Message: good } }] } as any);
+    await handleSesFeedback({ Records: [{ Sns: { Message: "not json" } }, { Sns: { Message: good } }] } as SNSEvent);
     expect(repos.deliveryLog.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1", deliveryMethod: "sesComplaint" }));
   });
 });

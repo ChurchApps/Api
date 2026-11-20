@@ -12,7 +12,7 @@ import { McpPrincipal } from "./lessonsProxy.js";
 export class McpController extends BaseHttpController {
   @httpPost("/")
   public async handle(req: express.Request, res: express.Response): Promise<void> {
-    const principal = (this.httpContext?.user as any)?.details as McpPrincipal | undefined;
+    const principal = this.httpContext?.user?.details as McpPrincipal | undefined;
     const churchId = principal?.churchId;
     if (!churchId) {
       // Points OAuth-capable clients (claude.ai, ChatGPT) at the sign-in discovery document.
@@ -37,7 +37,7 @@ export class McpController extends BaseHttpController {
     try {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
-    } catch (err: any) {
+    } catch (err) {
       console.error("MCP transport error:", err);
       if (!res.headersSent) res.status(500).json({ error: "MCP transport error" });
     }

@@ -1,15 +1,21 @@
 import { Report } from "../models/index.js";
 
+// Columns the groupAttendanceDownload report's queries select.
+type AttendanceRow = { groupId: string; personId: string; serviceTimeId: string; sessionDate: string; serviceName?: string; serviceTimeName?: string };
+type GroupRow = { id: string; groupName: string };
+type GroupMemberRow = { groupId: string; personId: string };
+type PersonRow = { id: string; displayName: string; firstName?: string; lastName?: string };
+
 export class GroupAttendanceDownloadHelper {
   // One row per group member, one present/absent column per dated session.
   public static combine(report: Report) {
-    const result: any[] = [];
-    const personByRow = new Map<any, any>();
+    const result: Record<string, string>[] = [];
+    const personByRow = new Map<Record<string, string>, PersonRow>();
     const getValue = (keyName: string) => report.queries?.find((q) => q.keyName === keyName)?.value;
-    const attendance: any[] = getValue("main");
-    const groups: any[] = getValue("groups");
-    const groupMembers: any[] = getValue("groupMembers");
-    const people: any[] = getValue("people");
+    const attendance = getValue("main") as AttendanceRow[];
+    const groups = getValue("groups") as GroupRow[];
+    const groupMembers = getValue("groupMembers") as GroupMemberRow[];
+    const people = getValue("people") as PersonRow[];
 
     if (!attendance || !groups || !groupMembers || !people) return result;
 
@@ -31,7 +37,7 @@ export class GroupAttendanceDownloadHelper {
       groupMembers.filter((gm) => gm.groupId === g.id).forEach((gm) => {
         const person = people.find((p) => p.id === gm.personId);
         if (!person) return;
-        const row: any = { displayName: person.displayName, groupName: g.groupName };
+        const row: Record<string, string> = { displayName: person.displayName, groupName: g.groupName };
         sessions.forEach((s) => {
           row[s.name] = present.has([g.id, person.id, s.serviceTimeId, s.sessionDate].join("//")) ? "present" : "absent";
         });

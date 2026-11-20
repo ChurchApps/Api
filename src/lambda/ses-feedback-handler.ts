@@ -1,16 +1,26 @@
 import { SNSEvent } from "aws-lambda";
 import { RepoManager } from "../shared/infrastructure/RepoManager.js";
+import type { Repos as MessagingRepos } from "../modules/messaging/repositories/index.js";
 
 const MIN_MS = 60 * 1000;
+
+// The subset of the SES bounce/complaint notification body this handler reads.
+interface SesRecipient { emailAddress: string }
+export interface SesFeedbackMessage {
+  notificationType?: string;
+  mail?: { timestamp?: string };
+  complaint?: { complainedRecipients?: SesRecipient[]; complaintFeedbackType?: string };
+  bounce?: { bounceType?: string; bounceSubType?: string; bouncedRecipients?: SesRecipient[] };
+}
 
 // SES bounce/complaint notifications arrive via SNS. Each is pinned to the church whose church-authored email
 // went to that address at that moment, so ChurchEmailLimiter can pause a church that is generating them.
 export const handleSesFeedback = async (event: SNSEvent): Promise<void> => {
-  const repos = await RepoManager.getRepos<any>("messaging");
+  const repos = await RepoManager.getRepos<MessagingRepos>("messaging");
   for (const record of event.Records || []) {
-    let msg: any;
+    let msg: SesFeedbackMessage;
     try {
-      msg = JSON.parse(record.Sns.Message);
+      msg = JSON.parse(record.Sns.Message) as SesFeedbackMessage;
     } catch {
       console.warn("[sesFeedback] skipping unparseable record", record.Sns?.MessageId);
       continue;
@@ -27,13 +37,13 @@ export const handleSesFeedback = async (event: SNSEvent): Promise<void> => {
   }
 };
 
-export function parseFeedback(msg: any): { method: "sesBounce" | "sesComplaint"; addresses: string[]; detail: string } | null {
+export function parseFeedback(msg: SesFeedbackMessage): { method: "sesBounce" | "sesComplaint"; addresses: string[]; detail: string } | null {
   if (msg?.notificationType === "Complaint") {
-    return { method: "sesComplaint", addresses: (msg.complaint?.complainedRecipients || []).map((r: any) => r.emailAddress), detail: msg.complaint?.complaintFeedbackType || "complaint" };
+    return { method: "sesComplaint", addresses: (msg.complaint?.complainedRecipients || []).map((r: SesRecipient) => r.emailAddress), detail: msg.complaint?.complaintFeedbackType || "complaint" };
   }
   // Transient bounces (full mailbox, etc.) say nothing about list quality.
   if (msg?.notificationType === "Bounce" && msg.bounce?.bounceType === "Permanent") {
-    return { method: "sesBounce", addresses: (msg.bounce.bouncedRecipients || []).map((r: any) => r.emailAddress), detail: msg.bounce.bounceSubType || "Permanent" };
+    return { method: "sesBounce", addresses: (msg.bounce.bouncedRecipients || []).map((r: SesRecipient) => r.emailAddress), detail: msg.bounce.bounceSubType || "Permanent" };
   }
   return null;
 }

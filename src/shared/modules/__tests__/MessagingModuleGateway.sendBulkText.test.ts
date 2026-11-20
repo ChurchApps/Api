@@ -12,14 +12,14 @@ jest.mock("@churchapps/texting", () => ({ getProvider: () => provider }));
 import { RepoManager } from "../../infrastructure/RepoManager.js";
 import { getMessagingModuleGateway } from "../MessagingModuleGateway.js";
 
-function fakeRepos(opts: any = {}) {
+function fakeRepos(opts: { providers?: Record<string, unknown>[] } = {}) {
   return {
     textingProvider: {
       loadByChurchId: jest.fn(async () => opts.providers ?? [{ provider: "clearstream", enabled: true, apiKey: "k", apiSecret: "s", fromNumber: "+1" }]),
-      convertAllToModel: (rows: any[]) => rows
+      convertAllToModel: (rows: unknown[]) => rows
     },
-    sentText: { save: jest.fn(async (m: any) => { m.id = "st1"; return m; }) },
-    deliveryLog: { save: jest.fn(async (m: any) => m) }
+    sentText: { save: jest.fn(async (m: Record<string, unknown>) => { m.id = "st1"; return m; }) },
+    deliveryLog: { save: jest.fn(async (m: Record<string, unknown>) => m) }
   };
 }
 
@@ -71,7 +71,7 @@ describe("MessagingModuleGateway.sendBulkText", () => {
   it("caps at 500 recipients", async () => {
     const repos = fakeRepos();
     (RepoManager.getRepos as jest.Mock).mockResolvedValue(repos);
-    provider.sendBulk.mockImplementation(async (_c: any, phones: string[]) => phones.map(() => ({ success: true })));
+    provider.sendBulk.mockImplementation(async (_c: unknown, phones: string[]) => phones.map(() => ({ success: true })));
 
     const recipients = Array.from({ length: 600 }, (_, i) => ({ phoneNumber: "+" + i }));
     await getMessagingModuleGateway().sendBulkText("c1", recipients, "msg");

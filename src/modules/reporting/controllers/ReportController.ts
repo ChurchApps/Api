@@ -10,7 +10,7 @@ import { GroupAttendanceDownloadHelper, ReportResultHelper, RunReportHelper } fr
 @controller("/reporting/reports")
 export class ReportController extends ReportingBaseController {
   @httpGet("/groupAttendanceDownload/run")
-  public async groupAttDownload(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async groupAttDownload(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const reportPath = path.join(process.cwd(), "reports", "groupAttendanceDownload.json");
 
@@ -32,7 +32,7 @@ export class ReportController extends ReportingBaseController {
   }
 
   @httpGet("/:keyName")
-  public async get(@requestParam("keyName") keyName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("keyName") keyName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (_au) => {
       if (!/^[A-Za-z0-9_-]+$/.test(keyName)) return this.json({}, 400);
       const reportPath = path.join(process.cwd(), "reports", `${keyName}.json`);
@@ -49,7 +49,7 @@ export class ReportController extends ReportingBaseController {
   }
 
   @httpGet("/:keyName/run")
-  public async run(@requestParam("keyName") keyName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async run(@requestParam("keyName") keyName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!/^[A-Za-z0-9_-]+$/.test(keyName)) return this.json({}, 400);
       const reportPath = path.join(process.cwd(), "reports", `${keyName}.json`);
@@ -94,7 +94,7 @@ export class ReportController extends ReportingBaseController {
     return result;
   }
 
-  private convertToResult(report: Report, table: any[]) {
+  private convertToResult(report: Report, table: Record<string, unknown>[]) {
     const result: ReportResult = {
       displayName: report.displayName,
       description: report.description,

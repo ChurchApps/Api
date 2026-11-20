@@ -32,7 +32,7 @@ const createModuleContextMiddleware = (moduleName: string) => {
   return (req: express.Request, _res: express.Response, next: express.NextFunction) => {
     // Add module information to request for debugging/logging
     // Database context is no longer needed — repos use Kysely with per-module getDb()
-    (req as any).module = moduleName;
+    (req as express.Request & { module?: string }).module = moduleName;
     next();
   };
 };

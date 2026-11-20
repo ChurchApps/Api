@@ -1,6 +1,6 @@
 import { ALL_WEBHOOK_EVENTS } from "./WebhookEvents.js";
 
-const SAMPLES: Record<string, (churchId: string) => any> = {
+const SAMPLES: Record<string, (churchId: string) => Record<string, unknown>> = {
   "person.created": (churchId) => ({ id: "smpl_person", churchId, name: { display: "Sample Person", first: "Sample", last: "Person" }, contactInfo: { email: "sample@example.com" } }),
   "person.updated": (churchId) => ({ id: "smpl_person", churchId, name: { display: "Sample Person", first: "Sample", last: "Person" }, contactInfo: { email: "sample@example.com" } }),
   "person.destroyed": (churchId) => ({ id: "smpl_person", churchId }),
@@ -35,7 +35,7 @@ const SAMPLES: Record<string, (churchId: string) => any> = {
   "event.destroyed": (churchId) => ({ id: "smpl_event", churchId })
 };
 
-export const samplePayloadFor = (event: string, churchId: string): any => {
+export const samplePayloadFor = (event: string, churchId: string): Record<string, unknown> => {
   return (SAMPLES[event] ?? ((cid: string) => ({ id: "smpl_sample", churchId: cid })))(churchId);
 };
 

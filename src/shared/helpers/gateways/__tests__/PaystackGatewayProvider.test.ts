@@ -4,11 +4,12 @@ jest.mock("axios", () => ({ __esModule: true, default: { request: jest.fn(), get
 import crypto from "crypto";
 import Axios from "axios";
 import { PaystackGatewayProvider } from "../PaystackGatewayProvider";
-import { GatewayConfig } from "../IGatewayProvider";
+import { GatewayConfig, GatewayPaymentRequest } from "../IGatewayProvider";
+import type { Donation } from "../../../../modules/giving/models";
 
-const mockedRequest = (Axios as any).request as jest.Mock;
-const mockedGet = (Axios as any).get as jest.Mock;
-const ok = (data: any) => ({ data: { status: true, data } });
+const mockedRequest = Axios.request as jest.Mock;
+const mockedGet = Axios.get as jest.Mock;
+const ok = (data: unknown) => ({ data: { status: true, data } });
 
 describe("PaystackGatewayProvider", () => {
   const provider = new PaystackGatewayProvider();
@@ -27,7 +28,7 @@ describe("PaystackGatewayProvider", () => {
 
     it("accepts a body signed with the secret key and keys the event on the reference", async () => {
       const raw = JSON.stringify(body);
-      const result = await provider.verifyWebhookSignature(config, { "x-paystack-signature": sign(raw) } as any, body);
+      const result = await provider.verifyWebhookSignature(config, { "x-paystack-signature": sign(raw) }, body);
       expect(result.success).toBe(true);
       expect(result.eventType).toBe("charge.success");
       expect(result.eventData.id).toBe("ref_1");
@@ -36,13 +37,13 @@ describe("PaystackGatewayProvider", () => {
 
     it("rejects a wrong signature and a missing one", async () => {
       const raw = JSON.stringify(body);
-      expect((await provider.verifyWebhookSignature(config, { "x-paystack-signature": sign(raw, "other") } as any, body)).success).toBe(false);
-      expect((await provider.verifyWebhookSignature(config, {} as any, body)).success).toBe(false);
+      expect((await provider.verifyWebhookSignature(config, { "x-paystack-signature": sign(raw, "other") }, body)).success).toBe(false);
+      expect((await provider.verifyWebhookSignature(config, {}, body)).success).toBe(false);
     });
 
     it("keys subscription events on subscription_code", async () => {
       const sub = { event: "subscription.disable", data: { id: 9, subscription_code: "SUB_1" } };
-      const result = await provider.verifyWebhookSignature(config, { "x-paystack-signature": sign(JSON.stringify(sub)) } as any, sub);
+      const result = await provider.verifyWebhookSignature(config, { "x-paystack-signature": sign(JSON.stringify(sub)) }, sub);
       expect(result.eventData.id).toBe("SUB_1");
       expect(provider.classifyWebhookEvent(result.eventType!).action).toBe("cancel-subscription");
     });
@@ -79,7 +80,7 @@ describe("PaystackGatewayProvider", () => {
 
     it("flags a reference that is already recorded so it isn't logged twice", async () => {
       const repos = { donation: { loadByTransactionId: jest.fn().mockResolvedValue({ id: "DON1" }) } };
-      const data: any = { id: "ref_6", amount: 10 };
+      const data: GatewayPaymentRequest = { id: "ref_6", amount: 10 };
       await provider.prepareCharge(config, data, repos);
       expect(repos.donation.loadByTransactionId).toHaveBeenCalledWith("CHU1", "ref_6");
       mockedRequest.mockResolvedValue(ok({ status: "success", reference: "ref_6", amount: 1000 }));
@@ -89,7 +90,7 @@ describe("PaystackGatewayProvider", () => {
 
     it("charges a saved authorization in subunits", async () => {
       mockedRequest.mockResolvedValue(ok({ status: "success", reference: "ref_3" }));
-      const data: any = { id: "AUTH_abc", amount: 12.5, currency: "ghs", person: { email: "a@b.com" } };
+      const data: GatewayPaymentRequest = { id: "AUTH_abc", amount: 12.5, currency: "ghs", person: { email: "a@b.com" } };
       await provider.prepareCharge(config, data, {});
       expect(data.paymentMethodId).toBe("AUTH_abc");
       await provider.processCharge(config, data);
@@ -149,7 +150,7 @@ describe("PaystackGatewayProvider", () => {
   describe("logDonation", () => {
     const repos = () => ({
       donationBatch: { getOrCreateCurrent: jest.fn().mockResolvedValue({ id: "BAT1" }) },
-      donation: { save: jest.fn().mockImplementation(async (d: any) => ({ ...d, id: "DON1" })) },
+      donation: { save: jest.fn().mockImplementation(async (d: Donation) => ({ ...d, id: "DON1" })) },
       fundDonation: { save: jest.fn() },
       customer: { load: jest.fn().mockResolvedValue({ personId: "PER_CUS" }), save: jest.fn() },
       gatewayPaymentMethod: { loadByExternalId: jest.fn().mockResolvedValue(null), save: jest.fn() },

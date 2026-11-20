@@ -9,6 +9,8 @@ jest.mock("stripe", () => {
 
 import Stripe from "stripe";
 import { StripeHelper } from "../StripeHelper";
+import type { Donation, PaymentDetails } from "../../../modules/giving/models";
+import type { StripeEventObject } from "../gateways/IGatewayProvider";
 
 type MockStripe = {
   subscriptions: { create: jest.Mock };
@@ -76,7 +78,7 @@ describe("StripeHelper currency handling", () => {
   });
 
   describe("donate (one-time charge)", () => {
-    const basePayment: any = {
+    const basePayment: PaymentDetails = {
       amount: 25,
       currency: "usd",
       customer: "cus_test",
@@ -113,7 +115,7 @@ describe("StripeHelper currency handling", () => {
 
   describe("logDonation", () => {
     const buildRepos = () => {
-      const savedDonations: any[] = [];
+      const savedDonations: Donation[] = [];
       return {
         savedDonations,
         repos: {
@@ -121,7 +123,7 @@ describe("StripeHelper currency handling", () => {
           donationBatch: { getOrCreateCurrent: jest.fn().mockResolvedValue({ id: "BAT1" }) },
           fund: { getOrCreateGeneral: jest.fn().mockResolvedValue({ id: "FUN1" }) },
           donation: {
-            save: jest.fn().mockImplementation((d: any) => {
+            save: jest.fn().mockImplementation((d: Donation) => {
               const saved = { ...d, id: "DON1" };
               savedDonations.push(saved);
               return Promise.resolve(saved);
@@ -169,7 +171,7 @@ describe("StripeHelper currency handling", () => {
 
     it("stores the donor memo from charge metadata in memo, not notes", async () => {
       const { savedDonations, repos } = buildRepos();
-      const event: any = stripeChargeEvent("usd", 2500);
+      const event: StripeEventObject = stripeChargeEvent("usd", 2500);
       event.metadata.memo = "Youth trip";
       await StripeHelper.logDonation("sk_test", "CHU1", event, repos);
 
@@ -179,7 +181,7 @@ describe("StripeHelper currency handling", () => {
 
     it("treats legacy metadata.notes from older subscriptions as the donor memo", async () => {
       const { savedDonations, repos } = buildRepos();
-      const event: any = stripeChargeEvent("usd", 2500);
+      const event: StripeEventObject = stripeChargeEvent("usd", 2500);
       event.metadata.notes = "Benevolence";
       await StripeHelper.logDonation("sk_test", "CHU1", event, repos);
 

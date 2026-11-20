@@ -3,7 +3,7 @@ jest.mock("../Environment.js", () => ({ Environment: env }));
 
 import { CaptchaPass } from "../CaptchaPass";
 
-const req = (captchaPass?: string): any => ({ body: captchaPass === undefined ? {} : { captchaPass } });
+const req = (captchaPass?: string): { body: { captchaPass?: string } } => ({ body: captchaPass === undefined ? {} : { captchaPass } });
 
 beforeEach(() => {
   env.captchaEnforce = true;

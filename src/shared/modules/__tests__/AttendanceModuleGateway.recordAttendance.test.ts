@@ -6,34 +6,35 @@ jest.mock("../../../modules/attendance/helpers/CheckinTimeZoneHelper.js", () => 
 import { RepoManager } from "../../infrastructure/RepoManager.js";
 import { WebhookDispatcher } from "../../webhooks/WebhookDispatcher.js";
 import { getAttendanceModuleGateway } from "../AttendanceModuleGateway.js";
+import type { ServiceTime, Session, Visit, VisitSession } from "../../../modules/attendance/models/index.js";
 
 // Sunday night service, 6:30–7:45pm church time (America/Chicago).
 const sundayNight = { id: "st1", serviceId: "s1", dayOfWeek: 0, startTime: "18:30", endTime: "19:45" };
 const during = new Date("2026-10-25T23:50:00Z"); // Sunday 6:50pm CDT
 const after = new Date("2026-10-26T02:00:00Z"); // Sunday 9:00pm CDT
 
-function fakeRepos(serviceTimes: any[]) {
-  const sessions: any[] = [];
-  const visits: any[] = [];
-  const visitSessions: any[] = [];
+function fakeRepos(serviceTimes: Partial<ServiceTime>[]) {
+  const sessions: Session[] = [];
+  const visits: Visit[] = [];
+  const visitSessions: VisitSession[] = [];
   let n = 0;
   const repos = {
     groupServiceTime: { loadWithServiceNames: jest.fn(async () => serviceTimes.map((st) => ({ groupId: "g1", serviceTimeId: st.id }))) },
     serviceTime: { loadByIds: jest.fn(async () => serviceTimes) },
-    service: { loadAll: jest.fn(async () => []) },
+    service: { loadAll: jest.fn(async (): Promise<unknown[]> => []) },
     session: {
       loadByGroupServiceTimeDate: jest.fn(async (_c: string, groupId: string, serviceTimeId: string, date: Date) =>
         sessions.find((s) => s.groupId === groupId && s.serviceTimeId === serviceTimeId && s.sessionDate.getTime() === date.getTime()) || null),
-      save: jest.fn(async (s: any) => { s.id = "sess" + ++n; sessions.push(s); return s; })
+      save: jest.fn(async (s: Session) => { s.id = "sess" + ++n; sessions.push(s); return s; })
     },
     visit: {
       loadByServiceDatePeopleIds: jest.fn(async (_c: string, serviceId: string, date: Date, peopleIds: string[]) =>
         visits.filter((v) => v.serviceId === serviceId && v.visitDate.getTime() === date.getTime() && peopleIds.includes(v.personId))),
-      save: jest.fn(async (v: any) => { if (!v.id) { v.id = "v" + ++n; visits.push(v); } return v; })
+      save: jest.fn(async (v: Visit) => { if (!v.id) { v.id = "v" + ++n; visits.push(v); } return v; })
     },
     visitSession: {
       loadByVisitIdSessionId: jest.fn(async (_c: string, visitId: string, sessionId: string) => visitSessions.find((vs) => vs.visitId === visitId && vs.sessionId === sessionId) || null),
-      save: jest.fn(async (vs: any) => { vs.id = "vs" + ++n; visitSessions.push(vs); return vs; })
+      save: jest.fn(async (vs: VisitSession) => { vs.id = "vs" + ++n; visitSessions.push(vs); return vs; })
     }
   };
   (RepoManager.getRepos as jest.Mock).mockResolvedValue(repos);

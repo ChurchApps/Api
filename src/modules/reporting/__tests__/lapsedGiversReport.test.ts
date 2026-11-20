@@ -26,14 +26,14 @@ describe("lapsedGivers report", () => {
   });
 
   it("requires the donations View permission", () => {
-    const actions = (report.permissions || []).flatMap((p: any) => p.requireOne.map((r: any) => r.action));
+    const actions = (report.permissions || []).flatMap((p: { requireOne: { action: string }[] }) => p.requireOne.map((r) => r.action));
     expect(actions).toContain("View");
   });
 
   it("outputs person, last gift date and previous total", () => {
     const columns = report.outputs?.[0]?.columns || [];
-    const values = columns.map((c: any) => c.value);
+    const values = columns.map((c: { value: string }) => c.value);
     expect(values).toEqual(["personId", "lastGiftDate", "previousTotal"]);
-    expect(columns.find((c: any) => c.value === "personId").formatter).toBe("person");
+    expect(columns.find((c: { value: string }) => c.value === "personId").formatter).toBe("person");
   });
 });

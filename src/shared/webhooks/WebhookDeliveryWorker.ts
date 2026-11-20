@@ -3,12 +3,13 @@ import { WebhookSigner } from "./WebhookSigner.js";
 import { WebhookRetryPolicy } from "./WebhookRetryPolicy.js";
 import { SafeHttp } from "./SafeHttp.js";
 import { MailchimpConnector } from "./MailchimpConnector.js";
+import type { Repos as MembershipRepos } from "../../modules/membership/repositories/index.js";
 
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_RESPONSE_BODY = 4000;
 
 export class WebhookDeliveryWorker {
-  public static async process(repos: any): Promise<{ attempted: number; succeeded: number; failed: number }> {
+  public static async process(repos: MembershipRepos): Promise<{ attempted: number; succeeded: number; failed: number }> {
     const due: WebhookDelivery[] = await repos.webhookDelivery.loadDuePending(100);
     let succeeded = 0;
     let failed = 0;
@@ -32,7 +33,7 @@ export class WebhookDeliveryWorker {
   }
 
   // Public so test-event route can run a single delivery synchronously.
-  public static async attempt(repos: any, webhook: Webhook, delivery: WebhookDelivery): Promise<boolean> {
+  public static async attempt(repos: MembershipRepos, webhook: Webhook, delivery: WebhookDelivery): Promise<boolean> {
     delivery.attemptCount = (delivery.attemptCount ?? 0) + 1;
     let status = 0;
     let responseBody = "";
@@ -58,8 +59,8 @@ export class WebhookDeliveryWorker {
         status = res.status;
         responseBody = res.body;
       }
-    } catch (e: any) {
-      responseBody = ("Request failed: " + (e?.message ?? String(e))).slice(0, MAX_RESPONSE_BODY);
+    } catch (e) {
+      responseBody = ("Request failed: " + ((e as Error | undefined)?.message ?? String(e))).slice(0, MAX_RESPONSE_BODY);
     }
 
     const success = status >= 200 && status < 300;

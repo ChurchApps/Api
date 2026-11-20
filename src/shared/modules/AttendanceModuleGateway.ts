@@ -3,10 +3,13 @@ import { KyselyPool } from "../infrastructure/KyselyPool.js";
 import { WebhookDispatcher } from "../webhooks/WebhookDispatcher.js";
 import { DateHelper } from "../helpers/DateHelper.js";
 import { CheckinGateHelper } from "../../modules/attendance/helpers/CheckinGateHelper.js";
+import type { Repos as AttendanceRepos } from "../../modules/attendance/repositories/index.js";
+import type { AttendanceDatabase } from "../../modules/attendance/db/DatabaseTypes.js";
+import type { Visit } from "../../modules/attendance/models/index.js";
 
 // Gateway: the only seam through which other modules read attendance data.
 export interface AttendanceModuleGateway {
-  loadVisitsByPerson(churchId: string, personId: string): Promise<any[]>;
+  loadVisitsByPerson(churchId: string, personId: string): Promise<Visit[]>;
   // People who have visited before but not since the cutoff — the template for an
   // absence-driven trigger (e.g. "absent 6 weeks" evaluated by a scheduled automation).
   findPeopleAbsentSince(churchId: string, since: Date): Promise<string[]>;
@@ -24,7 +27,7 @@ export interface AttendanceModuleGateway {
 
 class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
   private async repos() {
-    return RepoManager.getRepos<any>("attendance");
+    return RepoManager.getRepos<AttendanceRepos>("attendance");
   }
 
   public async loadVisitsByPerson(churchId: string, personId: string) {
@@ -37,7 +40,7 @@ class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
 
   public async loadSessionGroupIds(churchId: string, sessionIds: string[]): Promise<string[]> {
     if (sessionIds.length === 0) return [];
-    const db = KyselyPool.getDb("attendance") as any;
+    const db = KyselyPool.getDb<AttendanceDatabase>("attendance");
     const rows = (await db.selectFrom("sessions")
       .select("groupId")
       .where("churchId", "=", churchId)
@@ -47,7 +50,7 @@ class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
   }
 
   public async loadGroupIdsForServiceTimes(churchId: string, campusId: string, serviceId: string, serviceTimeId: string): Promise<string[]> {
-    const db = KyselyPool.getDb("attendance") as any;
+    const db = KyselyPool.getDb<AttendanceDatabase>("attendance");
     let query = db.selectFrom("groupServiceTimes as gst")
       .innerJoin("serviceTimes as st", "st.id", "gst.serviceTimeId")
       .innerJoin("services as s", "s.id", "st.serviceId")
@@ -69,7 +72,7 @@ class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
     const { CheckinTimeZoneHelper } = await import("../../modules/attendance/helpers/CheckinTimeZoneHelper.js");
     const zoneFor = await CheckinTimeZoneHelper.load(churchId, repos.service);
     // Unscheduled service times are always open for check-in, but would match at any hour here.
-    const open = ((await repos.serviceTime.loadByIds(churchId, serviceTimeIds)) as any[])
+    const open = (await repos.serviceTime.loadByIds(churchId, serviceTimeIds))
       .filter((st) => !st.removed && CheckinGateHelper.hasSchedule(st) && CheckinGateHelper.isServiceTimeOpen(st, at, zoneFor(st)));
 
     let recorded = 0;
@@ -84,7 +87,7 @@ class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
         await WebhookDispatcher.emit(churchId, "session.created", session);
       }
 
-      const existing = (await repos.visit.loadByServiceDatePeopleIds(churchId, st.serviceId, date, [personId])) as any[];
+      const existing = (await repos.visit.loadByServiceDatePeopleIds(churchId, st.serviceId, date, [personId])) as Visit[];
       const visit = existing.length > 0
         ? existing[0]
         : await repos.visit.save({ churchId, personId, serviceId: st.serviceId, groupId, visitDate: date, checkinTime: at });
@@ -98,14 +101,14 @@ class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
 
   public async loadAttendeePersonIds(churchId: string, scope: { campusId?: string; serviceId?: string; serviceTimeId?: string; groupId?: string }, startDate: Date, endDate: Date) {
     const repos = await this.repos();
-    let rows: any[];
+    let rows: { personId?: string }[];
     if (scope.campusId) rows = await repos.attendance.loadByCampusId(churchId, scope.campusId, startDate, endDate);
     else if (scope.serviceId) rows = await repos.attendance.loadByServiceId(churchId, scope.serviceId, startDate, endDate);
     else if (scope.serviceTimeId) rows = await repos.attendance.loadByServiceTimeId(churchId, scope.serviceTimeId, startDate, endDate);
     else if (scope.groupId) rows = await repos.attendance.loadByGroupId(churchId, scope.groupId, startDate, endDate);
     else rows = await repos.visit.loadAllByDate(churchId, startDate, endDate);
     const ids = new Set<string>();
-    (rows || []).forEach((r: any) => { if (r.personId) ids.add(r.personId); });
+    (rows || []).forEach((r) => { if (r.personId) ids.add(r.personId); });
     return Array.from(ids);
   }
 }

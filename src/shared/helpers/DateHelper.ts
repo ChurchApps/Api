@@ -40,7 +40,7 @@ export class DateHelper {
     return dayjs(date).endOf("day").format("YYYY-MM-DD HH:mm:ss");
   }
 
-  static isValid(date: any): boolean {
+  static isValid(date: dayjs.ConfigType): boolean {
     return dayjs(date).isValid();
   }
 

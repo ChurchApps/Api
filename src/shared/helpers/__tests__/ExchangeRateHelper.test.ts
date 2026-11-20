@@ -12,7 +12,7 @@ jest.mock("@churchapps/helpers", () => ({
 }), { virtual: true });
 
 const axiosGetMock = jest.fn();
-jest.mock("axios", () => ({ __esModule: true, default: { get: (...args: any[]) => axiosGetMock(...args) } }));
+jest.mock("axios", () => ({ __esModule: true, default: { get: (...args: unknown[]) => axiosGetMock(...args) } }));
 
 import { ExchangeRateHelper } from "../ExchangeRateHelper.js";
 
@@ -77,7 +77,7 @@ describe("ExchangeRateHelper.convertTotals", () => {
   });
 
   it("treats gifts without a currency as the church currency", () => {
-    const result = ExchangeRateHelper.convertTotals([{ currency: null as any, amount: 50 }, { currency: "", amount: 25 }], "gbp", { USD: 2 });
+    const result = ExchangeRateHelper.convertTotals([{ currency: null, amount: 50 }, { currency: "", amount: 25 }], "gbp", { USD: 2 });
     expect(result.totalAmount).toBe(75);
     expect(result.isConverted).toBe(false);
     expect(result.amountsByCurrency).toEqual([{ currency: "gbp", amount: 75 }]);

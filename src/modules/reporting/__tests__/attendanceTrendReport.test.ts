@@ -4,10 +4,10 @@ import path from "path";
 describe("attendanceTrend report", () => {
   const reportPath = path.join(process.cwd(), "reports", "attendanceTrend.json");
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  const main = report.queries.find((q: any) => q.keyName === "main");
+  const main = report.queries.find((q: { keyName: string }) => q.keyName === "main");
   const sql = (main?.sqlLines || []).join("\n");
-  const param = (keyName: string) => report.parameters.find((p: any) => p.keyName === keyName);
-  const output = (outputType: string) => report.outputs.find((o: any) => o.outputType === outputType);
+  const param = (keyName: string) => report.parameters.find((p: { keyName: string }) => p.keyName === keyName);
+  const output = (outputType: string) => report.outputs.find((o: { outputType: string }) => o.outputType === outputType);
 
   it("has Start Date and End Date filters", () => {
     expect(param("startDate")).toMatchObject({ displayName: "Start Date", source: "date", defaultValue: "lastYear" });
@@ -21,10 +21,10 @@ describe("attendanceTrend report", () => {
 
   it("lists the distinct session dates in each week", () => {
     expect(sql).toMatch(/GROUP_CONCAT\(DISTINCT DATE_FORMAT\(v\.visitDate.*\) AS sessionDates/);
-    expect(output("table").columns.map((c: any) => c.value)).toEqual(["week", "visits", "sessionDates"]);
+    expect(output("table").columns.map((c: { value: string }) => c.value)).toEqual(["week", "visits", "sessionDates"]);
   });
 
   it("keeps the bar chart as Week / Visits", () => {
-    expect(output("barChart").columns.map((c: any) => c.value)).toEqual(["week", "visits"]);
+    expect(output("barChart").columns.map((c: { value: string }) => c.value)).toEqual(["week", "visits"]);
   });
 });

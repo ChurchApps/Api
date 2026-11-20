@@ -1,10 +1,13 @@
 import { Kysely, MysqlDialect } from "kysely";
-import { createPool } from "mysql2";
+import { createPool, TypeCastField } from "mysql2";
 import { Environment } from "../helpers/Environment.js";
+
+/** Schema for queries over tables chosen at runtime (audit snapshots, batch undo): any table, any column. */
+export type DynamicDatabase = Record<string, Record<string, unknown>>;
 
 /** Multi-database Kysely instance manager for API. */
 export class KyselyPool {
-  private static instances: Map<string, Kysely<any>> = new Map();
+  private static instances: Map<string, Kysely<unknown>> = new Map();
 
   private static getPoolSize(): number {
     if (process.env.CONNECTION_POOL_SIZE) return parseInt(process.env.CONNECTION_POOL_SIZE, 10);
@@ -14,7 +17,7 @@ export class KyselyPool {
   }
 
   static getDb<T>(moduleName: string): Kysely<T> {
-    let instance = this.instances.get(moduleName);
+    let instance = this.instances.get(moduleName) as Kysely<T> | undefined;
 
     if (!instance) {
       const dbConfig = Environment.getDatabaseConfig(moduleName);
@@ -37,7 +40,7 @@ export class KyselyPool {
             enableKeepAlive: true,
             keepAliveInitialDelay: 0,
             charset: "utf8mb4",
-            typeCast: function castField(field: any, useDefaultTypeCasting: () => unknown) {
+            typeCast: function castField(field: TypeCastField, useDefaultTypeCasting: () => unknown) {
               if (field.type === "BIT" && field.length === 1) {
                 try {
                   const bytes = field.buffer();
@@ -52,10 +55,10 @@ export class KyselyPool {
         })
       });
 
-      this.instances.set(moduleName, instance);
+      this.instances.set(moduleName, instance as Kysely<unknown>);
     }
 
-    return instance as Kysely<T>;
+    return instance;
   }
 
   static async destroyAll(): Promise<void> {

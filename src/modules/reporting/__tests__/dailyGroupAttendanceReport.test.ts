@@ -15,6 +15,6 @@ describe("daily group attendance report", () => {
   });
 
   it("formats the attendee count as a number", () => {
-    expect(report.outputs[0].columns.find((c: any) => c.value === "attendees")?.formatter).toBe("number");
+    expect(report.outputs[0].columns.find((c: { value: string }) => c.value === "attendees")?.formatter).toBe("number");
   });
 });

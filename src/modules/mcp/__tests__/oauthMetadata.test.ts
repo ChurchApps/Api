@@ -2,6 +2,7 @@ jest.mock("../../../shared/helpers/Environment.js", () => ({ Environment: { memb
 jest.mock("../McpServer.js", () => ({ buildMcpServer: jest.fn() }));
 jest.mock("../../membership/helpers/LoginRateLimiter.js", () => ({ LoginRateLimiter: { getClientIp: () => "127.0.0.1" } }));
 
+import express from "express";
 import { authorizationServerMetadata, protectedResourceMetadata } from "../OAuthMetadata.js";
 import { McpController } from "../McpController.js";
 
@@ -25,10 +26,14 @@ describe("MCP OAuth discovery", () => {
 
   it("answers an unauthenticated /mcp call with a WWW-Authenticate header naming the resource metadata", async () => {
     const controller = new McpController();
-    (controller as any).httpContext = { user: { details: {} } };
+    Object.assign(controller, { httpContext: { user: { details: {} } } });
     const headers: Record<string, string> = {};
-    const res: any = { setHeader: (k: string, v: string) => { headers[k] = v; }, status: jest.fn(() => res), json: jest.fn(() => res) };
-    await controller.handle({ headers: {} } as any, res);
+    const res: Partial<express.Response> = {
+      setHeader: (k: string, v: string) => { headers[k] = v; return res as express.Response; },
+      status: jest.fn(() => res as express.Response),
+      json: jest.fn(() => res as express.Response)
+    };
+    await controller.handle({ headers: {} } as express.Request, res as express.Response);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(headers["WWW-Authenticate"]).toBe('Bearer resource_metadata="https://api.example/.well-known/oauth-protected-resource"');
   });

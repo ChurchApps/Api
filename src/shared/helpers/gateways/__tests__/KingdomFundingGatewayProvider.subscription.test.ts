@@ -4,9 +4,9 @@ jest.mock("axios", () => ({ __esModule: true, default: { post: jest.fn(), get: j
 
 import Axios from "axios";
 import { KingdomFundingGatewayProvider } from "../KingdomFundingGatewayProvider";
-import { GatewayConfig } from "../IGatewayProvider";
+import { GatewayConfig, GatewayInterval } from "../IGatewayProvider";
 
-const mockedPost = (Axios as any).post as jest.Mock;
+const mockedPost = Axios.post as jest.Mock;
 const provider = new KingdomFundingGatewayProvider();
 const config = { privateKey: "sk", settings: {} } as GatewayConfig;
 
@@ -26,7 +26,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe("KingdomFundingGatewayProvider.createSubscription interval mapping (NMI)", () => {
-  const run = (interval: any) =>
+  const run = (interval: GatewayInterval | string) =>
     provider.createSubscription(config, { amount: 10, interval, id: "tok-collectjs-1234567890-abc", billing_cycle_anchor: FUTURE_ANCHOR, person: { name: "A B", email: "a@b.com" } });
 
   // The frontend sends an OBJECT { interval_count, interval: <bare unit> } (DonationHelper.getInterval).

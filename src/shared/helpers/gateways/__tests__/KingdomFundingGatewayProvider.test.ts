@@ -131,7 +131,7 @@ describe("KingdomFundingGatewayProvider webhook dedup key", () => {
     const secret = "k";
     const raw = JSON.stringify({ event_id: "evt_9", event_type: "transaction.sale.success", event_body: { transaction: { transaction_id: "555", amount: "5.00" } } });
     const s = crypto.createHmac("sha256", secret).update(`n.${raw}`, "utf-8").digest("hex");
-    const result = await provider.verifyWebhookSignature({ webhookKey: secret } as GatewayConfig, { "webhook-signature": `t=n,s=${s}` } as any, raw);
+    const result = await provider.verifyWebhookSignature({ webhookKey: secret } as GatewayConfig, { "webhook-signature": `t=n,s=${s}` }, raw);
     const save = jest.fn();
     await provider.logEvent("C1", raw, result.eventData, { eventLog: { save } });
     expect(result.eventId).toBe("evt_9");

@@ -3,6 +3,68 @@
 
 import crypto from "crypto";
 import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models/index.js";
+import type { Repos } from "../../modules/giving/repositories/Repos.js";
+import type { FundAllocation, GatewayObject, GatewayWebhookData } from "./gateways/IGatewayProvider.js";
+
+export interface SquareCustomerInput {
+  email?: string;
+  name?: { givenName?: string; familyName?: string };
+  phoneNumber?: string;
+}
+
+export interface SquareAddress {
+  addressLine1?: string;
+  addressLine2?: string;
+  locality?: string;
+  administrativeDistrictLevel1?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+export interface SquareCardInput {
+  customerId: string;
+  cardNonce: string;
+  billingAddress?: SquareAddress;
+  cardholderName?: string;
+}
+
+export interface SquareCard extends GatewayObject {
+  customerId?: string;
+  last4?: string;
+  expMonth?: number;
+  expYear?: number;
+  cardBrand?: string;
+}
+
+export interface SquarePayment extends GatewayObject {
+  amountMoney?: { amount?: number; currency?: string };
+  sourceType?: string;
+  customerId?: string;
+  locationId?: string;
+}
+
+export interface SquareSubscription extends GatewayObject {
+  customerId?: string;
+  locationId?: string;
+  planId?: string;
+}
+
+// A Square webhook payment object (snake_case, as delivered).
+export interface SquareEventData extends GatewayWebhookData {
+  amount_money?: { amount?: number | string; currency?: string };
+  customer_id?: string;
+  created_at?: string;
+  note?: string;
+}
+
+export interface SquareWebhookBody {
+  id?: string;
+  event_id?: string;
+  merchant_id?: string;
+  type?: string;
+  created_at?: string;
+  data?: { id?: string; type?: string; object?: SquareEventData };
+}
 
 export class SquareHelper {
   private static getClient(_accessToken: string, _environment: string) {
@@ -21,11 +83,8 @@ export class SquareHelper {
       : "https://connect.squareupsandbox.com";
   }
 
-  static async createCustomer(_accessToken: string, _environment: string, _customerData: {
-    email?: string;
-    name?: { givenName?: string; familyName?: string };
-    phoneNumber?: string;
-  }): Promise<string> {
+  // The gateway provider passes the email string here.
+  static async createCustomer(_accessToken: string, _environment: string, _customerData: string | SquareCustomerInput): Promise<string> {
     SquareHelper.getClient(_accessToken, _environment);
     try {
       // TODO: Implement with Square SDK
@@ -48,7 +107,7 @@ export class SquareHelper {
     }
   }
 
-  static async getCustomer(_accessToken: string, _environment: string, customerId: string): Promise<any> {
+  static async getCustomer(_accessToken: string, _environment: string, customerId: string): Promise<{ id: string; emailAddress: string }> {
     try {
       // TODO: Implement with Square SDK
       // const client = SquareHelper.getClient(accessToken, environment);
@@ -62,12 +121,8 @@ export class SquareHelper {
     }
   }
 
-  static async createCard(_accessToken: string, _environment: string, cardData: {
-    customerId: string;
-    cardNonce: string;
-    billingAddress?: any;
-    cardholderName?: string;
-  }): Promise<any> {
+  // The gateway provider passes the payment method id string here.
+  static async createCard(_accessToken: string, _environment: string, cardData: string | SquareCardInput): Promise<SquareCard> {
     SquareHelper.getClient(_accessToken, _environment);
     try {
       // TODO: Implement with Square SDK
@@ -88,7 +143,7 @@ export class SquareHelper {
 
       return {
         id: `sq_card_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        customerId: cardData.customerId,
+        customerId: typeof cardData === "string" ? undefined : cardData.customerId,
         last4: "1234",
         expMonth: 12,
         expYear: 2025,
@@ -99,7 +154,7 @@ export class SquareHelper {
     }
   }
 
-  static async listCards(_accessToken: string, _environment: string, _customerId: string): Promise<any[]> {
+  static async listCards(_accessToken: string, _environment: string, _customerId: string): Promise<SquareCard[]> {
     try {
       // TODO: Implement with Square SDK
       // const client = SquareHelper.getClient(accessToken, environment);
@@ -132,7 +187,7 @@ export class SquareHelper {
     locationId: string;
     idempotencyKey: string;
     note?: string;
-  }): Promise<any> {
+  }): Promise<SquarePayment> {
     SquareHelper.getClient(_accessToken, _environment);
     try {
       // TODO: Implement with Square SDK
@@ -178,7 +233,7 @@ export class SquareHelper {
     planId: string;
     cardId?: string;
     startDate?: string;
-  }): Promise<any> {
+  }): Promise<SquareSubscription> {
     SquareHelper.getClient(_accessToken, _environment);
     try {
       // TODO: Implement with Square SDK
@@ -246,7 +301,7 @@ export class SquareHelper {
     return Math.round(((amount + fixedFee) / (1 - percentFee) - amount) * 100) / 100;
   }
 
-  static async logEvent(churchId: string, squareEvent: any, eventData: any, givingRepos: any): Promise<any> {
+  static async logEvent(churchId: string, squareEvent: SquareWebhookBody, eventData: SquareEventData, givingRepos: Repos) {
     const eventLog: EventLog = {
       id: "", // Let the repository create() method generate the ID
       churchId,
@@ -261,8 +316,8 @@ export class SquareHelper {
     return givingRepos.eventLog.save(eventLog);
   }
 
-  static async logDonation(_accessToken: string, _environment: string, churchId: string, eventData: any, givingRepos: any): Promise<any> {
-    const amount = parseFloat(eventData.amount_money?.amount || "0") / 100; // Square uses cents
+  static async logDonation(_accessToken: string, _environment: string, churchId: string, eventData: SquareEventData, givingRepos: Repos): Promise<FundDonation[]> {
+    const amount = parseFloat(String(eventData.amount_money?.amount || "0")) / 100; // Square uses cents
     const customerId = eventData.customer_id || "";
     const customerData = customerId ? await givingRepos.customer.load(churchId, customerId) : null;
     const personId = customerData?.personId;
@@ -284,7 +339,7 @@ export class SquareHelper {
     try {
       const fundData = eventData.note ? JSON.parse(eventData.note) : [];
       if (Array.isArray(fundData)) {
-        fundData.forEach((f: any) => {
+        fundData.forEach((f: FundAllocation) => {
           funds.push({ churchId, fundId: f.id, amount: f.amount });
         });
       }

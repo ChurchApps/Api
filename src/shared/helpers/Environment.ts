@@ -1,5 +1,38 @@
 import { EnvironmentBase, AwsHelper } from "@churchapps/apihelper";
-import { DatabaseUrlParser } from "./DatabaseUrlParser.js";
+import { DatabaseUrlParser, DatabaseConfig } from "./DatabaseUrlParser.js";
+
+// Settings read from the per-environment config file (config/<env>.json) that initBase loads.
+interface EnvironmentConfigFile {
+  aiProvider?: string;
+  apiUrl?: string;
+  attendanceApi?: string;
+  b1AdminRoot?: string;
+  b1AppRoot?: string;
+  caddyHost?: string;
+  caddyPort?: string;
+  commonsLicenseGrants?: string;
+  commonsMusicEditors?: string;
+  commonsSongLimits?: string;
+  contentApi?: string;
+  contentRoot?: string;
+  deliveryProvider?: string;
+  doingApi?: string;
+  fileStore?: string;
+  givingApi?: string;
+  lessonsApi?: string;
+  mailSystem?: string;
+  membershipApi?: string;
+  messagingApi?: string;
+  ministryStuffApi?: string;
+  ministryStuffContentRoot?: string;
+  s3Bucket?: string;
+  storeApi?: string;
+  supportEmail?: string;
+  webPushPublicKey?: string;
+  webPushSubject?: string;
+  worshipCommonsRoot?: string;
+  emailOnRegistration?: boolean;
+}
 
 const DOCKER_DEFAULT_JWT = "please-change-this-jwt-secret";
 const DOCKER_DEFAULT_ENCRYPTION = "PleaseChangeThisDockerDefaultKey";
@@ -24,7 +57,7 @@ export class Environment extends EnvironmentBase {
   static ministryStuffContentRoot: string;
 
   // Database connections per module
-  static dbConnections: Map<string, any> = new Map();
+  static dbConnections: Map<string, DatabaseConfig> = new Map();
 
   // Membership API specific
   static jwtExpiration: string;
@@ -166,7 +199,7 @@ export class Environment extends EnvironmentBase {
     if (environment === "prod" && enc === "aSecretKeyOfExactly192BitsLength") throw new Error("ENCRYPTION_KEY is set to the development sample");
   }
 
-  private static initializeModuleConfigs(config: any) {
+  private static initializeModuleConfigs(config: EnvironmentConfigFile) {
     // These can be overridden in monolith for internal calls
     this.membershipApi = config.membershipApi || config.apiUrl + "/membership";
     this.attendanceApi = config.attendanceApi || config.apiUrl + "/attendance";
@@ -181,7 +214,7 @@ export class Environment extends EnvironmentBase {
     this.ministryStuffContentRoot = process.env.MINISTRYSTUFF_CONTENT_ROOT || config.ministryStuffContentRoot || "";
   }
 
-  private static async initializeDatabaseConnections(_config: any) {
+  static async initializeDatabaseConnections(_config: EnvironmentConfigFile) {
     const modules = [
       "membership", "attendance", "content", "giving", "messaging", "doing", "reporting", "commons"
     ];
@@ -227,7 +260,7 @@ export class Environment extends EnvironmentBase {
     }
   }
 
-  private static async initializeAppConfigs(config: any) {
+  static async initializeAppConfigs(config: EnvironmentConfigFile) {
     // WebSocket configuration
     this.websocketUrl = process.env.SOCKET_URL || "";
     this.websocketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : 8087;
@@ -299,7 +332,7 @@ export class Environment extends EnvironmentBase {
     return !!Environment.mailSystem && Environment.mailSystem !== "";
   }
 
-  static getDatabaseConfig(moduleName: string): any {
+  static getDatabaseConfig(moduleName: string): DatabaseConfig | undefined {
     const config = this.dbConnections.get(moduleName);
     if (!config) {
       console.warn(`⚠️ Database config for ${moduleName} not available`);
@@ -321,7 +354,7 @@ export class Environment extends EnvironmentBase {
     };
   }
 
-  static getAllDatabaseConfigs(): Map<string, any> {
+  static getAllDatabaseConfigs(): Map<string, DatabaseConfig> {
     return this.dbConnections;
   }
 }
