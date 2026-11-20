@@ -2,7 +2,7 @@
  * Type-safe gateway settings with provider-specific configurations
  */
 
-interface BaseGatewaySettings {
+export interface BaseGatewaySettings {
   webhookEnabled?: boolean;
   testMode?: boolean;
   customFeesEnabled?: boolean;
@@ -61,32 +61,32 @@ namespace KingdomFundingSettings {
   }
 }
 
-function isStripeSettings(settings: any): settings is StripeSettings.Settings {
-  return settings && typeof settings === "object";
+function isStripeSettings(settings: unknown): settings is StripeSettings.Settings {
+  return !!settings && typeof settings === "object";
 }
 
-function isPayPalSettings(settings: any): settings is PayPalSettings.Settings {
-  return settings && typeof settings === "object";
+function isPayPalSettings(settings: unknown): settings is PayPalSettings.Settings {
+  return !!settings && typeof settings === "object";
 }
 
-function isSquareSettings(settings: any): settings is SquareSettings.Settings {
-  return settings && typeof settings === "object";
+function isSquareSettings(settings: unknown): settings is SquareSettings.Settings {
+  return !!settings && typeof settings === "object";
 }
 
-function isEPayMintsSettings(settings: any): settings is ePayMintsSettings.Settings {
-  return settings && typeof settings === "object";
+function isEPayMintsSettings(settings: unknown): settings is ePayMintsSettings.Settings {
+  return !!settings && typeof settings === "object";
 }
 
-function isKingdomFundingSettings(settings: any): settings is KingdomFundingSettings.Settings {
-  return settings && typeof settings === "object";
+function isKingdomFundingSettings(settings: unknown): settings is KingdomFundingSettings.Settings {
+  return !!settings && typeof settings === "object";
 }
 
 namespace PaystackSettings {
   export type Settings = BaseGatewaySettings;
 }
 
-function isPaystackSettings(settings: any): settings is PaystackSettings.Settings {
-  return settings && typeof settings === "object";
+function isPaystackSettings(settings: unknown): settings is PaystackSettings.Settings {
+  return !!settings && typeof settings === "object";
 }
 
 export function validateGatewaySettings(provider: string, settings: Record<string, unknown> | null): BaseGatewaySettings | null {

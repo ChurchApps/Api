@@ -1,4 +1,5 @@
-import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
+import { CompiledQuery, DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler, QueryResult } from "kysely";
+import type { DynamicDatabase } from "../../infrastructure/KyselyPool.js";
 
 const getDbMock = jest.fn();
 jest.mock("../../infrastructure/KyselyPool.js", () => ({ KyselyPool: { getDb: (...args: unknown[]) => getDbMock(...args) } }));
@@ -12,13 +13,13 @@ function capturingDb() {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
   driver.acquireConnection = async () => ({
-    executeQuery: async (q: any) => {
+    executeQuery: async <R>(q: CompiledQuery): Promise<QueryResult<R>> => {
       queries.push({ sql: q.sql, parameters: q.parameters });
-      return { rows: [{ id: "p1" }] } as any;
+      return { rows: [{ id: "p1" }] as R[] };
     },
     streamQuery: async function* () {}
   });
-  const db = new Kysely<any>({
+  const db = new Kysely<DynamicDatabase>({
     dialect: {
       createAdapter: () => new MysqlAdapter(),
       createDriver: () => driver,

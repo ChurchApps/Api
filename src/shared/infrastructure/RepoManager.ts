@@ -1,15 +1,15 @@
 export class RepoManager {
-  private static instances: Map<string, any> = new Map();
+  private static instances: Map<string, unknown> = new Map();
 
   static async getRepos<T>(moduleName: string): Promise<T> {
     if (!this.instances.has(moduleName)) {
       const repos = await this.createRepos(moduleName);
       this.instances.set(moduleName, repos);
     }
-    return this.instances.get(moduleName);
+    return this.instances.get(moduleName) as T;
   }
 
-  private static async createRepos(moduleName: string): Promise<any> {
+  private static async createRepos(moduleName: string): Promise<unknown> {
 
     switch (moduleName) {
       case "attendance":
@@ -54,8 +54,8 @@ export class RepoManager {
    * For modules that use Repos.getCurrent(), this provides
    * the same interface while using the shared infrastructure
    */
-  static async getCurrentForModule(moduleName: string): Promise<any> {
-    return await this.getRepos(moduleName);
+  static async getCurrentForModule<T = unknown>(moduleName: string): Promise<T> {
+    return await this.getRepos<T>(moduleName);
   }
 
   static clearCache(moduleName?: string): void {

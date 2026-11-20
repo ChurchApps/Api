@@ -1,8 +1,11 @@
 import express from "express";
 import Axios from "axios";
-import { SquareHelper } from "../SquareHelper.js";
+import { SquareHelper, SquareCardInput, SquareEventData, SquareWebhookBody } from "../SquareHelper.js";
 import { Environment } from "../Environment.js";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities } from "./IGatewayProvider.js";
+import {
+  IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities, GatewayPaymentRequest, GatewaySubscriptionUpdate,
+  GivingRepos, GatewayObject, GatewayPlanRequest
+} from "./IGatewayProvider.js";
 
 export class SquareGatewayProvider implements IGatewayProvider {
   readonly name = "square";
@@ -38,7 +41,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     // TODO: implement when Square SDK available
   }
 
-  async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any, extras?: { notificationUrl?: string }): Promise<WebhookResult> {
+  async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: string | Buffer | SquareWebhookBody, extras?: { notificationUrl?: string }): Promise<WebhookResult> {
     try {
       const signature = (headers["x-square-hmacsha256-signature"] || headers["x-square-signature"]) as string;
       const raw = typeof body === "string" ? body : Buffer.isBuffer(body) ? body.toString("utf8") : JSON.stringify(body);
@@ -53,19 +56,20 @@ export class SquareGatewayProvider implements IGatewayProvider {
         return { success: false, shouldProcess: false };
       }
 
+      const event = body as SquareWebhookBody;
       return {
         success: true,
         shouldProcess: true,
-        eventType: body.type,
-        eventData: body.data?.object || body.data,
-        eventId: body.event_id || body.id
+        eventType: event.type,
+        eventData: event.data?.object || event.data,
+        eventId: event.event_id || event.id
       };
     } catch {
       return { success: false, shouldProcess: false };
     }
   }
 
-  async processCharge(config: GatewayConfig, donationData: any): Promise<ChargeResult> {
+  async processCharge(config: GatewayConfig, donationData: GatewayPaymentRequest): Promise<ChargeResult> {
     try {
       const settings = this.parseSettings(config);
       const environment = this.resolveEnvironment(config, settings);
@@ -103,7 +107,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     }
   }
 
-  async createSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+  async createSubscription(config: GatewayConfig, subscriptionData: GatewayPaymentRequest): Promise<SubscriptionResult> {
     try {
       const settings = this.parseSettings(config);
       const environment = this.resolveEnvironment(config, settings);
@@ -139,7 +143,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     }
   }
 
-  async updateSubscription(_config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
+  async updateSubscription(_config: GatewayConfig, _subscriptionData: GatewaySubscriptionUpdate): Promise<SubscriptionResult> {
     // TODO: implement (Square typically: cancel + create new)
     throw new Error("Square subscription updates not yet implemented");
   }
@@ -184,7 +188,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     return SquareHelper.calculateFees(amount, customFixedFee, customPercentFee);
   }
 
-  async logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void> {
+  async logEvent(churchId: string, event: SquareWebhookBody, eventData: SquareEventData, repos: GivingRepos): Promise<void> {
     await SquareHelper.logEvent(churchId, event, eventData, repos);
   }
 
@@ -193,7 +197,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     return `square-catalog-${churchId}`;
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, _status?: "pending" | "complete"): Promise<any> {
+  async logDonation(config: GatewayConfig, churchId: string, eventData: SquareEventData, repos: GivingRepos, _status?: "pending" | "complete") {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     return await SquareHelper.logDonation(
@@ -205,7 +209,8 @@ export class SquareGatewayProvider implements IGatewayProvider {
     );
   }
 
-  async createCustomer(config: GatewayConfig, customerData: any): Promise<string> {
+  // Called through IGatewayProvider.createCustomer, so customerData is the email.
+  async createCustomer(config: GatewayConfig, customerData: string): Promise<string> {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     return await SquareHelper.createCustomer(
@@ -215,12 +220,12 @@ export class SquareGatewayProvider implements IGatewayProvider {
     );
   }
 
-  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<any> {
+  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<GatewayObject[]> {
     // TODO: implement (Square has no direct API to list subscriptions by customer)
     return [];
   }
 
-  async getCustomerPaymentMethods(config: GatewayConfig, customerId: string): Promise<any> {
+  async getCustomerPaymentMethods(config: GatewayConfig, customerId: string) {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     return await SquareHelper.listCards(
@@ -230,7 +235,8 @@ export class SquareGatewayProvider implements IGatewayProvider {
     );
   }
 
-  async attachPaymentMethod(config: GatewayConfig, paymentData: any): Promise<any> {
+  // Called through IGatewayProvider.attachPaymentMethod, so paymentData is the payment method id.
+  async attachPaymentMethod(config: GatewayConfig, paymentData: string | SquareCardInput) {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     return await SquareHelper.createCard(
@@ -240,7 +246,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     );
   }
 
-  async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string): Promise<any> {
+  async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string): Promise<GatewayObject> {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     await SquareHelper.deleteCard(
@@ -251,23 +257,23 @@ export class SquareGatewayProvider implements IGatewayProvider {
     return { success: true };
   }
 
-  async updateCard(): Promise<any> {
+  async updateCard(): Promise<never> {
     throw new Error("Square does not support direct card updates. Please add a new card and remove the old one.");
   }
 
-  async createBankAccount(): Promise<any> {
+  async createBankAccount(): Promise<never> {
     throw new Error("Square bank account creation not implemented in this API");
   }
 
-  async updateBank(): Promise<any> {
+  async updateBank(): Promise<never> {
     throw new Error("Square does not support bank account updates through this API");
   }
 
-  async verifyBank(): Promise<any> {
+  async verifyBank(): Promise<never> {
     throw new Error("Square bank account verification not implemented in this API");
   }
 
-  async deleteBankAccount(): Promise<any> {
+  async deleteBankAccount(): Promise<never> {
     throw new Error("Square bank account deletion not implemented in this API");
   }
 
@@ -276,16 +282,16 @@ export class SquareGatewayProvider implements IGatewayProvider {
     return config.publicKey; // Application ID
   }
 
-  async createOrder(): Promise<any> {
+  async createOrder(): Promise<never> {
     throw new Error("Square uses direct payment creation, not order-based flow");
   }
 
-  async createSubscriptionPlan(_config: GatewayConfig, _planData: any): Promise<string> {
+  async createSubscriptionPlan(_config: GatewayConfig, _planData: GatewayPlanRequest): Promise<string> {
     // TODO: implement (Square uses catalog objects as plans)
     return `sq_plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  async createSubscriptionWithPlan(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+  async createSubscriptionWithPlan(config: GatewayConfig, subscriptionData: GatewayPaymentRequest): Promise<SubscriptionResult> {
     return await this.createSubscription(config, subscriptionData);
   }
 

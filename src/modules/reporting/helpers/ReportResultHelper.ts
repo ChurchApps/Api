@@ -3,7 +3,7 @@ import { Query, Report } from "../models/index.js";
 
 export class ReportResultHelper {
   public static combineResults(report: Report) {
-    const result: any[] = [];
+    const result: Record<string, unknown>[] = [];
 
     const mainQuery: Query = ArrayHelper.getOne(report.queries, "keyName", "main");
     if (!mainQuery?.value) return result;
@@ -27,13 +27,13 @@ export class ReportResultHelper {
   }
 
   // Merges the related row the query's joinConditions point at, as "<keyName>.<field>" plus any field the row lacks.
-  private static findRelatedData(row: any, query: Query): any {
+  private static findRelatedData(row: Record<string, unknown>, query: Query): Record<string, unknown> | null {
     const conditions = query.joinConditions || [];
     if (conditions.length === 0) return null;
     const match = query.value.find((data) => conditions.every((c) => data[c.child] === row[c.parent]));
     if (!match) return null;
 
-    const result: any = {};
+    const result: Record<string, unknown> = {};
     Object.keys(match).forEach((key) => {
       result[query.keyName + "." + key] = match[key];
       if (!(key in row)) result[key] = match[key];

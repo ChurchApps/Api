@@ -11,6 +11,24 @@ export interface MailchimpConfig {
 }
 
 // One-way sync only: B1 -> Mailchimp. Unsubscribes in Mailchimp do not flow back.
+// The parts of a person or group/list membership payload that the Mailchimp sync reads.
+interface MailchimpPayloadData {
+  email?: string;
+  personEmail?: string;
+  firstName?: string;
+  lastName?: string;
+  mobilePhone?: string;
+  name?: { first?: string; last?: string };
+  contactInfo?: { email?: string; mobilePhone?: string };
+  groupName?: string;
+  listName?: string;
+}
+
+interface DeliveryEnvelope {
+  event?: string;
+  data?: MailchimpPayloadData;
+}
+
 export const MAILCHIMP_EVENTS = [
   "person.created",
   "person.updated",
@@ -48,9 +66,9 @@ export class MailchimpConnector {
     const config = MailchimpConnector.parseConfig(webhook);
     if (!config?.apiKey || !config?.audienceId) return { status: 0, responseBody: "Mailchimp connector is not configured" };
 
-    let envelope: any = {};
+    let envelope: DeliveryEnvelope = {};
     try { envelope = JSON.parse(delivery.payload ?? "{}"); } catch { return { status: 0, responseBody: "Invalid delivery payload" }; }
-    const d = envelope.data ?? {};
+    const d: MailchimpPayloadData = envelope.data ?? {};
     const email = (d.contactInfo?.email || d.email || d.personEmail || "").trim().toLowerCase();
     const hash = email ? crypto.createHash("md5").update(email).digest("hex") : "";
 
@@ -89,7 +107,7 @@ export class MailchimpConnector {
     }
   }
 
-  private static async upsertMember(config: MailchimpConfig, hash: string, email: string, d: any): Promise<{ status: number; responseBody: string }> {
+  private static async upsertMember(config: MailchimpConfig, hash: string, email: string, d: MailchimpPayloadData): Promise<{ status: number; responseBody: string }> {
     // Only Mailchimp's default merge fields — unknown fields make the whole call 400.
     const mergeFields: Record<string, string> = {};
     const first = d.name?.first || d.firstName;
@@ -99,7 +117,7 @@ export class MailchimpConnector {
     if (last) mergeFields.LNAME = last;
     if (phone) mergeFields.PHONE = phone;
 
-    const body: any = { email_address: email, status_if_new: "subscribed" };
+    const body: { email_address: string; status_if_new: string; merge_fields?: Record<string, string> } = { email_address: email, status_if_new: "subscribed" };
     if (Object.keys(mergeFields).length > 0) body.merge_fields = mergeFields;
     const res = await MailchimpConnector.request(config, "PUT", `/lists/${config.audienceId}/members/${hash}`, body);
     return { status: res.status, responseBody: res.body };
@@ -114,7 +132,7 @@ export class MailchimpConnector {
     return { status: 200, responseBody: "Skipped: " + reason };
   }
 
-  private static async request(config: MailchimpConfig, method: string, path: string, body?: any): Promise<{ status: number; body: string }> {
+  private static async request(config: MailchimpConfig, method: string, path: string, body?: unknown): Promise<{ status: number; body: string }> {
     const dc = MailchimpConnector.dataCenter(config.apiKey ?? "");
     if (!dc) return { status: 0, body: "Invalid API key format" };
     try {
@@ -129,8 +147,8 @@ export class MailchimpConnector {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
       });
       return { status: res.status, body: (await res.text()).slice(0, MAX_RESPONSE_BODY) };
-    } catch (e: any) {
-      return { status: 0, body: ("Request failed: " + (e?.message ?? String(e))).slice(0, MAX_RESPONSE_BODY) };
+    } catch (e) {
+      return { status: 0, body: ("Request failed: " + ((e as Error | undefined)?.message ?? String(e))).slice(0, MAX_RESPONSE_BODY) };
     }
   }
 }

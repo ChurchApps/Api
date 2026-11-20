@@ -4,6 +4,8 @@ jest.mock("../../Environment", () => ({ Environment: { membershipApi: "http://te
 
 import { StripeGatewayProvider } from "../StripeGatewayProvider";
 import { StripeHelper } from "../../StripeHelper";
+import type Stripe from "stripe";
+import { GatewayConfig } from "../IGatewayProvider";
 
 describe("StripeGatewayProvider.calculateFees", () => {
   const provider = new StripeGatewayProvider();
@@ -74,7 +76,7 @@ describe("StripeGatewayProvider.logEvent", () => {
 
 describe("StripeGatewayProvider.verifyWebhookSignature", () => {
   it("rejects every event when the church has no webhook secret", async () => {
-    const result = await new StripeGatewayProvider().verifyWebhookSignature({ privateKey: "sk_test", webhookKey: "" } as any, { "stripe-signature": "t=1,v1=abc" } as any, "{}");
+    const result = await new StripeGatewayProvider().verifyWebhookSignature({ privateKey: "sk_test", webhookKey: "" } as GatewayConfig, { "stripe-signature": "t=1,v1=abc" }, "{}");
     expect(result.success).toBe(false);
   });
 });
@@ -83,8 +85,8 @@ describe("StripeGatewayProvider.listReplayEvents", () => {
   it("skips subscription payment intents that carry no invoice field", async () => {
     const pi = { id: "evt_pi", type: "payment_intent.succeeded", created: 1, data: { object: { id: "pi_1", amount: 20000, customer: "cus_1", description: "Subscription update" } } };
     const oneTime = { id: "evt_pi2", type: "payment_intent.succeeded", created: 1, data: { object: { id: "pi_2", amount: 5000, customer: "cus_1" } } };
-    jest.spyOn(StripeHelper, "listEvents").mockResolvedValue([pi, oneTime] as any);
-    const [sub, gift] = await new StripeGatewayProvider().listReplayEvents({ privateKey: "sk_test" } as any, 0, 1);
+    jest.spyOn(StripeHelper, "listEvents").mockResolvedValue([pi, oneTime] as Stripe.Event[]);
+    const [sub, gift] = await new StripeGatewayProvider().listReplayEvents({ privateKey: "sk_test" } as GatewayConfig, 0, 1);
     expect(sub.skipReason).toBeTruthy();
     expect(gift.skipReason).toBeUndefined();
   });
@@ -95,14 +97,14 @@ describe("StripeGatewayProvider donor memo", () => {
   afterEach(() => jest.restoreAllMocks());
 
   it("sends the online form's memo as metadata.memo on a one-time charge", async () => {
-    const donate = jest.spyOn(StripeHelper, "donate").mockResolvedValue({ id: "pi_1", status: "succeeded" } as any);
-    await provider.processCharge({ privateKey: "sk" } as any, { amount: 10, customerId: "cus_1", funds: [], notes: "Youth trip", type: "card", id: "pm_1" });
+    const donate = jest.spyOn(StripeHelper, "donate").mockResolvedValue({ id: "pi_1", status: "succeeded" } as Stripe.Response<Stripe.PaymentIntent>);
+    await provider.processCharge({ privateKey: "sk" } as GatewayConfig, { amount: 10, customerId: "cus_1", funds: [], notes: "Youth trip", type: "card", id: "pm_1" });
     expect(donate.mock.calls[0][1].metadata).toEqual({ funds: "[]", memo: "Youth trip" });
   });
 
   it("sends the memo as metadata.memo on a new subscription", async () => {
-    const create = jest.spyOn(StripeHelper, "createSubscription").mockResolvedValue({ id: "sub_1" } as any);
-    await provider.createSubscription({ privateKey: "sk", productId: "prod" } as any, { id: "pm_1", amount: 10, customerId: "cus_1", notes: "Benevolence" });
+    const create = jest.spyOn(StripeHelper, "createSubscription").mockResolvedValue({ id: "sub_1" } as Stripe.Response<Stripe.Subscription>);
+    await provider.createSubscription({ privateKey: "sk", productId: "prod" } as GatewayConfig, { id: "pm_1", amount: 10, customerId: "cus_1", notes: "Benevolence" });
     expect(create.mock.calls[0][1].metadata).toEqual({ memo: "Benevolence" });
   });
 });

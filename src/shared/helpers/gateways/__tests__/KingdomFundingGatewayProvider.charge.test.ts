@@ -6,10 +6,10 @@ import Axios from "axios";
 import { KingdomFundingGatewayProvider } from "../KingdomFundingGatewayProvider";
 import { GatewayConfig } from "../IGatewayProvider";
 
-const mockedPost = (Axios as any).post as jest.Mock;
+const mockedPost = Axios.post as jest.Mock;
 
 // Extract NMI form-urlencoded response params for assertion.
-const bodyParams = (call: any[]): URLSearchParams => new URLSearchParams(call[1]);
+const bodyParams = (call: [string, string, ...unknown[]]): URLSearchParams => new URLSearchParams(call[1]);
 
 describe("KingdomFundingGatewayProvider.processCharge (NMI)", () => {
   const provider = new KingdomFundingGatewayProvider();

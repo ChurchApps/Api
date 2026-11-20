@@ -1,5 +1,6 @@
 import { Kysely, MysqlDialect } from "kysely";
-import { createPool } from "mysql2";
+import { createPool, TypeCastField } from "mysql2";
+import type { DynamicDatabase } from "./KyselyPool.js";
 import { DatabaseUrlParser } from "../helpers/DatabaseUrlParser.js";
 
 /**
@@ -16,7 +17,7 @@ export function getDbConfig(moduleName: string) {
   return DatabaseUrlParser.parseConnectionString(connString);
 }
 
-export function createKysely(moduleName: string): Kysely<any> {
+export function createKysely<DB = DynamicDatabase>(moduleName: string): Kysely<DB> {
   const config = getDbConfig(moduleName);
 
   const dialect = new MysqlDialect({
@@ -28,7 +29,7 @@ export function createKysely(moduleName: string): Kysely<any> {
       password: config.password,
       connectionLimit: 3,
       charset: "utf8mb4",
-      typeCast(field: any, next: () => unknown) {
+      typeCast(field: TypeCastField, next: () => unknown) {
         if (field.type === "BIT" && field.length === 1) {
           const bytes = field.buffer();
           return bytes ? bytes[0] === 1 : null;
@@ -38,5 +39,5 @@ export function createKysely(moduleName: string): Kysely<any> {
     })
   });
 
-  return new Kysely({ dialect });
+  return new Kysely<DB>({ dialect });
 }

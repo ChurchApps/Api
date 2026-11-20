@@ -98,7 +98,7 @@ export class PlaygroundController extends GivingBaseController {
 
   // Gateway testing endpoints
   @httpPost("/gateway/calculate-fees")
-  public async testCalculateFees(req: Request, res: Response): Promise<any> {
+  public async testCalculateFees(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -125,7 +125,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/process-charge")
-  public async testProcessCharge(req: Request, res: Response): Promise<any> {
+  public async testProcessCharge(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -152,7 +152,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/create-customer")
-  public async testCreateCustomer(req: Request, res: Response): Promise<any> {
+  public async testCreateCustomer(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -183,7 +183,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/create-subscription")
-  public async testCreateSubscription(req: Request, res: Response): Promise<any> {
+  public async testCreateSubscription(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -210,7 +210,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/generate-client-token")
-  public async testGenerateClientToken(req: Request, res: Response): Promise<any> {
+  public async testGenerateClientToken(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -240,7 +240,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/create-webhook")
-  public async testCreateWebhook(req: Request, res: Response): Promise<any> {
+  public async testCreateWebhook(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -267,7 +267,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/update-subscription")
-  public async testUpdateSubscription(req: Request, res: Response): Promise<any> {
+  public async testUpdateSubscription(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -294,7 +294,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/cancel-subscription")
-  public async testCancelSubscription(req: Request, res: Response): Promise<any> {
+  public async testCancelSubscription(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -321,7 +321,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/create-product")
-  public async testCreateProduct(req: Request, res: Response): Promise<any> {
+  public async testCreateProduct(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -352,7 +352,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/get-customer-payment-methods")
-  public async testGetCustomerPaymentMethods(req: Request, res: Response): Promise<any> {
+  public async testGetCustomerPaymentMethods(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -383,7 +383,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/attach-payment-method")
-  public async testAttachPaymentMethod(req: Request, res: Response): Promise<any> {
+  public async testAttachPaymentMethod(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -414,7 +414,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/detach-payment-method")
-  public async testDetachPaymentMethod(req: Request, res: Response): Promise<any> {
+  public async testDetachPaymentMethod(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -445,7 +445,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/create-bank-account")
-  public async testCreateBankAccount(req: Request, res: Response): Promise<any> {
+  public async testCreateBankAccount(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -476,7 +476,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/update-card")
-  public async testUpdateCard(req: Request, res: Response): Promise<any> {
+  public async testUpdateCard(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -507,7 +507,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/add-card")
-  public async testAddCard(req: Request, res: Response): Promise<any> {
+  public async testAddCard(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -538,7 +538,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/get-charge")
-  public async testGetCharge(req: Request, res: Response): Promise<any> {
+  public async testGetCharge(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -569,7 +569,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpGet("/gateway/providers")
-  public async getAvailableProviders(_req: Request, res: Response): Promise<any> {
+  public async getAvailableProviders(_req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -646,7 +646,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/create-setup-intent")
-  public async testCreateSetupIntent(req: Request, res: Response): Promise<any> {
+  public async testCreateSetupIntent(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -677,7 +677,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpPost("/gateway/add-card-token")
-  public async testAddCardToken(req: Request, res: Response): Promise<any> {
+  public async testAddCardToken(req: Request, res: Response): Promise<Response | void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }

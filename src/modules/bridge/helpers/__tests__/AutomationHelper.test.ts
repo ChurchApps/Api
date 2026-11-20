@@ -1,9 +1,9 @@
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
 const createNotificationsMock = jest.fn().mockResolvedValue(undefined);
 
-let groupsFixture: any[] = [];
-let eventsFixture: any[] = [];
-let sessionsResult: any[] = [];
+let groupsFixture: Group[] = [];
+let eventsFixture: Event[] = [];
+let sessionsResult: { id: string }[] = [];
 
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({ loadChurch: async () => ({ subDomain: "demo" }) }),
@@ -31,7 +31,8 @@ jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({
 jest.mock("../../../../shared/infrastructure/KyselyPool.js", () => ({
   KyselyPool: {
     getDb: () => {
-      const builder: any = {};
+      interface BuilderStub { selectFrom: () => BuilderStub; select: () => BuilderStub; where: () => BuilderStub; execute: () => Promise<{ id: string }[]> }
+      const builder = {} as BuilderStub;
       builder.selectFrom = () => builder;
       builder.select = () => builder;
       builder.where = () => builder;
@@ -44,6 +45,8 @@ jest.mock("../../../../shared/infrastructure/KyselyPool.js", () => ({
 jest.mock("../../../content/helpers/CalendarHelper.js", () => ({ CalendarHelper: { addExceptionDates: async () => {} } }));
 
 import { AutomationHelper } from "../AutomationHelper.js";
+import type { Group } from "../../../membership/models/index.js";
+import type { Event } from "../../../content/models/index.js";
 
 const yesterday = new Date();
 yesterday.setHours(0, 0, 0, 0);
@@ -63,7 +66,7 @@ describe("AutomationHelper.remindGroupAttendance", () => {
     groupsFixture = [{ id: "GRP1", churchId: "CHU1", name: "Sample Group" }];
     eventsFixture = [makeYesterdayEvent()];
     sessionsResult = [];
-    (AutomationHelper as any).subdomainCache = {};
+    AutomationHelper["subdomainCache"] = {};
   });
 
   it("returns 1 and calls createNotifications when event occurred but no session exists", async () => {

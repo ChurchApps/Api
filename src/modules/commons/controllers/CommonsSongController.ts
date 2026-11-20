@@ -211,7 +211,14 @@ export class CommonsSongController extends CommonsBaseController {
   private async editable(assetId: string) {
     const s = await this.repos.song.loadById(assetId);
     // licenseVersion carried, or submit stamps a default over the song's own (a writer grant's "permissions")
-    return { name: s?.title, tags: s?.themes, language: s?.language, license: s?.license, licenseVersion: s?.licenseVersion, detail: { writer: s?.writer, year: s?.year, songKey: s?.songKey, bpm: s?.bpm, timeSignature: s?.timeSignature, scripture: s?.scripture, chordPro: s?.chordPro, certified: true } };
+    return {
+      name: s?.title,
+      tags: s?.themes,
+      language: s?.language,
+      license: s?.license,
+      licenseVersion: s?.licenseVersion,
+      detail: { writer: s?.writer, year: s?.year, songKey: s?.songKey, bpm: s?.bpm, timeSignature: s?.timeSignature, scripture: s?.scripture, chordPro: s?.chordPro, certified: true }
+    };
   }
 
   // one files query for the whole list; has* flags and fileUrls come from it. qualityScore is reviewer-only and never leaves here.

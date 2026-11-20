@@ -7,7 +7,7 @@ import { createPool } from "mysql2";
 // and the nightly commonsWriterStats job. assetPublishers was created without DEFAULT CHARSET, so it took the
 // database default (utf8mb4_unicode_ci) while assets has utf8mb4_0900_ai_ci. Reproduced on the slot's commons
 // database with two scratch tables built the same two ways.
-import { alignCollation } from "../../../../tools/migrations/commons/2026-10-18_asset_publishers_collation";
+import { alignCollation } from "../../../../tools/migrations/commons/2026-10-18_asset_publishers_collation.js";
 
 const db = buildDb();
 const REF = "fpColl_assets";
@@ -34,14 +34,14 @@ describe("commons/2026-10-18_asset_publishers_collation", () => {
   });
 
   it("converts the table to the reference collation and the query works", async () => {
-    await alignCollation(db as Kysely<any>, TBL, REF);
+    await alignCollation(db, TBL, REF);
     const after = await collations();
     expect(after[TBL]).toBe(after[REF]);
     expect(await mineQuery()).toEqual([{ id: "A1" }]);
   });
 
   it("is a no-op the second time", async () => {
-    expect(await alignCollation(db as Kysely<any>, TBL, REF)).toBe(false);
+    expect(await alignCollation(db, TBL, REF)).toBe(false);
   });
 });
 
@@ -60,9 +60,9 @@ async function cleanup() {
   await sql.raw(`DROP TABLE IF EXISTS \`${REF}\``).execute(db);
 }
 
-function buildDb(): Kysely<never> {
+function buildDb(): Kysely<Record<string, Record<string, unknown>>> {
   const url = new URL(connectionString());
-  return new Kysely<never>({
+  return new Kysely<Record<string, Record<string, unknown>>>({
     dialect: new MysqlDialect({
       pool: createPool({
         host: url.hostname,

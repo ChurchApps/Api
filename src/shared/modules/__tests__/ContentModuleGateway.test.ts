@@ -5,15 +5,15 @@ import { KyselyPool } from "../../infrastructure/KyselyPool.js";
 import { getContentModuleGateway } from "../ContentModuleGateway.js";
 
 function recordingDb() {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       // Non-empty id lists so every cascade branch runs.
       if (prop === "execute") return async () => [{ id: "x1" }];
       // The cascade runs inside pool.transaction().execute(cb) — hand cb the same recording proxy.
-      if (prop === "transaction") return () => ({ execute: async (cb: any) => cb(proxy) });
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      if (prop === "transaction") return () => ({ execute: async (cb: (db: unknown) => unknown) => cb(proxy) });
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };

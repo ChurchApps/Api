@@ -30,8 +30,8 @@ export interface McpPrincipal {
 export interface LessonsForwardInput {
   method: string;
   path: string;
-  query?: Record<string, any>;
-  body?: any;
+  query?: Record<string, unknown>;
+  body?: unknown;
   principal: McpPrincipal;
 }
 
@@ -58,7 +58,7 @@ export function signLessonsJwt(principal: McpPrincipal): string {
   );
 }
 
-export async function forwardToLessons(input: LessonsForwardInput): Promise<{ status: number; body: any; truncated: boolean }> {
+export async function forwardToLessons(input: LessonsForwardInput): Promise<{ status: number; body: unknown; truncated: boolean }> {
   if (!Environment.lessonsApi) throw new Error("lessonsApi is not configured");
 
   const url = new URL(Environment.lessonsApi.replace(/\/$/, "") + input.path.substring(LESSONS_PREFIX.length));
@@ -83,7 +83,7 @@ export async function forwardToLessons(input: LessonsForwardInput): Promise<{ st
   const raw = await response.text();
   const truncated = Buffer.byteLength(raw, "utf8") > MAX_BODY_BYTES;
   const text = truncated ? Buffer.from(raw, "utf8").subarray(0, MAX_BODY_BYTES).toString("utf8") : raw;
-  let body: any = text;
+  let body: unknown = text;
   if (!truncated) {
     try {
       body = text ? JSON.parse(text) : null;

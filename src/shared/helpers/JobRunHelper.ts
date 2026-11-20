@@ -1,4 +1,5 @@
 import { RepoManager } from "../infrastructure/RepoManager.js";
+import type { Repos as MembershipRepos } from "../../modules/membership/repositories/index.js";
 
 export class JobRunHelper {
   // Failures are recorded and swallowed so one broken job can't abort the rest of a timer batch.
@@ -21,7 +22,7 @@ export class JobRunHelper {
     const log = status === "success" && !JobRunHelper.didWork(result) ? console.debug : console.info;
     log(`[job] ${jobName} ${status} in ${durationMs}ms${summary}`);
     try {
-      const repos = await RepoManager.getRepos<any>("membership");
+      const repos = await RepoManager.getRepos<MembershipRepos>("membership");
       await repos.jobRun.create({ jobName, status, startedAt, durationMs, errorMessage });
     } catch (recordError) {
       console.error(`[job] could not record run for ${jobName}:`, recordError);

@@ -3,6 +3,6 @@ export class Query {
   public db?: string;
   public sqlLines?: string[];
   public depth?: number;
-  public value?: any[];
+  public value?: Record<string, unknown>[];
   public joinConditions?: { parent: string; child: string }[];
 }

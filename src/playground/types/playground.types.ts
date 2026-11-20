@@ -38,11 +38,11 @@ export interface SubscriptionData {
   description?: string;
 }
 
-export interface APIResponse<T = any> {
+export interface APIResponse<T = unknown> {
   success: boolean;
   method?: string;
   provider?: string;
-  input?: any;
+  input?: unknown;
   result?: T;
   error?: string;
   message?: string;
@@ -56,13 +56,13 @@ export interface FeeResult {
 export interface ChargeResult {
   success: boolean;
   transactionId: string;
-  data: any;
+  data: unknown;
 }
 
 export interface SubscriptionResult {
   success: boolean;
   subscriptionId: string;
-  data: any;
+  data: unknown;
 }
 
 export interface WebhookResult {

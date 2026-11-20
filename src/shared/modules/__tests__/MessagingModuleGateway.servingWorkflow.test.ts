@@ -1,15 +1,15 @@
 const email = jest.fn();
-const repos: any = {
+const repos = {
   notificationPreference: { loadByPersonId: jest.fn() },
-  notificationPreferenceOverride: { loadForPerson: jest.fn(async () => []) }
+  notificationPreferenceOverride: { loadForPerson: jest.fn(async (): Promise<unknown[]> => []) }
 };
-jest.mock("../../../modules/messaging/helpers/NotificationHelper.js", () => ({ NotificationHelper: { sendWorkflowEmail: (...args: any[]) => email(...args) } }));
+jest.mock("../../../modules/messaging/helpers/NotificationHelper.js", () => ({ NotificationHelper: { sendWorkflowEmail: (...args: unknown[]) => email(...args) } }));
 jest.mock("../../infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: async () => repos } }));
 import { getMessagingModuleGateway } from "../MessagingModuleGateway.js";
 const gateway = getMessagingModuleGateway();
 const person = { email: "volunteer@example.test", mobilePhone: "+15555550123" };
 const message = { subject: "Serving request", html: "<p>Confirm request</p>", text: "Confirm request" };
-const send = (channel: "email" | "sms", p = person) => gateway.sendServingWorkflowMessage("c1", "p1", "card1", channel, p, message, "Sample Church");
+const send = (channel: "email" | "sms", p: { email?: string; mobilePhone?: string; optedOut?: boolean } = person) => gateway.sendServingWorkflowMessage("c1", "p1", "card1", channel, p, message, "Sample Church");
 let text: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
@@ -28,7 +28,7 @@ it("honors serving-category SMS opt-out", async () => {
   expect(await send("sms")).toContain("category_opt_out"); expect(text).not.toHaveBeenCalled();
 });
 it("honors person opt-out and missing phones", async () => {
-  expect(await send("sms", { ...person, optedOut: true } as any)).toContain("skipped");
+  expect(await send("sms", { ...person, optedOut: true })).toContain("skipped");
   expect(await send("sms", { ...person, mobilePhone: "" })).toContain("skipped"); expect(text).not.toHaveBeenCalled();
 });
 it("reports missing providers without falling back to another channel", async () => {

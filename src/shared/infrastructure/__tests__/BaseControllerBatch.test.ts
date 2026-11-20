@@ -2,18 +2,29 @@
 
 jest.mock("@churchapps/apihelper", () => ({
   CustomBaseController: class {
-    protected _au: any;
-    async actionWrapper(_req: any, _res: any, fn: (au: any) => Promise<any>) { return fn(this._au); }
-    async actionWrapperAnon(_req: any, _res: any, fn: () => Promise<any>) { return fn(); }
-    json(obj: any, statusCode: number) { return { json: obj, statusCode }; }
+    protected _au: unknown;
+    async actionWrapper(_req: unknown, _res: unknown, fn: (au: unknown) => Promise<unknown>) { return fn(this._au); }
+    async actionWrapperAnon(_req: unknown, _res: unknown, fn: () => Promise<unknown>) { return fn(); }
+    json(obj: unknown, statusCode: number) { return { json: obj, statusCode }; }
   },
   AuthenticatedUser: class {}
 }));
 
-let dbRows: any[] = [];
+type Row = Record<string, unknown>;
+interface FakeQuery {
+  selectAll: () => FakeQuery;
+  select: () => FakeQuery;
+  set: () => FakeQuery;
+  values: () => FakeQuery;
+  where: () => FakeQuery;
+  execute: () => Promise<Row[]>;
+  executeTakeFirst: () => Promise<Row | undefined>;
+}
+
+let dbRows: Row[] = [];
 let dbThrows = false;
-function chain(): any {
-  const c: any = {
+function chain(): FakeQuery {
+  const c: FakeQuery = {
     selectAll: () => c,
     select: () => c,
     set: () => c,
@@ -26,32 +37,41 @@ function chain(): any {
 }
 jest.mock("../KyselyPool.js", () => ({ KyselyPool: { getDb: () => ({ selectFrom: chain, deleteFrom: chain, updateTable: chain, insertInto: chain }) } }));
 
-let batchRecord: any = null;
+let batchRecord: Partial<Batch> | null = null;
 jest.mock("../RepoManager.js", () => ({
   RepoManager: {
     getRepos: async () => ({
-      auditLog: { create: async (log: any) => { ((globalThis as any).__sink ||= []).push(log); return log; } },
+      auditLog: { create: async (log: Created) => { ((globalThis as SinkGlobals).__sink ||= []).push(log); return log; } },
       batch: { load: async () => batchRecord }
     })
   }
 }));
 
+import type { Request, Response } from "express";
+import type { AuthenticatedUser } from "@churchapps/apihelper";
+import type { Batch } from "../../../modules/membership/models/index.js";
 import { BaseController } from "../BaseController.js";
 
-function sink(): any[] { return (globalThis as any).__sink; }
+interface Created { batchId?: string; details?: string }
+type SinkGlobals = typeof globalThis & { __sink?: Created[] };
+type JsonResult = { json: unknown; statusCode: number };
 
-function makeController(moduleName: string, au: any) {
+function sink(): Created[] { return (globalThis as SinkGlobals).__sink; }
+
+function makeController(moduleName: string, au: Partial<AuthenticatedUser>) {
   class TestController extends BaseController {
-    constructor() { super(moduleName); (this as any)._au = au; }
+    constructor() { super(moduleName); (this as this & { _au: unknown })._au = au; }
   }
   return new TestController();
 }
 
 const au = { churchId: "ch1", id: "u1" };
-const baseReq = { headers: {}, socket: {}, params: {}, query: {} } as any;
+const baseReq = { headers: {}, socket: {}, params: {}, query: {} };
+const mockReq = (over: Partial<Request>) => ({ ...baseReq, ...over }) as Request;
+const res = {} as Response;
 
 beforeEach(() => {
-  (globalThis as any).__sink = [];
+  (globalThis as SinkGlobals).__sink = [];
   dbRows = [];
   dbThrows = false;
   batchRecord = null;
@@ -62,9 +82,9 @@ describe("actionWrapper explicit batch (X-Batch-Id)", () => {
     batchRecord = { id: "b1", churchId: "ch1", status: "open" };
     dbRows = [{ id: "p1", churchId: "ch1", firstName: "Old" }];
     const ctrl = makeController("membership", au);
-    const req = { ...baseReq, method: "POST", baseUrl: "/membership/people", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ id: "p1", firstName: "New" }] };
+    const req = mockReq({ method: "POST", baseUrl: "/membership/people", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ id: "p1", firstName: "New" }] });
     let ran = false;
-    await ctrl.actionWrapper(req, {} as any, async () => { ran = true; return [{ id: "p1" }]; });
+    await ctrl.actionWrapper(req, res, async () => { ran = true; return [{ id: "p1" }]; });
 
     expect(ran).toBe(true);
     expect(sink()).toHaveLength(1);
@@ -79,8 +99,8 @@ describe("actionWrapper explicit batch (X-Batch-Id)", () => {
     batchRecord = { id: "b1", churchId: "ch1", status: "open" };
     dbRows = [];
     const ctrl = makeController("membership", au);
-    const req = { ...baseReq, method: "POST", baseUrl: "/membership/people", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ firstName: "New" }] };
-    await ctrl.actionWrapper(req, {} as any, async () => [{ id: "pNew" }]);
+    const req = mockReq({ method: "POST", baseUrl: "/membership/people", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ firstName: "New" }] });
+    await ctrl.actionWrapper(req, res, async () => [{ id: "pNew" }]);
 
     expect(sink()).toHaveLength(1);
     const details = JSON.parse(sink()[0].details);
@@ -91,36 +111,36 @@ describe("actionWrapper explicit batch (X-Batch-Id)", () => {
   it("returns 403 and does not run the action for a closed/invalid batch", async () => {
     batchRecord = { id: "b1", churchId: "ch1", status: "completed" };
     const ctrl = makeController("membership", au);
-    const req = { ...baseReq, method: "POST", baseUrl: "/membership/people", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ id: "p1" }] };
+    const req = mockReq({ method: "POST", baseUrl: "/membership/people", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ id: "p1" }] });
     let ran = false;
-    const result = await ctrl.actionWrapper(req, {} as any, async () => { ran = true; return [{ id: "p1" }]; });
+    const result = await ctrl.actionWrapper(req, res, async () => { ran = true; return [{ id: "p1" }]; });
 
     expect(ran).toBe(false);
-    expect(result.statusCode).toBe(403);
+    expect((result as JsonResult).statusCode).toBe(403);
     expect(sink()).toHaveLength(0);
   });
 
   it("returns 400 for a batch-mode request on a route with no dbModule/table", async () => {
     batchRecord = { id: "b1", churchId: "ch1", status: "open" };
     const ctrl = makeController("doing", au);
-    const req = { ...baseReq, method: "POST", baseUrl: "/doing/tasks", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ id: "t1" }] };
+    const req = mockReq({ method: "POST", baseUrl: "/doing/tasks", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ id: "t1" }] });
     let ran = false;
-    const result = await ctrl.actionWrapper(req, {} as any, async () => { ran = true; return [{ id: "t1" }]; });
+    const result = await ctrl.actionWrapper(req, res, async () => { ran = true; return [{ id: "t1" }]; });
 
     expect(ran).toBe(false);
-    expect(result.statusCode).toBe(400);
+    expect((result as JsonResult).statusCode).toBe(400);
   });
 
   it("fails the request (500) with no writes when the snapshot read fails", async () => {
     batchRecord = { id: "b1", churchId: "ch1", status: "open" };
     dbThrows = true;
     const ctrl = makeController("membership", au);
-    const req = { ...baseReq, method: "POST", baseUrl: "/membership/people", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ id: "p1", firstName: "New" }] };
+    const req = mockReq({ method: "POST", baseUrl: "/membership/people", path: "/", route: { path: "/" }, headers: { "x-batch-id": "b1" }, body: [{ id: "p1", firstName: "New" }] });
     let ran = false;
-    const result = await ctrl.actionWrapper(req, {} as any, async () => { ran = true; return [{ id: "p1" }]; });
+    const result = await ctrl.actionWrapper(req, res, async () => { ran = true; return [{ id: "p1" }]; });
 
     expect(ran).toBe(false);
-    expect(result.statusCode).toBe(500);
+    expect((result as JsonResult).statusCode).toBe(500);
     expect(sink()).toHaveLength(0);
   });
 });
@@ -129,8 +149,8 @@ describe("actionWrapper implicit bulk batch", () => {
   it("tags bulk audit rows with the batchId returned in the payload and captures before-images", async () => {
     dbRows = [{ id: "p1", churchId: "ch1", firstName: "A" }, { id: "p2", churchId: "ch1", firstName: "B" }];
     const ctrl = makeController("membership", au);
-    const req = { ...baseReq, method: "POST", baseUrl: "/membership/people", path: "/bulk-delete", route: { path: "/bulk-delete" }, body: { personIds: ["p1", "p2"] } };
-    await ctrl.actionWrapper(req, {} as any, async () => ({ json: { success: true, deletedIds: ["p1", "p2"], count: 2, batchId: "b9" }, statusCode: 200 }));
+    const req = mockReq({ method: "POST", baseUrl: "/membership/people", path: "/bulk-delete", route: { path: "/bulk-delete" }, body: { personIds: ["p1", "p2"] } });
+    await ctrl.actionWrapper(req, res, async () => ({ json: { success: true, deletedIds: ["p1", "p2"], count: 2, batchId: "b9" }, statusCode: 200 }));
 
     expect(sink()).toHaveLength(2);
     expect(sink().every((c) => c.batchId === "b9")).toBe(true);

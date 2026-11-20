@@ -1,8 +1,13 @@
 import express from "express";
 import Axios from "axios";
-import { PayPalHelper } from "../PayPalHelper.js";
+import { PayPalHelper, PayPalEventData, PayPalMoney, PayPalVaultToken, PayPalWebhookBody } from "../PayPalHelper.js";
 import { Environment } from "../Environment.js";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities, WebhookEventClassification } from "./IGatewayProvider.js";
+import type { Customer } from "../../../modules/giving/models/index.js";
+import {
+  IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities, WebhookEventClassification, GivingRepos,
+  GatewayAttachBody, LocalMethodRecord, GatewayPaymentRequest, GatewaySubscriptionUpdate, GatewayOrderRequest, GatewayObject, NormalizedPaymentMethod,
+  GatewayAttachOptions, GatewayPlanRequest
+} from "./IGatewayProvider.js";
 
 export class PayPalGatewayProvider implements IGatewayProvider {
   readonly name = "paypal";
@@ -41,13 +46,13 @@ export class PayPalGatewayProvider implements IGatewayProvider {
   }
 
   // The attach flow keys saved methods to the provider-scoped customer, not the request-supplied id.
-  async resolveCustomerForAttach(config: GatewayConfig, personId: string | undefined, _requestCustomerId: string | undefined, repos: any): Promise<string | undefined> {
+  async resolveCustomerForAttach(config: GatewayConfig, personId: string | undefined, _requestCustomerId: string | undefined, repos: GivingRepos): Promise<string | undefined> {
     if (!personId) return undefined;
     const providerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name);
     return providerCustomer?.id || undefined;
   }
 
-  buildLocalMethodRecord(pm: any, body: any, tokenId: string): { methodType: string; displayName: string; metadata: any } | null {
+  buildLocalMethodRecord(pm: PayPalVaultToken, body: GatewayAttachBody, tokenId: string): LocalMethodRecord | null {
     const paymentSource = pm?.payment_source || {};
     const card = paymentSource.card as { last4?: string; brand?: string } | undefined;
     const paypalSource = paymentSource.paypal as { email_address?: string } | undefined;
@@ -71,7 +76,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     await PayPalHelper.deleteWebhooksByChurchId(config.publicKey, config.privateKey, churchId);
   }
 
-  async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any): Promise<WebhookResult> {
+  async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: PayPalWebhookBody): Promise<WebhookResult> {
     try {
       await PayPalHelper.verifySignature(config.publicKey, config.privateKey, config.webhookKey, headers, body);
 
@@ -87,7 +92,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     }
   }
 
-  async processCharge(config: GatewayConfig, donationData: any): Promise<ChargeResult> {
+  async processCharge(config: GatewayConfig, donationData: GatewayPaymentRequest): Promise<ChargeResult> {
     const capture = await PayPalHelper.captureOrder(config.publicKey, config.privateKey, donationData.id);
     const eventData = capture.purchase_units?.[0]?.payments?.captures?.[0] || capture;
 
@@ -95,19 +100,21 @@ export class PayPalGatewayProvider implements IGatewayProvider {
       return { success: false, transactionId: eventData?.id || "", data: { error: `PayPal capture ${String(eventData?.status || "failed").toLowerCase()}` } };
     }
     // The order amount is set client-side at create-order, so the requested amount is only trusted when the capture agrees.
-    const captured = parseFloat(eventData.amount?.value ?? "NaN");
+    const amount = eventData.amount as PayPalMoney;
+    const captured = parseFloat(amount?.value ?? "NaN");
     if (!Number.isFinite(captured) || Math.round(captured * 100) !== Math.round(Number(donationData.amount) * 100)) {
-      console.error("PayPal capture amount mismatch", { captureId: eventData.id, captured: eventData.amount?.value, requested: donationData.amount });
+      console.error("PayPal capture amount mismatch", { captureId: eventData.id, captured: amount?.value, requested: donationData.amount });
       return { success: false, transactionId: eventData.id || "", data: { error: "Captured amount does not match the donation amount" } };
     }
+    const data: PayPalEventData = { ...eventData, currency: amount?.currency_code };
     return {
       success: true,
       transactionId: eventData.id || "",
-      data: { ...eventData, currency: eventData.amount?.currency_code }
+      data
     };
   }
 
-  async createSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+  async createSubscription(config: GatewayConfig, subscriptionData: GatewayPaymentRequest): Promise<SubscriptionResult> {
     const payPalSub = await PayPalHelper.getSubscriptionDetails(config.publicKey, config.privateKey, subscriptionData.id);
 
     return {
@@ -117,7 +124,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     };
   }
 
-  async updateSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+  async updateSubscription(config: GatewayConfig, subscriptionData: GatewaySubscriptionUpdate): Promise<SubscriptionResult> {
     const payPalSub = await PayPalHelper.updateSubscription(config.publicKey, config.privateKey, subscriptionData);
 
     return {
@@ -159,7 +166,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     return Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
   }
 
-  async logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void> {
+  async logEvent(churchId: string, event: PayPalWebhookBody, eventData: PayPalEventData, repos: GivingRepos): Promise<void> {
     await PayPalHelper.logEvent(churchId, event, eventData, repos);
   }
 
@@ -168,7 +175,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     return `paypal-product-${churchId}`;
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, _status?: "pending" | "complete"): Promise<any> {
+  async logDonation(config: GatewayConfig, churchId: string, eventData: PayPalEventData, repos: GivingRepos, _status?: "pending" | "complete") {
     return await PayPalHelper.logDonation(config.publicKey, config.privateKey, churchId, eventData, repos);
   }
 
@@ -177,7 +184,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     return await PayPalHelper.generateClientToken(config.publicKey, config.privateKey);
   }
 
-  async createOrder(config: GatewayConfig, orderData: any): Promise<any> {
+  async createOrder(config: GatewayConfig, orderData: GatewayOrderRequest) {
     return await PayPalHelper.createOrder(config.publicKey, config.privateKey, orderData);
   }
 
@@ -192,13 +199,13 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     });
   }
 
-  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<any> {
+  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<GatewayObject[]> {
     // PayPal doesn't provide a direct API to list subscriptions by customer
     // This would need to be tracked in the database
     return [];
   }
 
-  async getCustomerPaymentMethods(config: GatewayConfig, customer: any): Promise<any> {
+  async getCustomerPaymentMethods(config: GatewayConfig, customer: Customer | string) {
     const customerId = typeof customer === "string" ? customer : customer?.id;
     if (!customerId) {
       throw new Error("PayPal customer id is required to list payment methods");
@@ -206,14 +213,14 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     return await PayPalHelper.listVaultPaymentMethods(config.publicKey, config.privateKey, customerId);
   }
 
-  async listNormalizedPaymentMethods(config: GatewayConfig, customer: any, repos: any): Promise<any[]> {
+  async listNormalizedPaymentMethods(config: GatewayConfig, customer: Customer | string, repos: GivingRepos): Promise<NormalizedPaymentMethod[]> {
     const raw = await this.getCustomerPaymentMethods(config, customer);
     if (!Array.isArray(raw)) return [];
     const customerId = typeof customer === "string" ? customer : customer?.id;
     const stored = await repos.gatewayPaymentMethod.loadByCustomer(config.churchId, config.gatewayId, customerId);
-    const lookup = new Map(stored.map((record: any) => [record.externalId, record]));
-    return raw.map((method: any) => {
-      const record: any = lookup.get(method?.id);
+    const lookup = new Map(stored.map((record) => [record.externalId, record]));
+    return raw.map((method) => {
+      const record = lookup.get(method?.id);
       return {
         id: method.id,
         type: "paypal",
@@ -226,7 +233,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     });
   }
 
-  async attachPaymentMethod(config: GatewayConfig, paymentMethodId: string, options: any): Promise<any> {
+  async attachPaymentMethod(config: GatewayConfig, paymentMethodId: string, options: GatewayAttachOptions) {
     const customerId = typeof options?.customer === "string" ? options.customer : options?.customer?.id;
     if (!customerId) {
       throw new Error("PayPal payment method attachment requires a customer identifier");
@@ -237,35 +244,35 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     });
   }
 
-  async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string): Promise<any> {
+  async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string): Promise<GatewayObject> {
     await PayPalHelper.deleteVaultPaymentMethod(config.publicKey, config.privateKey, paymentMethodId);
     return { success: true };
   }
 
-  async updateCard(): Promise<any> {
+  async updateCard(): Promise<never> {
     // PayPal Vault doesn't support direct card updates
     // Users need to add a new payment method and remove the old one
     throw new Error("PayPal does not support direct card updates. Please add a new payment method and remove the old one.");
   }
 
-  async createBankAccount(): Promise<any> {
+  async createBankAccount(): Promise<never> {
     throw new Error("PayPal does not support bank account creation through this API");
   }
 
-  async updateBank(): Promise<any> {
+  async updateBank(): Promise<never> {
     throw new Error("PayPal does not support bank account updates");
   }
 
-  async verifyBank(): Promise<any> {
+  async verifyBank(): Promise<never> {
     throw new Error("PayPal does not support bank account verification through this API");
   }
 
-  async deleteBankAccount(): Promise<any> {
+  async deleteBankAccount(): Promise<never> {
     throw new Error("PayPal does not support bank account deletion through this API");
   }
 
   // PayPal-specific methods for subscription plans
-  async createSubscriptionPlan(config: GatewayConfig, planData: any): Promise<string> {
+  async createSubscriptionPlan(config: GatewayConfig, planData: GatewayPlanRequest): Promise<string> {
     // Create product if it doesn't exist
     let productId = config.productId;
     if (!productId) {
@@ -287,7 +294,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     });
   }
 
-  async createSubscriptionWithPlan(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+  async createSubscriptionWithPlan(config: GatewayConfig, subscriptionData: GatewayPaymentRequest): Promise<SubscriptionResult> {
     const paypalSub = await PayPalHelper.createSubscriptionWithVault(config.publicKey, config.privateKey, subscriptionData);
 
     return {

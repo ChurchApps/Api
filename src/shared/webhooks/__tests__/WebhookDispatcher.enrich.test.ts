@@ -1,6 +1,6 @@
-import { WebhookDispatcher } from "../WebhookDispatcher";
+import { WebhookDispatcher, EnrichRepos } from "../WebhookDispatcher.js";
 
-const enrich = (repos: any, event: string, payload: any) => (WebhookDispatcher as any).enrich(repos, "c1", event, payload);
+const enrich = async (repos: EnrichRepos, event: string, payload: unknown) => (await WebhookDispatcher["enrich"](repos, "c1", event, payload)) as Record<string, unknown>;
 
 const repos = {
   person: { load: jest.fn().mockResolvedValue({ id: "p1", displayName: "Jane Doe", firstName: "Jane", lastName: "Doe" }) },

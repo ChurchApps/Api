@@ -1,12 +1,13 @@
 jest.mock("../../../shared/helpers/Environment.js", () => ({ Environment: { jwtSecret: "test-secret", lessonsApi: "https://api.lessons.test/" } }));
 
+import express from "express";
 import jwt from "jsonwebtoken";
-import { forwardToLessons, isLessonsPath, signLessonsJwt } from "../lessonsProxy.js";
+import { forwardToLessons, isLessonsPath, signLessonsJwt, McpPrincipal } from "../lessonsProxy.js";
 import { makeApiCallHandler } from "../tools/apiCall.js";
 import { setExpressApp } from "../internalDispatch.js";
 import { getRouteInventory } from "../RouteInventory.js";
 
-const principal = {
+const principal: McpPrincipal = {
   id: "user1",
   churchId: "church1",
   personId: "person1",
@@ -22,7 +23,7 @@ describe("MCP lessons proxy", () => {
 
   beforeEach(() => {
     fetchMock = jest.fn(async () => new Response(JSON.stringify([{ id: "c1" }]), { status: 200 }));
-    global.fetch = fetchMock as any;
+    global.fetch = fetchMock as typeof fetch;
   });
 
   afterEach(() => {
@@ -40,7 +41,7 @@ describe("MCP lessons proxy", () => {
   });
 
   it("signs a short-lived JWT carrying the resolved principal", () => {
-    const decoded: any = jwt.verify(signLessonsJwt(principal), "test-secret");
+    const decoded = jwt.verify(signLessonsJwt(principal), "test-secret") as jwt.JwtPayload;
     expect(decoded).toMatchObject({ id: "user1", churchId: "church1", personId: "person1", permissions: ["LessonsApi_Schedules__Edit"] });
     expect(decoded.exp - decoded.iat).toBe(15 * 60);
   });
@@ -52,7 +53,7 @@ describe("MCP lessons proxy", () => {
     expect(init.method).toBe("POST");
     expect(init.body).toBe(JSON.stringify([{ id: "s1" }]));
     const token = init.headers.Authorization.replace("Bearer ", "");
-    expect((jwt.verify(token, "test-secret") as any).churchId).toBe("church1");
+    expect((jwt.verify(token, "test-secret") as jwt.JwtPayload).churchId).toBe("church1");
     expect(result).toEqual({ status: 200, body: [{ id: "c1" }], truncated: false });
   });
 
@@ -65,14 +66,15 @@ describe("MCP lessons proxy", () => {
     fetchMock.mockResolvedValueOnce(new Response("x".repeat(70 * 1024), { status: 200 }));
     const result = await forwardToLessons({ method: "GET", path: "/lessons/classrooms", principal });
     expect(result.truncated).toBe(true);
-    expect(result.body.length).toBe(64 * 1024);
+    expect((result.body as string).length).toBe(64 * 1024);
   });
 
   it("api_call sends /lessons paths to LessonsApi, not the in-process app", async () => {
-    const inProcess = jest.fn((_req: any, res: any) => res.json({}));
-    setExpressApp(inProcess as any);
+    const inProcess = jest.fn((_req: express.Request, res: express.Response) => res.json({}));
+    const inProcessHandler: (req: express.Request, res: express.Response) => express.Response = inProcess;
+    setExpressApp(inProcessHandler as express.Application);
     const handler = makeApiCallHandler(() => "Bearer cak_x.y", () => "", () => principal);
-    const result: any = await handler({ method: "GET", path: "/lessons/classrooms" });
+    const result = await handler({ method: "GET", path: "/lessons/classrooms" });
     expect(inProcess).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.isError).toBe(false);
@@ -80,7 +82,7 @@ describe("MCP lessons proxy", () => {
 
   it("api_call refuses /lessons paths when the session has no user", async () => {
     const handler = makeApiCallHandler(() => "Bearer x");
-    const result: any = await handler({ method: "GET", path: "/lessons/classrooms" });
+    const result = await handler({ method: "GET", path: "/lessons/classrooms" });
     expect(result.isError).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -89,7 +91,7 @@ describe("MCP lessons proxy", () => {
     fetchMock.mockRejectedValueOnce(new Error("connect ECONNREFUSED 10.0.0.5"));
     jest.spyOn(console, "error").mockImplementation(() => {});
     const handler = makeApiCallHandler(() => "Bearer x", () => "", () => principal);
-    const result: any = await handler({ method: "GET", path: "/lessons/classrooms" });
+    const result = await handler({ method: "GET", path: "/lessons/classrooms" });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).not.toContain("10.0.0.5");
     (console.error as jest.Mock).mockRestore();

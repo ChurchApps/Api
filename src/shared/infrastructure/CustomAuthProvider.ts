@@ -5,6 +5,7 @@ import { UserHelper } from "../../modules/membership/helpers/index.js";
 import { buildPermStrings } from "../auth/buildPermStrings.js";
 import { filterPermissionsByScopes, parseScopes } from "../auth/Scopes.js";
 import crypto from "crypto";
+import express from "express";
 
 /** CustomAuthProvider for monolith with module-specific logic. */
 export class CustomAuthProvider extends BaseAuthProvider {
@@ -25,7 +26,7 @@ export class CustomAuthProvider extends BaseAuthProvider {
     return Environment.jwtExpiration || "2 days";
   }
 
-  protected async validateModuleAccess(token: any, _moduleName?: string): Promise<boolean> {
+  protected async validateModuleAccess(token: unknown, _moduleName?: string): Promise<boolean> {
     const isValid = await this.validateToken(token);
     return isValid;
   }
@@ -34,7 +35,7 @@ export class CustomAuthProvider extends BaseAuthProvider {
     return Environment.membershipApi;
   }
 
-  async validateToken(token: any): Promise<boolean> {
+  async validateToken(token: unknown): Promise<boolean> {
     try {
       if (!token) return false;
       if (typeof token === "string") {
@@ -49,7 +50,7 @@ export class CustomAuthProvider extends BaseAuthProvider {
   }
 
   // cak_ tokens are API keys; everything else delegates to base (JWT).
-  async getUser(req: any, res: any, next: any): Promise<any> {
+  async getUser(req: express.Request, res: express.Response, next: express.NextFunction): Promise<Principal> {
     try {
       const authHeader = req.headers?.authorization;
       const token = authHeader ? authHeader.split(" ")[1] : null;
@@ -91,7 +92,7 @@ export class CustomAuthProvider extends BaseAuthProvider {
 
       const groupIds: string[] = [];
       const leaderGroupIds: string[] = [];
-      groupMembers.forEach((g: any) => {
+      groupMembers.forEach((g) => {
         groupIds.push(g.groupId);
         if (g.leader) leaderGroupIds.push(g.groupId);
       });

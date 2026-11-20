@@ -27,7 +27,7 @@ export class PlanAuth {
   static async canEditPosition(au: AuthenticatedUser, positionId: string | undefined | null): Promise<boolean> {
     if (au.checkAccess(Permissions.plans.edit)) return true;
     if (!positionId) return false;
-    const position: any = await getDoingModuleGateway().loadPosition(au.churchId, positionId);
+    const position = await getDoingModuleGateway().loadPosition(au.churchId, positionId);
     return PlanAuth.canEditPlan(au, position?.planId);
   }
 }

@@ -1,15 +1,18 @@
 import { RepoManager } from "../infrastructure/RepoManager.js";
+import type { Repos as DoingRepos } from "../../modules/doing/repositories/index.js";
+import type { DoingDatabase } from "../../modules/doing/db/DatabaseTypes.js";
+import type { Assignment, BlockoutDate, Position, Task } from "../../modules/doing/models/index.js";
 
 // Gateway: the only seam through which other modules read doing data.
 export interface DoingModuleGateway {
-  loadAssignmentsByPerson(churchId: string, personId: string): Promise<any[]>;
+  loadAssignmentsByPerson(churchId: string, personId: string): Promise<Assignment[]>;
   // Tasks the person is assigned or created, any status.
-  loadTasksByPerson(churchId: string, personId: string): Promise<any[]>;
+  loadTasksByPerson(churchId: string, personId: string): Promise<Task[]>;
   // Single card, for gating card notes in messaging.
-  loadTask(churchId: string, taskId: string): Promise<any | null>;
-  loadBlockoutDatesByPerson(churchId: string, personId: string): Promise<any[]>;
-  loadUnconfirmedAssignments(): Promise<any[]>;
-  loadPosition(churchId: string, positionId: string): Promise<any | null>;
+  loadTask(churchId: string, taskId: string): Promise<Task | null>;
+  loadBlockoutDatesByPerson(churchId: string, personId: string): Promise<BlockoutDate[]>;
+  loadUnconfirmedAssignments(): Promise<Assignment[]>;
+  loadPosition(churchId: string, positionId: string): Promise<Position | null>;
   loadPlan(churchId: string, planId: string): Promise<{ ministryId?: string } | null>;
   loadPlanType(churchId: string, planTypeId: string): Promise<{ ministryId?: string } | null>;
   // List-condition provider: people scheduled to serve in the window (any plan).
@@ -24,7 +27,7 @@ export interface DoingModuleGateway {
 
 class DoingModuleGatewayDb implements DoingModuleGateway {
   private async repos() {
-    return RepoManager.getRepos<any>("doing");
+    return RepoManager.getRepos<DoingRepos>("doing");
   }
 
   public async loadAssignmentsByPerson(churchId: string, personId: string) {
@@ -34,9 +37,9 @@ class DoingModuleGatewayDb implements DoingModuleGateway {
   public async loadTasksByPerson(churchId: string, personId: string) {
     // Lazy-load so importers of this gateway don't transitively pull Environment at module scope.
     const { KyselyPool } = await import("../infrastructure/KyselyPool.js");
-    return KyselyPool.getDb<any>("doing").selectFrom("tasks").selectAll()
+    return KyselyPool.getDb<DoingDatabase>("doing").selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
-      .where((eb: any) => eb.or([eb("assignedToId", "=", personId), eb("createdById", "=", personId)]))
+      .where((eb) => eb.or([eb("assignedToId", "=", personId), eb("createdById", "=", personId)]))
       .execute();
   }
 
@@ -81,7 +84,7 @@ class DoingModuleGatewayDb implements DoingModuleGateway {
 
   public async loadPalette(churchId: string) {
     const { KyselyPool } = await import("../infrastructure/KyselyPool.js");
-    return KyselyPool.getDb<any>("doing").selectFrom("plans").select(["id", "name"])
+    return KyselyPool.getDb<DoingDatabase>("doing").selectFrom("plans").select(["id", "name"])
       .where("churchId", "=", churchId)
       .orderBy("serviceDate", "desc")
       .execute();

@@ -5,13 +5,13 @@ import { Environment } from "../helpers/index.js";
 @controller("/health")
 export class HealthController {
   @httpGet("/database-connections")
-  public async checkDatabaseConnections(_req: express.Request, res: express.Response): Promise<any> {
+  public async checkDatabaseConnections(_req: express.Request, res: express.Response): Promise<express.Response> {
     try {
       const connectionStatus = Environment.getConnectionStatus();
       const allDatabaseConfigs = Environment.getAllDatabaseConfigs();
 
       // Test connection validity (basic check)
-      const connectionDetails: Record<string, any> = {};
+      const connectionDetails: Record<string, { configured: boolean }> = {};
       for (const [moduleName, config] of allDatabaseConfigs.entries()) {
         connectionDetails[moduleName] = { configured: !!config };
       }
@@ -45,7 +45,7 @@ export class HealthController {
   }
 
   @httpGet("/")
-  public async healthCheck(_req: express.Request, res: express.Response): Promise<any> {
+  public async healthCheck(_req: express.Request, res: express.Response): Promise<express.Response> {
     try {
       const connectionStatus = Environment.getConnectionStatus();
       const isHealthy = connectionStatus.missing.length === 0;
@@ -70,7 +70,7 @@ export class HealthController {
   }
 
   @httpGet("/environment")
-  public async environmentInfo(_req: express.Request, res: express.Response): Promise<any> {
+  public async environmentInfo(_req: express.Request, res: express.Response): Promise<express.Response> {
     try {
       return res.json({
         environment: Environment.currentEnvironment,

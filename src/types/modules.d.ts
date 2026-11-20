@@ -2,7 +2,7 @@ declare module "node-geocoder" {
   namespace NodeGeocoder {
     interface Options {
       provider: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }
     interface Entry {
       latitude?: number;
@@ -14,7 +14,7 @@ declare module "node-geocoder" {
       streetName?: string;
       streetNumber?: string;
       district?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }
     interface Geocoder {
       geocode(query: string): Promise<Entry[]>;

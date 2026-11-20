@@ -7,6 +7,7 @@ import { Logger } from "../modules/messaging/helpers/Logger.js";
 import { SocketHelper } from "../modules/messaging/helpers/SocketHelper.js";
 import { initializeMessagingModule } from "../modules/messaging/index.js";
 import { RepoManager } from "../shared/infrastructure/RepoManager.js";
+import type { Repos as MessagingRepos } from "../modules/messaging/repositories/index.js";
 
 let gwManagement: ApiGatewayManagementApiClient;
 let initialized = false;
@@ -21,7 +22,7 @@ const initEnv = async () => {
     });
 
     // Initialize messaging module repositories and helpers
-    const repos = await RepoManager.getRepos<any>("messaging");
+    const repos = await RepoManager.getRepos<MessagingRepos>("messaging");
     initializeMessagingModule(repos);
     initialized = true;
   }
@@ -37,7 +38,7 @@ export const handleSocket = async (event: APIGatewayProxyEvent, context: Context
   try {
     await initEnv();
 
-    const { eventType, connectionId } = event.requestContext as any;
+    const { eventType, connectionId } = event.requestContext;
 
     console.log(`WebSocket ${eventType} for connection ${connectionId}`);
 
@@ -88,7 +89,7 @@ async function handleDisconnect(event: APIGatewayProxyEvent, _context: Context):
 }
 
 function getApiGatewayManagementClient(event: APIGatewayProxyEvent): ApiGatewayManagementApiClient {
-  const requestContext = event.requestContext as any;
+  const requestContext = event.requestContext;
 
   if (requestContext && requestContext.apiId && requestContext.stage) {
     const { apiId, stage } = requestContext;
@@ -123,8 +124,9 @@ async function handleMessage(event: APIGatewayProxyEvent, _context: Context): Pr
 
       await apiGwClient.send(command);
       console.log(`Successfully sent socketId response to connection ${connectionId}`);
-    } catch (e: any) {
-      if (e?.name !== "GoneException" && e?.$metadata?.httpStatusCode !== 410) {
+    } catch (e) {
+      const err = e as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined;
+      if (err?.name !== "GoneException" && err?.$metadata?.httpStatusCode !== 410) {
         console.error(`Failed to send socketId response to connection ${connectionId}:`, e);
         await logMessage(e instanceof Error ? e.message : String(e));
       }

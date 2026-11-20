@@ -23,9 +23,9 @@ export class CaptchaPass {
   }
 
   // True when enforcement is off (CAPTCHA_ENFORCE !== "true") or req.body.captchaPass is a valid, unexpired pass for this church.
-  public static verify(req: { body?: any }, churchId: string): boolean {
+  public static verify(req: { body?: unknown }, churchId: string): boolean {
     if (!Environment.captchaEnforce) return true;
-    const token = req.body?.captchaPass;
+    const token = (req.body as { captchaPass?: unknown } | undefined)?.captchaPass;
     if (!token || typeof token !== "string" || !Environment.jwtSecret) return false;
     const [body, sig] = token.split(".");
     if (!body || !sig) return false;

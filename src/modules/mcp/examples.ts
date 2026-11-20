@@ -17,8 +17,8 @@ interface EndpointGuidance {
 
 export interface EndpointExample {
   summary: string;
-  requestBody?: any;
-  responseSample?: any;
+  requestBody?: unknown;
+  responseSample?: unknown;
   notes?: string;
   guidance?: EndpointGuidance;
 }

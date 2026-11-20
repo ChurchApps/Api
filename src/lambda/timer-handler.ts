@@ -6,6 +6,11 @@ import { JobRunHelper } from "../shared/helpers/JobRunHelper.js";
 import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper.js";
 import { RepoManager } from "../shared/infrastructure/RepoManager.js";
 import { AutomationHelper } from "../modules/bridge/helpers/AutomationHelper.js";
+import type { Repos as MessagingRepos } from "../modules/messaging/repositories/index.js";
+import type { Repos as DoingRepos } from "../modules/doing/repositories/index.js";
+import type { Repos as CommonsRepos } from "../modules/commons/repositories/index.js";
+import type { Repos as ContentRepos } from "../modules/content/repositories/index.js";
+import type { Repos as MembershipRepos } from "../modules/membership/repositories/index.js";
 
 const initEnv = async () => {
   console.debug("[initEnv] Starting environment initialization...");
@@ -19,7 +24,7 @@ const initEnv = async () => {
 
   // Always initialize messaging helpers (repos may be undefined on warm starts)
   console.debug("[initEnv] Initializing messaging repos...");
-  const repos = await RepoManager.getRepos<any>("messaging");
+  const repos = await RepoManager.getRepos<MessagingRepos>("messaging");
   // Recovered serving-request cards can create app alerts and human assignments.
   const { initializeNotificationDelivery } = await import("../modules/messaging/index.js");
   initializeNotificationDelivery(repos);
@@ -43,37 +48,37 @@ export const handle30MinTimer = async (_event: ScheduledEvent, _context: Context
 
   await JobRunHelper.run("automationRetries", async () => {
     const { ExecutionHelper } = await import("../modules/doing/helpers/ExecutionHelper.js");
-    const doingRepos = await RepoManager.getRepos<any>("doing");
+    const doingRepos = await RepoManager.getRepos<DoingRepos>("doing");
     return ExecutionHelper.processDue(doingRepos);
   });
 
   // Resume workflow cards whose wait has ended, so a "1 day" wait means about a day.
   await JobRunHelper.run("workflowSnoozed", async () => {
     const { WorkflowHelper } = await import("../modules/doing/helpers/WorkflowHelper.js");
-    const doingRepos = await RepoManager.getRepos<any>("doing");
+    const doingRepos = await RepoManager.getRepos<DoingRepos>("doing");
     return WorkflowHelper.processSnoozed(doingRepos);
   });
 
   await JobRunHelper.run("scanReminders", async () => {
     const { scanReminders } = await import("../modules/messaging/helpers/ReminderBootstrap.js");
-    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    const messagingRepos = await RepoManager.getRepos<MessagingRepos>("messaging");
     return scanReminders(messagingRepos);
   });
 
   await JobRunHelper.run("commonsSyncOutput", async () => {
     const { MaintenanceHelper } = await import("../modules/commons/helpers/MaintenanceHelper.js");
-    const commonsRepos = await RepoManager.getRepos<any>("commons");
+    const commonsRepos = await RepoManager.getRepos<CommonsRepos>("commons");
     return MaintenanceHelper.syncRecentOutput(commonsRepos);
   });
 
   await JobRunHelper.run("reapStaleConnections", async () => {
     const { SocketHelper } = await import("../modules/messaging/helpers/SocketHelper.js");
-    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    const messagingRepos = await RepoManager.getRepos<MessagingRepos>("messaging");
     return SocketHelper.reapStaleConnections(messagingRepos);
   });
 
   await JobRunHelper.run("conversationCleanup", async () => {
-    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    const messagingRepos = await RepoManager.getRepos<MessagingRepos>("messaging");
     return messagingRepos.conversation.cleanup();
   });
 
@@ -90,7 +95,7 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
   await JobRunHelper.run("remindGroupAttendance", () => AutomationHelper.remindGroupAttendance());
 
   await JobRunHelper.run("advanceRecurringServices", async () => {
-    const contentRepos = await RepoManager.getRepos<any>("content");
+    const contentRepos = await RepoManager.getRepos<ContentRepos>("content");
     const { RecurringStreamHelper } = await import("../modules/content/helpers/RecurringStreamHelper.js");
     return RecurringStreamHelper.advanceStale(contentRepos.streamingService);
   });
@@ -109,30 +114,30 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
 
   // Automation execution history retention (>= 32 days required; we keep 90).
   await JobRunHelper.run("purgeAutomationExecutions", async () => {
-    const doingRepos = await RepoManager.getRepos<any>("doing");
+    const doingRepos = await RepoManager.getRepos<DoingRepos>("doing");
     return doingRepos.automationExecution.purgeOld();
   });
 
   await JobRunHelper.run("expandReminders", async () => {
     const { expandReminders } = await import("../modules/messaging/helpers/ReminderBootstrap.js");
-    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    const messagingRepos = await RepoManager.getRepos<MessagingRepos>("messaging");
     return expandReminders(messagingRepos);
   });
 
   // Audit log retention (365 days) — must stay above any future undo window.
   await JobRunHelper.run("purgeAuditLogs", async () => {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
     return membershipRepos.auditLog.deleteOld(365);
   });
 
   await JobRunHelper.run("purgeJobRuns", async () => {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
     return membershipRepos.jobRun.deleteOld(30);
   });
 
   // Failed-login counters expire after minutes; a day of slack is plenty before reclaiming rows.
   await JobRunHelper.run("purgeLoginAttempts", async () => {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
     return membershipRepos.loginAttempt.deleteOld(1);
   });
 
@@ -144,12 +149,12 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
   await JobRunHelper.run("dailyEmails", () => NotificationHelper.sendEmailNotifications("daily"));
   await JobRunHelper.run("commonsNightly", async () => {
     const { MaintenanceHelper } = await import("../modules/commons/helpers/MaintenanceHelper.js");
-    const commonsRepos = await RepoManager.getRepos<any>("commons");
+    const commonsRepos = await RepoManager.getRepos<CommonsRepos>("commons");
     return MaintenanceHelper.nightly(commonsRepos);
   });
   await JobRunHelper.run("commonsWriterStats", async () => {
     const { CommonsMauticHelper } = await import("../modules/commons/helpers/CommonsMauticHelper.js");
-    const commonsRepos = await RepoManager.getRepos<any>("commons");
+    const commonsRepos = await RepoManager.getRepos<CommonsRepos>("commons");
     return CommonsMauticHelper.syncAllWriters(commonsRepos);
   });
 
@@ -162,13 +167,13 @@ export const handleWebhookTimer = async (_event: ScheduledEvent, _context: Conte
   await initEnv();
   await JobRunHelper.run("webhookDeliveries", async () => {
     const { WebhookDeliveryWorker } = await import("../shared/webhooks/index.js");
-    const repos = await RepoManager.getRepos<any>("membership");
+    const repos = await RepoManager.getRepos<MembershipRepos>("membership");
     return WebhookDeliveryWorker.process(repos);
   });
   // Scheduled push notifications go out on this one-minute clock (ChurchAppsSupport#1411).
   await JobRunHelper.run("scheduledNotifications", async () => {
     const { ScheduledNotificationHelper } = await import("../modules/messaging/helpers/ScheduledNotificationHelper.js");
-    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    const messagingRepos = await RepoManager.getRepos<MessagingRepos>("messaging");
     return ScheduledNotificationHelper.dispatchDue(messagingRepos);
   });
 };
@@ -177,7 +182,7 @@ export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Con
   await initEnv();
   console.log("Scheduled tasks timer triggered");
 
-  const doingRepos = await RepoManager.getRepos<any>("doing");
+  const doingRepos = await RepoManager.getRepos<DoingRepos>("doing");
 
   // Workflow card overdue reminders (the un-snooze sweep runs on the 30-minute timer).
   await JobRunHelper.run("workflowOverdue", async () => {

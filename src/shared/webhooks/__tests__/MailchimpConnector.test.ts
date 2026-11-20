@@ -6,21 +6,22 @@ jest.mock("@churchapps/apihelper", () => ({
 }));
 
 import crypto from "crypto";
-import { MailchimpConnector, MAILCHIMP_EVENTS } from "../MailchimpConnector";
+import { MailchimpConnector, MAILCHIMP_EVENTS } from "../MailchimpConnector.js";
+import { Webhook, WebhookDelivery } from "../../../modules/membership/models/index.js";
 
 const config = { apiKey: "abc123-us21", audienceId: "aud1" };
-const webhook: any = { connectorType: "mailchimp", connectorConfig: "enc:" + Buffer.from(JSON.stringify(config)).toString("base64") };
+const webhook: Webhook = { connectorType: "mailchimp", connectorConfig: "enc:" + Buffer.from(JSON.stringify(config)).toString("base64") };
 const BASE = "https://us21.api.mailchimp.com/3.0/lists/aud1";
 const hashOf = (email: string) => crypto.createHash("md5").update(email.toLowerCase()).digest("hex");
 
 const mockFetch = (responses: Array<{ status: number; body?: string }>) => {
   const fn = jest.fn();
   responses.forEach((r) => fn.mockResolvedValueOnce({ status: r.status, text: async () => r.body ?? "{}" }));
-  global.fetch = fn as any;
+  global.fetch = fn as typeof fetch;
   return fn;
 };
 
-const delivery = (event: string, data: any): any => ({ payload: JSON.stringify({ event, churchId: "c1", occurredAt: "2026-08-18T00:00:00.000Z", data }) });
+const delivery = (event: string, data: Record<string, unknown>): WebhookDelivery => ({ payload: JSON.stringify({ event, churchId: "c1", occurredAt: "2026-08-18T00:00:00.000Z", data }) });
 
 describe("MailchimpConnector.dataCenter", () => {
   it("extracts the dc suffix", () => expect(MailchimpConnector.dataCenter("xyz-us21")).toBe("us21"));
@@ -29,7 +30,7 @@ describe("MailchimpConnector.dataCenter", () => {
 
 describe("MailchimpConnector.parseConfig", () => {
   it("round-trips the encrypted config", () => expect(MailchimpConnector.parseConfig(webhook)).toEqual(config));
-  it("returns null for missing config", () => expect(MailchimpConnector.parseConfig({} as any)).toBeNull());
+  it("returns null for missing config", () => expect(MailchimpConnector.parseConfig({})).toBeNull());
 });
 
 describe("MailchimpConnector.deliver", () => {
@@ -53,7 +54,7 @@ describe("MailchimpConnector.deliver", () => {
   });
 
   it("skips a person with no email as success", async () => {
-    global.fetch = jest.fn() as any;
+    global.fetch = jest.fn() as typeof fetch;
     const result = await MailchimpConnector.deliver(webhook, delivery("person.created", { name: { first: "X" } }));
     expect(result.status).toBe(200);
     expect(result.responseBody).toMatch(/Skipped/);
@@ -92,14 +93,14 @@ describe("MailchimpConnector.deliver", () => {
   });
 
   it("skips unmapped events as success", async () => {
-    global.fetch = jest.fn() as any;
+    global.fetch = jest.fn() as typeof fetch;
     const result = await MailchimpConnector.deliver(webhook, delivery("donation.created", { amount: 5 }));
     expect(result.status).toBe(200);
     expect(result.responseBody).toMatch(/not mapped/);
   });
 
   it("fails without retryable side effects when unconfigured", async () => {
-    const result = await MailchimpConnector.deliver({ connectorType: "mailchimp" } as any, delivery("person.created", { email: "a@b.co" }));
+    const result = await MailchimpConnector.deliver({ connectorType: "mailchimp" }, delivery("person.created", { email: "a@b.co" }));
     expect(result.status).toBe(0);
   });
 });
@@ -116,7 +117,7 @@ describe("MailchimpConnector.verify", () => {
     expect(await MailchimpConnector.verify(config)).toMatch(/[Aa]udience/);
   });
   it("rejects a key without a dc suffix without calling out", async () => {
-    global.fetch = jest.fn() as any;
+    global.fetch = jest.fn() as typeof fetch;
     expect(await MailchimpConnector.verify({ apiKey: "nope", audienceId: "a" })).toMatch(/data center/);
     expect(global.fetch).not.toHaveBeenCalled();
   });

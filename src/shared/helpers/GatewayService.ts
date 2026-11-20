@@ -1,8 +1,15 @@
 import { GatewayFactory, IGatewayProvider, GatewayConfig } from "./gateways/index.js";
-import type { ProviderCapabilities, WebhookEventClassification, ReplayEvent, SubscriptionResult } from "./gateways/index.js";
-import { validateGatewaySettings } from "./gateways/GatewaySettings.js";
+import type {
+  ProviderCapabilities, WebhookEventClassification, ReplayEvent, SubscriptionResult, GatewayObject, GatewayPaymentRequest, GatewayPerson,
+  GatewaySubscriptionUpdate, GatewayAttachBody, GatewayAttachOptions, LocalMethodRecord, NormalizedPaymentMethod, NormalizedSubscription,
+  GatewayPaymentMethodList, GatewaySubscriptionList, GatewayBankAccountOptions, GatewayErrorMapping, GatewayDonationLogResult, GatewayOrderRequest, GatewayPlanRequest
+} from "./gateways/index.js";
+import type Stripe from "stripe";
+import type express from "express";
+import { validateGatewaySettings, BaseGatewaySettings } from "./gateways/GatewaySettings.js";
 import { GatewayRepo } from "../../modules/giving/repositories/GatewayRepo.js";
-import { Gateway } from "../../modules/giving/models/index.js";
+import { Customer, Gateway } from "../../modules/giving/models/index.js";
+import type { Repos } from "../../modules/giving/repositories/Repos.js";
 import { EncryptionHelper } from "@churchapps/apihelper";
 
 export type { ProviderCapabilities } from "./gateways/index.js";
@@ -18,7 +25,7 @@ export interface GetGatewayOptions {
 type GatewayResolutionReason = "not-found" | "ambiguous" | null;
 
 export class GatewayService {
-  static getGatewayConfig(gateway: any): GatewayConfig {
+  static getGatewayConfig(gateway: Gateway): GatewayConfig {
     const decryptIfPresent = (value: string | null | undefined) => {
       if (!value) return "";
       try {
@@ -53,38 +60,38 @@ export class GatewayService {
     };
   }
 
-  static getProviderFromGateway(gateway: any): IGatewayProvider {
+  static getProviderFromGateway(gateway: Gateway): IGatewayProvider {
     return GatewayFactory.getProvider(gateway.provider);
   }
 
-  static async createWebhook(gateway: any, webhookUrl: string): Promise<{ id: string; secret?: string }> {
+  static async createWebhook(gateway: Gateway, webhookUrl: string): Promise<{ id: string; secret?: string }> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.createWebhookEndpoint(config, webhookUrl);
   }
 
-  static async deleteWebhooks(gateway: any, churchId: string): Promise<void> {
+  static async deleteWebhooks(gateway: Gateway, churchId: string): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     await provider.deleteWebhooksByChurchId(config, churchId);
   }
 
-  static async verifyWebhook(gateway: any, headers: any, body: any, extras?: { notificationUrl?: string }) {
+  static async verifyWebhook(gateway: Gateway, headers: express.Request["headers"], body: unknown, extras?: { notificationUrl?: string }) {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.verifyWebhookSignature(config, headers, body, extras);
   }
 
-  static classifyWebhookEvent(gateway: any, eventType: string): WebhookEventClassification {
+  static classifyWebhookEvent(gateway: Gateway, eventType: string): WebhookEventClassification {
     const provider = this.getProviderFromGateway(gateway);
     return provider.classifyWebhookEvent?.(eventType) || { action: "ignore" };
   }
 
-  static logsDonationsImmediately(gateway: any): boolean {
+  static logsDonationsImmediately(gateway: Gateway): boolean {
     return !!this.getProviderFromGateway(gateway).logsDonationsImmediately;
   }
 
-  static async prepareCharge(gateway: any, donationData: any, repos: any): Promise<void> {
+  static async prepareCharge(gateway: Gateway, donationData: GatewayPaymentRequest, repos: Repos): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.prepareCharge) {
       const config = this.getGatewayConfig(gateway);
@@ -92,13 +99,13 @@ export class GatewayService {
     }
   }
 
-  static async processCharge(gateway: any, donationData: any) {
+  static async processCharge(gateway: Gateway, donationData: GatewayPaymentRequest) {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.processCharge(config, donationData);
   }
 
-  static async prepareSubscription(gateway: any, subscriptionData: any, person: any, repos: any): Promise<void> {
+  static async prepareSubscription(gateway: Gateway, subscriptionData: GatewayPaymentRequest, person: GatewayPerson, repos: Repos): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.prepareSubscription) {
       const config = this.getGatewayConfig(gateway);
@@ -106,7 +113,7 @@ export class GatewayService {
     }
   }
 
-  static async finalizeSubscription(gateway: any, result: SubscriptionResult, subscriptionData: any, person: any, repos: any): Promise<string | undefined> {
+  static async finalizeSubscription(gateway: Gateway, result: SubscriptionResult, subscriptionData: GatewayPaymentRequest, person: GatewayPerson, repos: Repos): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.finalizeSubscription) {
       const config = this.getGatewayConfig(gateway);
@@ -115,43 +122,43 @@ export class GatewayService {
     return undefined;
   }
 
-  static async createSubscription(gateway: any, subscriptionData: any) {
+  static async createSubscription(gateway: Gateway, subscriptionData: GatewayPaymentRequest) {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.createSubscription(config, subscriptionData);
   }
 
-  static async updateSubscription(gateway: any, subscriptionData: any) {
+  static async updateSubscription(gateway: Gateway, subscriptionData: GatewaySubscriptionUpdate) {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.updateSubscription(config, subscriptionData);
   }
 
-  static async cancelSubscription(gateway: any, subscriptionId: string, reason?: string): Promise<void> {
+  static async cancelSubscription(gateway: Gateway, subscriptionId: string, reason?: string): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     await provider.cancelSubscription(config, subscriptionId, reason);
   }
 
-  static async pauseSubscription(gateway: any, subscriptionId: string): Promise<void> {
+  static async pauseSubscription(gateway: Gateway, subscriptionId: string): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     await provider.pauseSubscription(config, subscriptionId);
   }
 
-  static async resumeSubscription(gateway: any, subscriptionId: string): Promise<void> {
+  static async resumeSubscription(gateway: Gateway, subscriptionId: string): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     await provider.resumeSubscription(config, subscriptionId);
   }
 
-  static async calculateFees(gateway: any, amount: number, churchId: string, currency?: string, paymentType?: "card" | "bank"): Promise<number> {
+  static async calculateFees(gateway: Gateway, amount: number, churchId: string, currency?: string, paymentType?: "card" | "bank"): Promise<number> {
     const provider = this.getProviderFromGateway(gateway);
     const currencyToUse = currency || gateway.currency || "USD";
     return await provider.calculateFees(amount, churchId, currencyToUse, paymentType);
   }
 
-  static async createProduct(gateway: any, churchId: string): Promise<string | undefined> {
+  static async createProduct(gateway: Gateway, churchId: string): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createProduct) {
       const config = this.getGatewayConfig(gateway);
@@ -160,45 +167,45 @@ export class GatewayService {
     return undefined;
   }
 
-  static async logEvent(gateway: any, churchId: string, event: any, eventData: any, repos: any): Promise<void> {
+  static async logEvent(gateway: Gateway, churchId: string, event: unknown, eventData: GatewayObject, repos: Repos): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     await provider.logEvent(churchId, event, eventData, repos);
   }
 
-  static async logDonation(gateway: any, churchId: string, eventData: any, repos: any, status: "pending" | "complete" | "failed" = "complete"): Promise<any> {
+  static async logDonation(gateway: Gateway, churchId: string, eventData: GatewayObject, repos: Repos, status: "pending" | "complete" | "failed" = "complete"): Promise<GatewayDonationLogResult> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.logDonation(config, churchId, eventData, repos, status);
   }
 
-  static async updateDonationStatus(gateway: any, churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: any): Promise<void> {
+  static async updateDonationStatus(gateway: Gateway, churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: Repos): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.updateDonationStatus) {
       await provider.updateDonationStatus(churchId, transactionId, status, repos);
     }
   }
 
-  static supportsRetry(gateway: any): boolean {
+  static supportsRetry(gateway: Gateway): boolean {
     return !!this.getProviderFromGateway(gateway).retryFailedPayment;
   }
 
-  static async retryFailedPayment(gateway: any, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }> {
+  static async retryFailedPayment(gateway: Gateway, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }> {
     const provider = this.getProviderFromGateway(gateway);
     if (!provider.retryFailedPayment) return { success: false, error: `${provider.name} does not support retrying failed payments` };
     return await provider.retryFailedPayment(this.getGatewayConfig(gateway), donation);
   }
 
-  static supportsRefund(gateway: any): boolean {
+  static supportsRefund(gateway: Gateway): boolean {
     return !!this.getProviderFromGateway(gateway).refundCharge;
   }
 
-  static async refundDonation(gateway: any, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }> {
+  static async refundDonation(gateway: Gateway, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }> {
     const provider = this.getProviderFromGateway(gateway);
     if (!provider.refundCharge) return { success: false, error: `${provider.name} does not support refunds` };
     return await provider.refundCharge(this.getGatewayConfig(gateway), transactionId);
   }
 
-  static async createCustomer(gateway: any, email: string, name: string, options?: { personId?: string }): Promise<string | undefined> {
+  static async createCustomer(gateway: Gateway, email: string, name: string, options?: { personId?: string }): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createCustomer) {
       const config = this.getGatewayConfig(gateway);
@@ -207,13 +214,13 @@ export class GatewayService {
     return undefined;
   }
 
-  static async getCustomerCreatedAt(gateway: any, customerId: string): Promise<Date | null> {
+  static async getCustomerCreatedAt(gateway: Gateway, customerId: string): Promise<Date | null> {
     const provider = this.getProviderFromGateway(gateway);
     if (!provider.getCustomerCreatedAt) return null;
     return await provider.getCustomerCreatedAt(this.getGatewayConfig(gateway), customerId);
   }
 
-  static async getCustomerSubscriptions(gateway: any, customerId: string): Promise<any> {
+  static async getCustomerSubscriptions(gateway: Gateway, customerId: string): Promise<GatewaySubscriptionList> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.getCustomerSubscriptions) {
       const config = this.getGatewayConfig(gateway);
@@ -222,7 +229,7 @@ export class GatewayService {
     return [];
   }
 
-  static async getSubscription(gateway: any, subscriptionId: string): Promise<any> {
+  static async getSubscription(gateway: Gateway, subscriptionId: string): Promise<GatewayObject | null> {
     const provider = this.getProviderFromGateway(gateway);
     if (typeof provider.getSubscription === "function") {
       const config = this.getGatewayConfig(gateway);
@@ -231,7 +238,7 @@ export class GatewayService {
     return null;
   }
 
-  static async getCustomerPaymentMethods(gateway: any, customer: any): Promise<any> {
+  static async getCustomerPaymentMethods(gateway: Gateway, customer: Customer | string): Promise<GatewayPaymentMethodList> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.getCustomerPaymentMethods) {
       const config = this.getGatewayConfig(gateway);
@@ -240,7 +247,7 @@ export class GatewayService {
     return [];
   }
 
-  static async listNormalizedPaymentMethods(gateway: any, customer: any, repos: any): Promise<any[]> {
+  static async listNormalizedPaymentMethods(gateway: Gateway, customer: Customer | string, repos: Repos): Promise<NormalizedPaymentMethod[]> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.listNormalizedPaymentMethods) {
       const config = this.getGatewayConfig(gateway);
@@ -249,7 +256,7 @@ export class GatewayService {
     return [];
   }
 
-  static async listNormalizedSubscriptions(gateway: any, customerId: string): Promise<any[]> {
+  static async listNormalizedSubscriptions(gateway: Gateway, customerId: string): Promise<NormalizedSubscription[] | GatewayObject[] | Stripe.Subscription[]> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     if (provider.listNormalizedSubscriptions) {
@@ -260,12 +267,12 @@ export class GatewayService {
     return Array.isArray(raw) ? raw : raw?.data || [];
   }
 
-  static validateAttachToken(gateway: any, id: string): string | null {
+  static validateAttachToken(gateway: Gateway, id: string): string | null {
     const provider = this.getProviderFromGateway(gateway);
     return provider.validateAttachToken ? provider.validateAttachToken(id) : null;
   }
 
-  static async resolveCustomerForAttach(gateway: any, personId: string | undefined, requestCustomerId: string | undefined, repos: any): Promise<string | undefined> {
+  static async resolveCustomerForAttach(gateway: Gateway, personId: string | undefined, requestCustomerId: string | undefined, repos: Repos): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.resolveCustomerForAttach) {
       const config = this.getGatewayConfig(gateway);
@@ -274,16 +281,16 @@ export class GatewayService {
     return requestCustomerId;
   }
 
-  static recreatesMissingCustomers(gateway: any): boolean {
+  static recreatesMissingCustomers(gateway: Gateway): boolean {
     return !!this.getProviderFromGateway(gateway).recreatesMissingCustomers;
   }
 
-  static buildAttachOptions(gateway: any, customerId: string, tokenId: string, body: any): any {
+  static buildAttachOptions(gateway: Gateway, customerId: string, tokenId: string, body: GatewayAttachBody): GatewayAttachOptions {
     const provider = this.getProviderFromGateway(gateway);
     return provider.buildAttachOptions ? provider.buildAttachOptions(customerId, tokenId, body) : { customer: customerId };
   }
 
-  static buildLocalMethodRecord(gateway: any, pm: any, body: any, tokenId: string): { methodType: string; displayName: string; metadata: any } | null {
+  static buildLocalMethodRecord(gateway: Gateway, pm: GatewayObject, body: GatewayAttachBody, tokenId: string): LocalMethodRecord | null {
     const provider = this.getProviderFromGateway(gateway);
     return provider.buildLocalMethodRecord ? provider.buildLocalMethodRecord(pm, body, tokenId) : null;
   }
@@ -297,7 +304,7 @@ export class GatewayService {
     return null;
   }
 
-  static async verifyMethodOwnership(gateway: any, paymentMethodId: string, customerId: string, repos: any): Promise<boolean> {
+  static async verifyMethodOwnership(gateway: Gateway, paymentMethodId: string, customerId: string, repos: Repos): Promise<boolean> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     if (provider.verifyMethodOwnership) {
@@ -309,7 +316,7 @@ export class GatewayService {
     return !!record && String(record.customerId) === String(customerId);
   }
 
-  static async deletePaymentMethod(gateway: any, paymentMethodId: string, customerId: string, repos: any): Promise<void> {
+  static async deletePaymentMethod(gateway: Gateway, paymentMethodId: string, customerId: string, repos: Repos): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     if (provider.deletePaymentMethod) {
@@ -321,7 +328,7 @@ export class GatewayService {
     await repos.gatewayPaymentMethod.deleteByExternalId(gateway.churchId, gateway.id, paymentMethodId);
   }
 
-  static async verifySubscriptionOwnership(gateway: any, subscriptionId: string, personId: string, repos: any): Promise<boolean> {
+  static async verifySubscriptionOwnership(gateway: Gateway, subscriptionId: string, personId: string, repos: Repos): Promise<boolean> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.verifySubscriptionOwnership) {
       const config = this.getGatewayConfig(gateway);
@@ -330,7 +337,7 @@ export class GatewayService {
     return false;
   }
 
-  static mapGatewayError(gateway: any, e: any): { status: number; body: any } | null {
+  static mapGatewayError(gateway: Gateway, e: unknown): GatewayErrorMapping | null {
     try {
       return this.getProviderFromGateway(gateway).mapError?.(e) || null;
     } catch {
@@ -338,25 +345,25 @@ export class GatewayService {
     }
   }
 
-  static supportsReplayEvents(gateway: any): boolean {
+  static supportsReplayEvents(gateway: Gateway): boolean {
     return !!this.getProviderFromGateway(gateway).listReplayEvents;
   }
 
-  static async listReplayEvents(gateway: any, startDate: number, endDate: number): Promise<ReplayEvent[]> {
+  static async listReplayEvents(gateway: Gateway, startDate: number, endDate: number): Promise<ReplayEvent[]> {
     const provider = this.getProviderFromGateway(gateway);
     if (!provider.listReplayEvents) throw new Error(`${gateway.provider} does not support event replay`);
     const config = this.getGatewayConfig(gateway);
     return await provider.listReplayEvents(config, startDate, endDate);
   }
 
-  static async importReplayEvent(gateway: any, churchId: string, event: ReplayEvent, repos: any): Promise<void> {
+  static async importReplayEvent(gateway: Gateway, churchId: string, event: ReplayEvent, repos: Repos): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     if (!provider.importReplayEvent) throw new Error(`${gateway.provider} does not support event replay`);
     const config = this.getGatewayConfig(gateway);
     await provider.importReplayEvent(config, churchId, event, repos);
   }
 
-  static async attachPaymentMethod(gateway: any, paymentMethodId: string, options: any): Promise<any> {
+  static async attachPaymentMethod(gateway: Gateway, paymentMethodId: string, options: GatewayAttachOptions): Promise<GatewayObject> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.attachPaymentMethod) {
       const config = this.getGatewayConfig(gateway);
@@ -365,7 +372,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support payment method attachment`);
   }
 
-  static async detachPaymentMethod(gateway: any, paymentMethodId: string): Promise<any> {
+  static async detachPaymentMethod(gateway: Gateway, paymentMethodId: string): Promise<GatewayObject> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.detachPaymentMethod) {
       const config = this.getGatewayConfig(gateway);
@@ -374,7 +381,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support payment method detachment`);
   }
 
-  static async updateCard(gateway: any, paymentMethodId: string, cardData: any): Promise<any> {
+  static async updateCard(gateway: Gateway, paymentMethodId: string, cardData: Stripe.PaymentMethodUpdateParams): Promise<GatewayObject> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.updateCard) {
       const config = this.getGatewayConfig(gateway);
@@ -383,7 +390,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support card updates`);
   }
 
-  static async createBankAccount(gateway: any, customerId: string, options: any): Promise<any> {
+  static async createBankAccount(gateway: Gateway, customerId: string, options: GatewayBankAccountOptions): Promise<GatewayObject> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createBankAccount) {
       const config = this.getGatewayConfig(gateway);
@@ -392,7 +399,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support bank account creation`);
   }
 
-  static async updateBank(gateway: any, paymentMethodId: string, bankData: any, customerId: string): Promise<any> {
+  static async updateBank(gateway: Gateway, paymentMethodId: string, bankData: Stripe.CustomerUpdateSourceParams, customerId: string): Promise<GatewayObject> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.updateBank) {
       const config = this.getGatewayConfig(gateway);
@@ -401,7 +408,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support bank account updates`);
   }
 
-  static async verifyBank(gateway: any, paymentMethodId: string, amountData: any, customerId: string): Promise<any> {
+  static async verifyBank(gateway: Gateway, paymentMethodId: string, amountData: Stripe.CustomerVerifySourceParams, customerId: string): Promise<GatewayObject> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.verifyBank) {
       const config = this.getGatewayConfig(gateway);
@@ -410,7 +417,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support bank account verification`);
   }
 
-  static async deleteBankAccount(gateway: any, customerId: string, bankAccountId: string): Promise<any> {
+  static async deleteBankAccount(gateway: Gateway, customerId: string, bankAccountId: string): Promise<GatewayObject> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.deleteBankAccount) {
       const config = this.getGatewayConfig(gateway);
@@ -419,11 +426,11 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support bank account deletion`);
   }
 
-  static supportsACHSetupIntent(gateway: any): boolean {
+  static supportsACHSetupIntent(gateway: Gateway): boolean {
     return !!this.getProviderFromGateway(gateway).createACHSetupIntent;
   }
 
-  static async createACHSetupIntent(gateway: any, customerId: string, instantOnly = false): Promise<any> {
+  static async createACHSetupIntent(gateway: Gateway, customerId: string, instantOnly = false): Promise<Stripe.SetupIntent> {
     // Stripe picks us_bank_account (ACH) or acss_debit (Canadian PAD) from config.currency
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createACHSetupIntent) {
@@ -433,7 +440,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support ACH SetupIntent`);
   }
 
-  static async generateClientToken(gateway: any): Promise<string | undefined> {
+  static async generateClientToken(gateway: Gateway): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.generateClientToken) {
       const config = this.getGatewayConfig(gateway);
@@ -442,13 +449,13 @@ export class GatewayService {
     return undefined;
   }
 
-  static async registerPaymentMethodDomain(gateway: any, domainName: string): Promise<{ id: string; created: boolean } | null> {
+  static async registerPaymentMethodDomain(gateway: Gateway, domainName: string): Promise<{ id: string; created: boolean } | null> {
     const provider = this.getProviderFromGateway(gateway);
     if (!provider.registerPaymentMethodDomain) return null;
     return await provider.registerPaymentMethodDomain(this.getGatewayConfig(gateway), domainName);
   }
 
-  static async createOrder(gateway: any, orderData: any): Promise<any> {
+  static async createOrder(gateway: Gateway, orderData: GatewayOrderRequest): Promise<GatewayObject> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createOrder) {
       const config = this.getGatewayConfig(gateway);
@@ -457,7 +464,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support order creation`);
   }
 
-  static async createSubscriptionPlan(gateway: any, planData: any): Promise<string | undefined> {
+  static async createSubscriptionPlan(gateway: Gateway, planData: GatewayPlanRequest): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createSubscriptionPlan) {
       const config = this.getGatewayConfig(gateway);
@@ -466,7 +473,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support subscription plan creation`);
   }
 
-  static async createSubscriptionWithPlan(gateway: any, subscriptionData: any): Promise<any> {
+  static async createSubscriptionWithPlan(gateway: Gateway, subscriptionData: GatewayPaymentRequest): Promise<SubscriptionResult> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createSubscriptionWithPlan) {
       const config = this.getGatewayConfig(gateway);
@@ -601,7 +608,7 @@ export class GatewayService {
   }
 
   /** Validate gateway settings based on provider type. */
-  static validateSettings(gateway: any): any {
+  static validateSettings(gateway: Gateway): BaseGatewaySettings | null {
     if (!gateway.settings) return null;
     return validateGatewaySettings(gateway.provider, gateway.settings);
   }

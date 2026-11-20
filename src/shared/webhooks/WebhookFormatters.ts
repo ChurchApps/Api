@@ -4,11 +4,28 @@ export interface WebhookEnvelope {
   event: string;
   churchId: string;
   occurredAt: string;
-  data: any;
+  data: unknown;
+}
+
+interface PersonNameParts {
+  display?: string;
+  first?: string;
+  last?: string;
+}
+
+// Fields describeEvent reads. "name" is a string for groups and households and an object for people.
+interface WebhookEventData {
+  name?: string | PersonNameParts;
+  personName?: string;
+  groupName?: string;
+  formName?: string;
+  title?: string;
+  amount?: unknown;
+  currency?: string;
 }
 
 export function describeEvent(envelope: WebhookEnvelope): string {
-  const d = envelope.data ?? {};
+  const d = (envelope.data ?? {}) as WebhookEventData;
   switch (envelope.event) {
     case "person.created": return `👤 New person added: ${personName(d)}`;
     case "person.updated": return `👤 Person updated: ${personName(d)}`;
@@ -33,11 +50,12 @@ export function describeEvent(envelope: WebhookEnvelope): string {
   }
 }
 
-function personName(d: any): string {
-  return d?.name?.display || [d?.name?.first, d?.name?.last].filter(Boolean).join(" ") || "(unnamed)";
+function personName(d: WebhookEventData): string {
+  const name = d?.name as PersonNameParts | undefined;
+  return name?.display || [name?.first, name?.last].filter(Boolean).join(" ") || "(unnamed)";
 }
 
-function formatAmount(d: any): string {
+function formatAmount(d: WebhookEventData): string {
   if (typeof d?.amount !== "number") return "(amount unknown)";
   const currency = (d.currency ?? "USD").toUpperCase();
   return currency === "USD" ? `$${d.amount.toFixed(2)}` : `${d.amount.toFixed(2)} ${currency}`;

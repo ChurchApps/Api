@@ -2,6 +2,74 @@ import paypal from "@paypal/checkout-server-sdk";
 import express from "express";
 import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models/index.js";
 import { Environment } from "./Environment.js";
+import type { Repos } from "../../modules/giving/repositories/Repos.js";
+import type { FundAllocation, GatewayObject, GatewayPerson, GatewaySubscriptionUpdate, GatewayWebhookData } from "./gateways/IGatewayProvider.js";
+
+export interface PayPalMoney {
+  currency_code?: string;
+  value?: string;
+}
+
+// A PayPal capture, subscription or webhook resource, plus the fields the charge route merges in before logging.
+export interface PayPalEventData extends GatewayWebhookData {
+  amount?: number | PayPalMoney;
+  currency?: string;
+  purchase_units?: { amount?: PayPalMoney; payments?: { captures?: PayPalEventData[] } }[];
+  payer?: { payer_id?: string };
+  subscriber?: { payer_id?: string };
+  create_time?: string;
+  custom_id?: string;
+  anonymous?: boolean;
+  person?: GatewayPerson;
+  notes?: string;
+  funds?: FundAllocation[];
+}
+
+export interface PayPalWebhookBody {
+  id?: string;
+  event_type?: string;
+  create_time?: string;
+  resource?: PayPalEventData;
+}
+
+export interface PayPalOrder extends GatewayObject {
+  links?: { href?: string; rel?: string; method?: string }[];
+}
+
+export type PayPalSubscription = GatewayObject;
+
+// A vaulted PayPal payment token (v3 vault API).
+export interface PayPalVaultToken extends GatewayObject {
+  customer_id?: string;
+  type?: string;
+  email?: string;
+  card_type?: string;
+  last_4?: string;
+  payment_source?: {
+    card?: { last4?: string; brand?: string };
+    paypal?: { email_address?: string };
+  };
+}
+
+interface PayPalWebhookHook {
+  id: string;
+  url?: string;
+}
+
+interface PayPalSetupTokenBody {
+  payment_source: { paypal: { usage_type: string; experience_context: Record<string, string> } };
+  customer?: { id?: string; email_address?: string; name?: { given_name: string; surname?: string } };
+  external_id?: string;
+}
+
+interface PayPalSubscriptionBody {
+  plan_id?: string;
+  quantity: string;
+  custom_id?: string;
+  start_time?: string;
+  subscriber?: { payer_id: string };
+  payment_source?: { token: { id: string; type: string } };
+}
 
 export class PayPalHelper {
   // Stages are lowercased serverless stage names ("prod"), not "production"
@@ -58,7 +126,7 @@ export class PayPalHelper {
     return result.client_token;
   }
 
-  static async createOrder(clientId: string, clientSecret: string, params: { amount: number; currency?: string; description?: string; customId?: string }): Promise<any> {
+  static async createOrder(clientId: string, clientSecret: string, params: { amount: number; currency?: string; description?: string; customId?: string }): Promise<PayPalOrder> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
     const currency = (params.currency || "USD").toUpperCase();
     const body = {
@@ -71,7 +139,7 @@ export class PayPalHelper {
         }
       ],
       application_context: { shipping_preference: "NO_SHIPPING", user_action: "PAY_NOW" }
-    } as any;
+    };
 
     const response = await fetch(`${PayPalHelper.getBaseUrl()}/v2/checkout/orders`, {
       method: "POST",
@@ -130,11 +198,11 @@ export class PayPalHelper {
     }
 
     const data = await listResponse.json();
-    const hooks = data.webhooks || [];
+    const hooks: PayPalWebhookHook[] = data.webhooks || [];
 
     // Delete webhooks that contain the churchId
     await Promise.all(
-      hooks.map(async (hook: any) => {
+      hooks.map(async (hook) => {
         if (hook.url && hook.url.includes(churchId)) {
           const deleteResponse = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks/${hook.id}`, {
             method: "DELETE",
@@ -152,7 +220,7 @@ export class PayPalHelper {
     );
   }
 
-  static async verifySignature(clientId: string, clientSecret: string, webhookId: string, headers: express.Request["headers"], body: any): Promise<any> {
+  static async verifySignature(clientId: string, clientSecret: string, webhookId: string, headers: express.Request["headers"], body: PayPalWebhookBody): Promise<PayPalWebhookBody> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
 
     const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/verify-webhook-signature`, {
@@ -183,15 +251,15 @@ export class PayPalHelper {
     return body;
   }
 
-  static async captureOrder(clientId: string, clientSecret: string, orderId: string): Promise<any> {
+  static async captureOrder(clientId: string, clientSecret: string, orderId: string): Promise<PayPalEventData> {
     const client = PayPalHelper.getClient(clientId, clientSecret);
     const request = new paypal.orders.OrdersCaptureRequest(orderId);
     request.requestBody({});
     const response = await client.execute(request);
-    return response.result;
+    return response.result as PayPalEventData;
   }
 
-  static async getSubscriptionDetails(clientId: string, clientSecret: string, subscriptionId: string): Promise<any> {
+  static async getSubscriptionDetails(clientId: string, clientSecret: string, subscriptionId: string): Promise<PayPalSubscription> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
     const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
       method: "GET",
@@ -204,7 +272,7 @@ export class PayPalHelper {
     return response.json();
   }
 
-  static async updateSubscription(clientId: string, clientSecret: string, subscriptionData: any): Promise<any> {
+  static async updateSubscription(clientId: string, clientSecret: string, subscriptionData: GatewaySubscriptionUpdate): Promise<PayPalSubscription> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
     const baseUrl = PayPalHelper.getBaseUrl();
 
@@ -275,7 +343,7 @@ export class PayPalHelper {
     return await PayPalHelper.getSubscriptionDetails(clientId, clientSecret, subscriptionData.id);
   }
 
-  static async cancelSubscription(clientId: string, clientSecret: string, subscriptionId: string, reason?: string): Promise<any> {
+  static async cancelSubscription(clientId: string, clientSecret: string, subscriptionId: string, reason?: string): Promise<void> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
     const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
       method: "POST",
@@ -288,7 +356,7 @@ export class PayPalHelper {
     }
   }
 
-  static async logEvent(churchId: string, payPalEvent: any, eventData: any, givingRepos: any) {
+  static async logEvent(churchId: string, payPalEvent: PayPalWebhookBody, eventData: PayPalEventData, givingRepos: Repos) {
     const { id: eventId, event_type: eventType, create_time: createTime } = payPalEvent;
     const status = eventData.status || eventType;
     const message = eventData.status || "";
@@ -306,13 +374,13 @@ export class PayPalHelper {
     return givingRepos.eventLog.save(eventLog);
   }
 
-  static async logDonation(_clientId: string, _clientSecret: string, churchId: string, eventData: any, givingRepos: any) {
+  static async logDonation(_clientId: string, _clientSecret: string, churchId: string, eventData: PayPalEventData, givingRepos: Repos) {
     const amount = typeof eventData.amount === "number" ? eventData.amount : parseFloat(eventData.amount?.value ?? eventData.purchase_units?.[0]?.amount?.value ?? "0");
-    const currency = eventData.amount?.currency_code || eventData.purchase_units?.[0]?.amount?.currency_code || eventData.currency;
+    const currency = (eventData.amount as PayPalMoney)?.currency_code || eventData.purchase_units?.[0]?.amount?.currency_code || eventData.currency;
     const payerId = eventData.payer?.payer_id || eventData.subscriber?.payer_id || "";
     let personId: string | undefined = eventData.anonymous ? undefined : eventData.person?.id || undefined;
     if (!personId && !eventData.anonymous && payerId) {
-      const customerData = (await givingRepos.customer.load(churchId, payerId)) as any;
+      const customerData = await givingRepos.customer.load(churchId, payerId);
       personId = customerData?.personId;
     }
     const batch: DonationBatch = await givingRepos.donationBatch.getOrCreateCurrent(churchId);
@@ -329,7 +397,7 @@ export class PayPalHelper {
       memo: eventData.notes || undefined,
       notes: eventData.custom_id || ""
     };
-    let funds: any[] = Array.isArray(eventData.funds) && eventData.funds.length ? eventData.funds : [];
+    let funds: FundAllocation[] = Array.isArray(eventData.funds) && eventData.funds.length ? eventData.funds : [];
     if (!funds.length && eventData.custom_id) {
       try { funds = JSON.parse(eventData.custom_id); } catch { funds = []; }
     }
@@ -338,8 +406,8 @@ export class PayPalHelper {
       if (general?.id) funds = [{ id: general.id, amount }];
     }
     const fundDonations: FundDonation[] = funds
-      .filter((f: any) => f.fundId || f.id)
-      .map((f: any) => ({ churchId, fundId: f.fundId || f.id, amount: Number(f.amount || 0) }));
+      .filter((f) => f.fundId || f.id)
+      .map((f) => ({ churchId, fundId: f.fundId || f.id, amount: Number(f.amount || 0) }));
     await givingRepos.donation.save(donationData, fundDonations);
     return fundDonations;
   }
@@ -354,7 +422,7 @@ export class PayPalHelper {
 
     const experienceContext = { payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED", return_url: customerData.returnUrl || "https://example.com/return", cancel_url: customerData.cancelUrl || "https://example.com/cancel" };
 
-    const body: any = {
+    const body: PayPalSetupTokenBody = {
       payment_source: {
         paypal: {
           usage_type: "MERCHANT",
@@ -367,7 +435,7 @@ export class PayPalHelper {
       body.customer = { id: customerData.payerId };
       body.external_id = customerData.payerId;
     } else if (customerData.email || customerData.name) {
-      const customerPayload: any = {};
+      const customerPayload: PayPalSetupTokenBody["customer"] = {};
       if (customerData.email) customerPayload.email_address = customerData.email;
       if (customerData.name) {
         const [givenName, ...rest] = customerData.name.split(" ");
@@ -400,7 +468,7 @@ export class PayPalHelper {
     return result.id || result.customer?.id || customerData.payerId || "";
   }
 
-  static async createVaultPaymentMethod(clientId: string, clientSecret: string, paymentData: { customerId: string; token: string }): Promise<any> {
+  static async createVaultPaymentMethod(clientId: string, clientSecret: string, paymentData: { customerId: string; token: string }): Promise<PayPalVaultToken> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
 
     const response = await fetch(`${PayPalHelper.getBaseUrl()}/v3/vault/payment-tokens`, {
@@ -431,7 +499,7 @@ export class PayPalHelper {
     return result;
   }
 
-  static async listVaultPaymentMethods(clientId: string, clientSecret: string, customerId: string): Promise<any[]> {
+  static async listVaultPaymentMethods(clientId: string, clientSecret: string, customerId: string): Promise<PayPalVaultToken[]> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
 
     const response = await fetch(`${PayPalHelper.getBaseUrl()}/v3/vault/payment-tokens?customer_id=${customerId}`, {
@@ -551,15 +619,15 @@ export class PayPalHelper {
   }
 
   static async createSubscriptionWithVault(clientId: string, clientSecret: string, subscriptionData: {
-    planId: string;
+    planId?: string;
     customerId?: string;
     paymentTokenId?: string;
     customId?: string;
     startDate?: string;
-  }): Promise<any> {
+  }): Promise<PayPalSubscription> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
 
-    const body: any = {
+    const body: PayPalSubscriptionBody = {
       plan_id: subscriptionData.planId,
       quantity: "1"
     };

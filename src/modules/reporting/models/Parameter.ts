@@ -4,5 +4,5 @@ export class Parameter {
   public dataType?: string;
   public source?: string;
   public sourceKey?: string;
-  public value?: any;
+  public value?: unknown;
 }

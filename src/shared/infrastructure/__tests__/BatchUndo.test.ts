@@ -8,23 +8,35 @@ jest.mock("@churchapps/apihelper", () => ({
 }));
 
 // In-memory Kysely stand-in operating on a shared table store.
-let store: Record<string, any[]> = {};
-function match(row: any, conds: any[]) {
+type Row = Record<string, unknown>;
+interface Cond { col: string; op: string; val: unknown }
+interface FakeBuilder {
+  selectAll: () => FakeBuilder;
+  select: () => FakeBuilder;
+  set: (o: Row) => FakeBuilder;
+  values: (o: Row) => FakeBuilder;
+  where: (col: string, o: string, val: unknown) => FakeBuilder;
+  execute: () => Promise<Row[]>;
+  executeTakeFirst: () => Promise<Row | undefined>;
+}
+
+let store: Record<string, Row[]> = {};
+function match(row: Row, conds: Cond[]) {
   return conds.every((c) => {
     if (c.op === "=") return row[c.col] === c.val;
-    if (c.op === "in") return c.val.includes(row[c.col]);
+    if (c.op === "in") return (c.val as unknown[]).includes(row[c.col]);
     return true;
   });
 }
 function builder(table: string, op: string) {
-  const conds: any[] = [];
-  let payload: any = null;
-  const b: any = {
+  const conds: Cond[] = [];
+  let payload: Row = null;
+  const b: FakeBuilder = {
     selectAll: () => b,
     select: () => b,
-    set: (o: any) => { payload = o; return b; },
-    values: (o: any) => { payload = o; return b; },
-    where: (col: any, o: any, val: any) => { conds.push({ col, op: o, val }); return b; },
+    set: (o) => { payload = o; return b; },
+    values: (o) => { payload = o; return b; },
+    where: (col, o, val) => { conds.push({ col, op: o, val }); return b; },
     execute: async () => {
       const rows = store[table] || (store[table] = []);
       if (op === "select") return rows.filter((r) => match(r, conds)).map((r) => ({ ...r }));
@@ -49,26 +61,32 @@ const fakeDb = {
 };
 jest.mock("../KyselyPool.js", () => ({ KyselyPool: { getDb: () => fakeDb } }));
 
+import type { AuditLogRepo, GroupMemberHistoryRepo, GroupMemberRepo, Repos as MembershipRepos } from "../../../modules/membership/repositories/index.js";
+import type { AuditLog, GroupMember } from "../../../modules/membership/models/index.js";
 import { BatchUndoHelper } from "../BatchUndoHelper.js";
 
-function auditRow(over: any, i: number) {
+interface ConflictCall { entityId: string; after: Date }
+interface ExtraRepos {
+  groupMemberHistory?: Pick<GroupMemberHistoryRepo, "log">;
+  groupMember?: Pick<GroupMemberRepo, "save">;
+}
+type FakeAuditLogRepo = Pick<AuditLogRepo, "loadForBatch" | "hasLaterModification" | "create">;
+
+function auditRow(over: AuditLog, i: number): AuditLog {
   return { module: "membership", category: over.entityType || "person", created: new Date(2026, 6, 4, 0, 0, i), ...over };
 }
 
-function repos(rows: any[], conflictFor: string[] = [], extra: any = {}) {
-  const conflictCalls: any[] = [];
-  const r: any = {
-    auditLog: {
-      loadForBatch: async () => rows,
-      hasLaterModification: async (_c: string, _m: string, _e: string, entityId: string, after: Date) => {
-        conflictCalls.push({ entityId, after });
-        return conflictFor.includes(entityId);
-      },
-      create: async () => {}
+function repos(rows: AuditLog[], conflictFor: string[] = [], extra: ExtraRepos = {}) {
+  const conflictCalls: ConflictCall[] = [];
+  const auditLog: FakeAuditLogRepo = {
+    loadForBatch: async () => rows,
+    hasLaterModification: async (_c: string, _m: string, _e: string, entityId: string, after: Date) => {
+      conflictCalls.push({ entityId, after });
+      return conflictFor.includes(entityId);
     },
-    ...extra
+    create: async (log: AuditLog) => log
   };
-  r.__conflictCalls = conflictCalls;
+  const r = { auditLog, ...extra, __conflictCalls: conflictCalls } as MembershipRepos & { __conflictCalls: ConflictCall[] };
   return r;
 }
 
@@ -179,11 +197,11 @@ describe("BatchUndoHelper multi-touch entities", () => {
 
 describe("BatchUndoHelper groupMember onUndo hook", () => {
   it("writes groupMemberHistory 'left' when undoing an add", async () => {
-    const history: any[] = [];
+    const history: { g: string; p: string; a: string }[] = [];
     const r = repos(
       [auditRow({ entityType: "groupMember", action: "groupMember_saved", entityId: "per1", details: JSON.stringify({ op: "create", before: null, after: { groupId: "grp1" } }) }, 1)],
       [],
-      { groupMemberHistory: { log: async (_c: string, g: string, p: string, a: string) => history.push({ g, p, a }) }, groupMember: { save: async () => ({}) } }
+      { groupMemberHistory: { log: async (_c: string, g: string, p: string, a: string) => { history.push({ g, p, a }); } }, groupMember: { save: async () => ({}) } }
     );
     const result = await BatchUndoHelper.undo(r, "ch1", { id: "b1" }, "u1");
     expect(result.restored).toBe(1);
@@ -191,12 +209,12 @@ describe("BatchUndoHelper groupMember onUndo hook", () => {
   });
 
   it("re-adds the member + writes 'joined' when undoing a remove", async () => {
-    const history: any[] = [];
-    const saved: any[] = [];
+    const history: { g: string; p: string; a: string }[] = [];
+    const saved: GroupMember[] = [];
     const r = repos(
       [auditRow({ entityType: "groupMember", action: "groupMember_deleted", entityId: "per1", details: JSON.stringify({ op: "delete", before: null, after: { groupId: "grp1" } }) }, 1)],
       [],
-      { groupMemberHistory: { log: async (_c: string, g: string, p: string, a: string) => history.push({ g, p, a }) }, groupMember: { save: async (m: any) => { saved.push(m); return m; } } }
+      { groupMemberHistory: { log: async (_c: string, g: string, p: string, a: string) => { history.push({ g, p, a }); } }, groupMember: { save: async (m: GroupMember) => { saved.push(m); return m; } } }
     );
     const result = await BatchUndoHelper.undo(r, "ch1", { id: "b1" }, "u1");
     expect(result.restored).toBe(1);

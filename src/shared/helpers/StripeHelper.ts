@@ -1,6 +1,20 @@
 import Stripe from "stripe";
-import express from "express";
-import { Donation, DonationBatch, EventLog, FundDonation, PaymentDetails } from "../../modules/giving/models/index.js";
+import { Customer, Donation, DonationBatch, EventLog, FundDonation, PaymentDetails } from "../../modules/giving/models/index.js";
+import type { Repos } from "../../modules/giving/repositories/Repos.js";
+import type { FundAllocation, GatewaySubscriptionUpdate, StripeCustomerPaymentMethods, StripeEventObject } from "./gateways/IGatewayProvider.js";
+
+export interface StripeSubscriptionInput {
+  payment_method_id?: string;
+  amount: number;
+  currency?: string;
+  customer: string;
+  type?: string;
+  billing_cycle_anchor?: number;
+  proration_behavior?: string;
+  interval?: Stripe.SubscriptionCreateParams.Item.PriceData.Recurring;
+  metadata?: Stripe.MetadataParam;
+  productId?: string;
+}
 
 // Stripe takes and reports these in whole units, not cents
 const STRIPE_ZERO_DECIMAL_CURRENCIES = new Set([
@@ -22,14 +36,14 @@ export class StripeHelper {
     if (payment?.source) return await stripe.charges.create(payment);
   };
 
-  static createSubscription = async (secretKey: string, donationData: any) => {
+  static createSubscription = async (secretKey: string, donationData: StripeSubscriptionInput) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
     const { customer, metadata, productId, interval, amount, payment_method_id, type, billing_cycle_anchor, currency } = donationData;
 
     const currencyLower = (currency || "usd").toLowerCase();
     const unitAmount = STRIPE_ZERO_DECIMAL_CURRENCIES.has(currencyLower) ? Math.round(amount * 1) : Math.trunc(Math.round(amount * 100));
 
-    const subscriptionData: any = {
+    const subscriptionData: Stripe.SubscriptionCreateParams = {
       customer,
       metadata,
       items: [
@@ -52,10 +66,10 @@ export class StripeHelper {
     return await stripe.subscriptions.create(subscriptionData);
   };
 
-  static updateSubscription = async (secretKey: string, sub: any) => {
+  static updateSubscription = async (secretKey: string, sub: GatewaySubscriptionUpdate) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
     // Use default_payment_method for all payment types (default_source is deprecated)
-    const paymentMethod: any = { default_payment_method: sub.default_payment_method || null };
+    const paymentMethod: Stripe.SubscriptionUpdateParams = { default_payment_method: sub.default_payment_method || null };
 
     // Preserve currency from existing subscription (price or plan)
     const existingPrice = sub.items?.data?.[0]?.price;
@@ -121,7 +135,7 @@ export class StripeHelper {
     return customer.id;
   };
 
-  static async addCard(secretKey: string, customerId: string, paymentMethod: any) {
+  static async addCard(secretKey: string, customerId: string, paymentMethod: string | Stripe.CustomerCreateSourceParams) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     // If paymentMethod is a string (token/payment method ID), attach it
     if (typeof paymentMethod === "string") {
@@ -133,7 +147,7 @@ export class StripeHelper {
 
   static async createSetupIntent(secretKey: string, customerId?: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    const params: any = {
+    const params: Stripe.SetupIntentCreateParams = {
       usage: "on_session",
       automatic_payment_methods: { enabled: true }
     };
@@ -184,7 +198,7 @@ export class StripeHelper {
     return await stripe.paymentIntents.retrieve(paymentIntentId);
   }
 
-  static async createPaymentMethod(secretKey: string, paymentMethodData: any) {
+  static async createPaymentMethod(secretKey: string, paymentMethodData: Stripe.PaymentMethodCreateParams) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.paymentMethods.create(paymentMethodData);
   }
@@ -202,32 +216,32 @@ export class StripeHelper {
     return await stripe.setupIntents.confirm(setupIntentId, { payment_method: paymentMethodId });
   }
 
-  static async updateCard(secretKey: string, paymentMethodId: string, card: any) {
+  static async updateCard(secretKey: string, paymentMethodId: string, card: Stripe.PaymentMethodUpdateParams) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.paymentMethods.update(paymentMethodId, card);
   }
 
-  static async attachPaymentMethod(secretKey: string, paymentMethodId: string, customer: any) {
+  static async attachPaymentMethod(secretKey: string, paymentMethodId: string, customer: Stripe.PaymentMethodAttachParams) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.paymentMethods.attach(paymentMethodId, customer);
   }
 
-  static async createBankAccount(secretKey: string, customerId: string, source: any) {
+  static async createBankAccount(secretKey: string, customerId: string, source: Stripe.CustomerCreateSourceParams) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.customers.createSource(customerId, source);
   }
 
-  static async updateBank(secretKey: string, paymentMethodId: string, bankData: any, customerId: string) {
+  static async updateBank(secretKey: string, paymentMethodId: string, bankData: Stripe.CustomerUpdateSourceParams, customerId: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.customers.updateSource(customerId, paymentMethodId, bankData);
   }
 
-  static async verifyBank(secretKey: string, paymentMethodId: string, amountData: any, customerId: string) {
+  static async verifyBank(secretKey: string, paymentMethodId: string, amountData: Stripe.CustomerVerifySourceParams, customerId: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.customers.verifySource(customerId, paymentMethodId, amountData);
   }
 
-  static async getCustomerPaymentMethods(secretKey: string, customer: any) {
+  static async getCustomerPaymentMethods(secretKey: string, customer: Customer): Promise<StripeCustomerPaymentMethods[]> {
     const stripe = StripeHelper.getStripeObj(secretKey);
     // Get modern PaymentMethods (cards and us_bank_account)
     const cards = await stripe.paymentMethods.list({ customer: customer.id, type: "card" });
@@ -295,13 +309,13 @@ export class StripeHelper {
     }
   }
 
-  static async verifySignature(secretKey: string, request: express.Request, sig: string, endpointSecret: string) {
+  static async verifySignature(secretKey: string, request: { body: string | Buffer }, sig: string, endpointSecret: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
   }
 
-  static async getPaymentDetails(secretKey: string, eventData: any) {
-    let payment_method_details = eventData.payment_method_details;
+  static async getPaymentDetails(secretKey: string, eventData: StripeEventObject) {
+    let payment_method_details: Stripe.Charge.PaymentMethodDetails | null | undefined = eventData.payment_method_details;
 
     // Handle PaymentIntent events (payment_intent.succeeded)
     if (!payment_method_details && eventData.latest_charge) {
@@ -312,15 +326,15 @@ export class StripeHelper {
       payment_method_details = charge.payment_method_details;
     }
 
-    const methodTypes: any = { ach_debit: "ACH Debit", us_bank_account: "ACH Debit", acss_debit: "PAD", card: "Card" };
+    const methodTypes: Record<string, string> = { ach_debit: "ACH Debit", us_bank_account: "ACH Debit", acss_debit: "PAD", card: "Card" };
     const paymentType = payment_method_details?.type || "card";
-    const details = payment_method_details?.[paymentType];
+    const details = payment_method_details?.[paymentType as keyof Stripe.Charge.PaymentMethodDetails] as { last4?: string | null } | undefined;
     return { method: methodTypes[paymentType] || "Card", methodDetails: details?.last4 || "" };
   }
 
   // Note: These methods use dependency injection with repository parameters
 
-  static async logEvent(churchId: string, stripeEvent: any, eventData: any, givingRepos: any) {
+  static async logEvent(churchId: string, stripeEvent: { id?: string; type?: string }, eventData: StripeEventObject, givingRepos: Repos) {
     const { billing_reason, status, failure_message, outcome, created, customer } = eventData;
     let message = billing_reason + " " + status;
     if (!billing_reason) {
@@ -341,7 +355,7 @@ export class StripeHelper {
     return givingRepos.eventLog.save(eventLog);
   }
 
-  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any, status: "pending" | "complete" | "failed" = "complete") {
+  static async logDonation(secretKey: string, churchId: string, eventData: StripeEventObject, givingRepos: Repos, status: "pending" | "complete" | "failed" = "complete") {
     // Handle both Charge events (amount) and PaymentIntent events (amount)
     // PaymentIntent amounts are in cents, same as Charge events
     // amount_due is the failed-invoice case; amount_paid is 0 there.
@@ -351,7 +365,7 @@ export class StripeHelper {
     const divisor = STRIPE_ZERO_DECIMAL_CURRENCIES.has(currencyLower) ? 1 : 100;
     const amount = rawAmount / divisor;
 
-    const customerData = (await givingRepos.customer.load(churchId, eventData.customer)) as any;
+    const customerData = await givingRepos.customer.load(churchId, eventData.customer);
     const personId = customerData?.personId;
     const { method, methodDetails } = await this.getPaymentDetails(secretKey, eventData);
     const batch: DonationBatch = await givingRepos.donationBatch.getOrCreateCurrent(churchId);
@@ -377,7 +391,7 @@ export class StripeHelper {
 
     // Get funds from metadata, subscription, or fallback to general fund
     // PaymentIntent metadata is in eventData.metadata, same as Charge
-    let funds: FundDonation[] = [];
+    let funds: FundAllocation[] = [];
     if (eventData.metadata?.funds) {
       funds = JSON.parse(eventData.metadata.funds);
     } else if (eventData.subscription && givingRepos.subscriptionFunds) {
@@ -390,7 +404,7 @@ export class StripeHelper {
       funds = [{ id: generalFund.id, amount }];
     }
 
-    const fundDonations: FundDonation[] = funds.map((fund: any) => {
+    const fundDonations: FundDonation[] = funds.map((fund) => {
       const fundId = (fund?.subscriptionId && fund.subscriptionId !== "") ? fund.fundId : fund.id;
       return { churchId, amount: fund.amount, fundId: fundId };
     });
@@ -398,7 +412,7 @@ export class StripeHelper {
     return fundDonations;
   }
 
-  static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", givingRepos: any) {
+  static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", givingRepos: Repos) {
     await givingRepos.donation.updateStatus(churchId, transactionId, status);
   }
 

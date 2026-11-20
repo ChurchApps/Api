@@ -37,7 +37,7 @@ const startServer = async () => {
         const { SocketHelper } = await import("./modules/messaging/helpers/SocketHelper.js");
         SocketHelper.shutdown();
       } catch (error) {
-        console.warn("Failed to shutdown WebSocket server:", (error as any)?.message || error);
+        console.warn("Failed to shutdown WebSocket server:", (error as Error | undefined)?.message || error);
       }
 
       // Stop accepting new requests, let in-flight ones finish, then close database connections

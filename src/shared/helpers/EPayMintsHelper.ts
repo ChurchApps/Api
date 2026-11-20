@@ -1,4 +1,46 @@
 import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models/index.js";
+import type { Repos } from "../../modules/giving/repositories/Repos.js";
+import type { FundAllocation, GatewayObject, GatewayWebhookData } from "./gateways/IGatewayProvider.js";
+
+// ePayMints API response (payment, refund, transaction status, settlement or customer).
+export interface EPayMintsResult extends GatewayObject {
+  customer_id?: string;
+  amount?: number;
+  currency?: string;
+  transaction_id?: string;
+  terminal_id?: string;
+  settlement_date?: string;
+  transactions?: unknown[];
+  total_amount?: number;
+}
+
+export interface EPayMintsEventData extends GatewayWebhookData {
+  amount?: number | string;
+  customer_id?: string;
+  transaction_id?: string;
+  timestamp?: string | number;
+  description?: string;
+  message?: string;
+  metadata?: { funds?: string };
+}
+
+export interface EPayMintsWebhookBody {
+  id?: string;
+  type?: string;
+  event_type?: string;
+  terminal_id?: string;
+  transaction_id?: string;
+  timestamp?: string | number;
+  data?: EPayMintsEventData;
+}
+
+interface EPayMintsPaymentBody {
+  amount: number;
+  currency: string;
+  customer_id?: string;
+  description: string;
+  payment_method?: { type: "card"; card: Record<string, string> } | { type: "ach"; ach: Record<string, string> };
+}
 
 export class EPayMintsHelper {
   private static getBaseUrl(environment: string): string {
@@ -12,8 +54,8 @@ export class EPayMintsHelper {
     url: string,
     method: string,
     headers: Record<string, string>,
-    body?: any
-  ): Promise<any> {
+    body?: unknown
+  ): Promise<EPayMintsResult> {
     try {
       const response = await fetch(url, {
         method,
@@ -85,12 +127,12 @@ export class EPayMintsHelper {
       };
       description?: string;
     }
-  ): Promise<any> {
+  ): Promise<EPayMintsResult> {
     try {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
       const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": paymentData.terminalId };
 
-      const requestBody: any = {
+      const requestBody: EPayMintsPaymentBody = {
         amount: Math.round(paymentData.amount * 100),
         currency: paymentData.currency || "USD",
         customer_id: paymentData.customerId,
@@ -137,7 +179,7 @@ export class EPayMintsHelper {
       customerId?: string;
       description?: string;
     }
-  ): Promise<any> {
+  ): Promise<EPayMintsResult> {
     return EPayMintsHelper.createPayment(apiKey, environment, {
       amount: achData.amount,
       terminalId: achData.terminalId,
@@ -157,7 +199,7 @@ export class EPayMintsHelper {
     environment: string,
     terminalId: string,
     transactionId: string
-  ): Promise<any> {
+  ): Promise<EPayMintsResult> {
     try {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
       const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": terminalId };
@@ -189,7 +231,7 @@ export class EPayMintsHelper {
       amount?: number; // Full refund if not specified
       reason?: string;
     }
-  ): Promise<any> {
+  ): Promise<EPayMintsResult> {
     try {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
       const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": refundData.terminalId };
@@ -222,7 +264,7 @@ export class EPayMintsHelper {
     environment: string,
     terminalId: string,
     date?: string
-  ): Promise<any> {
+  ): Promise<EPayMintsResult> {
     try {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
       const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": terminalId };
@@ -277,10 +319,10 @@ export class EPayMintsHelper {
 
   static async logEvent(
     churchId: string,
-    ePayMintsEvent: any,
-    eventData: any,
-    givingRepos: any
-  ): Promise<any> {
+    ePayMintsEvent: EPayMintsWebhookBody,
+    eventData: EPayMintsEventData,
+    givingRepos: Repos
+  ) {
     const eventLog: EventLog = {
       id: `${ePayMintsEvent.terminal_id}_${ePayMintsEvent.transaction_id}`,
       churchId,
@@ -291,17 +333,18 @@ export class EPayMintsHelper {
       message: eventData.message || "",
       created: new Date(ePayMintsEvent.timestamp || Date.now())
     };
-    return givingRepos.eventLog.create(eventLog);
+    // create() is private on EventLogRepo; this path has always called it directly.
+    return givingRepos.eventLog["create"](eventLog);
   }
 
   static async logDonation(
     _apiKey: string,
     _environment: string,
     churchId: string,
-    eventData: any,
-    givingRepos: any
-  ): Promise<any> {
-    const amount = parseFloat(eventData.amount || "0") / 100; // ePayMints uses cents
+    eventData: EPayMintsEventData,
+    givingRepos: Repos
+  ): Promise<FundDonation[]> {
+    const amount = parseFloat(String(eventData.amount || "0")) / 100; // ePayMints uses cents
     const customerId = eventData.customer_id || "";
     const customerData = customerId ? await givingRepos.customer.load(churchId, customerId) : null;
     const personId = customerData?.personId;
@@ -323,7 +366,7 @@ export class EPayMintsHelper {
     try {
       const fundData = eventData.metadata?.funds ? JSON.parse(eventData.metadata.funds) : [];
       if (Array.isArray(fundData)) {
-        fundData.forEach((f: any) => {
+        fundData.forEach((f: FundAllocation) => {
           funds.push({ churchId, fundId: f.id, amount: f.amount });
         });
       }

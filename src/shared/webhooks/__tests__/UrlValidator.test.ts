@@ -1,5 +1,5 @@
-import { UrlValidator } from "../UrlValidator";
-import { SafeHttp } from "../SafeHttp";
+import { UrlValidator } from "../UrlValidator.js";
+import { SafeHttp } from "../SafeHttp.js";
 
 describe("UrlValidator.isPrivateIp", () => {
   it.each([
@@ -36,9 +36,9 @@ describe("UrlValidator.isPrivateIp", () => {
 
 describe("SafeHttp", () => {
   it("connect-time lookup rejects hosts that resolve to a private address", async () => {
-    const err = await new Promise<any>((resolve) => SafeHttp.guardedLookup("localhost", { all: true }, (e: any) => resolve(e)));
+    const err = await new Promise<Error | null>((resolve) => SafeHttp.guardedLookup("localhost", { all: true }, (e) => resolve(e)));
     expect(err?.message).toMatch(/private address/);
-    const err2 = await new Promise<any>((resolve) => SafeHttp.guardedLookup("localhost", {}, (e: any) => resolve(e)));
+    const err2 = await new Promise<Error | null>((resolve) => SafeHttp.guardedLookup("localhost", {}, (e) => resolve(e)));
     expect(err2?.message).toMatch(/private address/);
   });
 

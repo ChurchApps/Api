@@ -3,7 +3,7 @@ declare module "@paypal/checkout-server-sdk" {
     namespace core {
       class PayPalHttpClient {
         constructor(environment: LiveEnvironment | SandboxEnvironment);
-        execute(request: unknown): Promise<any>;
+        execute(request: unknown): Promise<{ statusCode: number; headers: Record<string, string>; result: unknown }>;
       }
       class LiveEnvironment {
         constructor(clientId: string, clientSecret: string);
