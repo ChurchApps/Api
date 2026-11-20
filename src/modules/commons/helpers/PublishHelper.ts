@@ -244,7 +244,24 @@ export class PublishHelper {
       const s = await repos.song.loadById(asset.id || "");
       // licenseVersion carried, or submit stamps a default over the song's own (a writer grant's "permissions")
       if (s?.licenseVersion) payload.licenseVersion = s.licenseVersion;
-      if (s) payload.detail = { writer: s.writer, year: s.year, songKey: s.songKey, bpm: s.bpm, timeSignature: s.timeSignature, scripture: s.scripture, scriptureText: s.scriptureText, chordPro: s.chordPro, videoUrl: s.videoUrl, parentSongId: s.parentSongId, relationLabel: s.relationLabel, proAnswer: s.proAnswer, ccli: s.ccli, certified: true };
+      if (s) {
+        payload.detail = {
+          writer: s.writer,
+          year: s.year,
+          songKey: s.songKey,
+          bpm: s.bpm,
+          timeSignature: s.timeSignature,
+          scripture: s.scripture,
+          scriptureText: s.scriptureText,
+          chordPro: s.chordPro,
+          videoUrl: s.videoUrl,
+          parentSongId: s.parentSongId,
+          relationLabel: s.relationLabel,
+          proAnswer: s.proAnswer,
+          ccli: s.ccli,
+          certified: true
+        };
+      }
     }
     return payload;
   }
