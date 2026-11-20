@@ -4,6 +4,9 @@ jest.mock("../WorkflowHelper.js", () => ({ WorkflowHelper: {} }));
 jest.mock("../ConjunctionHelper.js", () => ({ ConjunctionHelper: {} }));
 
 import { ExecutionHelper } from "../ExecutionHelper.js";
+import type { Repos } from "../../repositories/Repos.js";
+import type { TaskRepo } from "../../repositories/TaskRepo.js";
+import type { Task, WorkflowTrigger } from "../../models/index.js";
 
 // Issue #1370: "Add again after their card is closed" lets a person get a new card once
 // their old one on the board is closed, but never two open cards at the same time.
@@ -11,14 +14,16 @@ describe("ExecutionHelper.existingCardForSubject", () => {
   const openCard = { id: "t-open", status: "Open" };
   const closedCard = { id: "t-closed", status: "Closed" };
 
-  const reposWith = (anyCard: any, openOnlyCard: any) => ({
-    task: {
+  const reposWith = (anyCard: Task | null, openOnlyCard: Task | null) => {
+    const task: Partial<TaskRepo> = {
       loadBySubjectInWorkflow: jest.fn().mockResolvedValue(anyCard),
       loadOpenBySubjectInWorkflow: jest.fn().mockResolvedValue(openOnlyCard)
-    }
-  }) as any;
+    };
+    return { task } as Repos;
+  };
 
-  const trigger = (extra: any) => ({ churchId: "c1", workflowId: "w1", oncePerSubject: true, ...extra });
+  // allowRepeatAfterClose may arrive as a raw MySQL bit(1) Buffer.
+  const trigger = (extra: { allowRepeatAfterClose?: boolean | Buffer | null }) => ({ churchId: "c1", workflowId: "w1", oncePerSubject: true, ...extra }) as WorkflowTrigger;
 
   it("an open card still blocks a new one when repeat after close is on", async () => {
     const repos = reposWith(openCard, openCard);

@@ -27,6 +27,6 @@ export class AuthorRepo {
 
   /** bio and links are cleared by writing null, so the update shape is nullable where Author is optional. */
   public async update(id: string, values: { bio?: string | null; links?: string | null; userId?: string | null }): Promise<void> {
-    await getDb().updateTable("authors").set(values as any).where("id", "=", id).execute();
+    await getDb().updateTable("authors").set(values).where("id", "=", id).execute();
   }
 }

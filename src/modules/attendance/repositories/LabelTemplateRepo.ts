@@ -3,6 +3,9 @@ import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { getDb } from "../db/index.js";
 import { LabelTemplate } from "../models/index.js";
 
+// isDefault can come back from MySQL as 0/1 rather than a boolean.
+export type LabelTemplateRow = Omit<LabelTemplate, "isDefault"> & { isDefault?: boolean | number };
+
 export class LabelTemplateRepo {
   public async save(model: LabelTemplate) {
     return model.id ? this.update(model) : this.create(model);
@@ -20,8 +23,8 @@ export class LabelTemplateRepo {
       height: model.height,
       isDefault: model.isDefault,
       content: model.content,
-      createdDate: now as any,
-      modifiedDate: now as any
+      createdDate: now,
+      modifiedDate: now
     }).execute();
     return model;
   }
@@ -34,7 +37,7 @@ export class LabelTemplateRepo {
       height: model.height,
       isDefault: model.isDefault,
       content: model.content,
-      modifiedDate: DateHelper.toMysqlDate(new Date()) as any
+      modifiedDate: DateHelper.toMysqlDate(new Date())
     }).where("id", "=", model.id)
       .where("churchId", "=", model.churchId)
       .execute();
@@ -57,15 +60,15 @@ export class LabelTemplateRepo {
     return getDb().selectFrom("labelTemplates").selectAll().where("churchId", "=", churchId).orderBy("name").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: LabelTemplateRow) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): LabelTemplate[] {
+  public convertAllToModel(_churchId: string, data: LabelTemplateRow[]): LabelTemplate[] {
     return data.map((row) => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): LabelTemplate {
+  protected rowToModel(row: LabelTemplateRow): LabelTemplate {
     return {
       id: row.id,
       churchId: row.churchId,

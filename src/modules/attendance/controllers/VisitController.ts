@@ -5,8 +5,16 @@ import { Visit, VisitSession, Session } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { SecurityCodeHelper, CheckinGateHelper, CheckinTimeZoneHelper } from "../helpers/index.js";
-import type { GateGroup, GateCount, GateIncoming, GateServiceTime } from "../helpers/CheckinGateHelper.js";
+import type { GateGroup, GateCount, GateIncoming, GateResult, GateServiceTime } from "../helpers/CheckinGateHelper.js";
+import type { VisitRow } from "../repositories/VisitRepo.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+
+// 409 body returned when check-in gates reject a batch.
+interface GateRejection {
+  error: string;
+  warning?: boolean;
+  groups: GateResult["hard"];
+}
 
 @controller("/attendance/visits")
 export class VisitController extends AttendanceBaseController {
@@ -40,16 +48,16 @@ export class VisitController extends AttendanceBaseController {
         const lastDate = await this.repos.visit.loadLastLoggedDate(au.churchId, serviceId, peopleIds);
 
         const visits: Visit[] =
-          peopleIds.length === 0 ? [] : this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, lastDate, peopleIds)) as any);
+          peopleIds.length === 0 ? [] : this.repos.visit.convertAllToModel(au.churchId, await this.repos.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, lastDate, peopleIds));
 
         const visitIds: string[] = [];
         if (visits.length > 0) {
           visits?.forEach((v) => visitIds.push(v.id));
-          const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(au.churchId, (await this.repos.visitSession.loadByVisitIds(au.churchId, visitIds)) as any);
+          const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(au.churchId, await this.repos.visitSession.loadByVisitIds(au.churchId, visitIds));
           if (visitSessions.length > 0) {
             const sessionIds: string[] = [];
             visitSessions.forEach((vs) => sessionIds.push(vs.sessionId));
-            const sessions: Session[] = this.repos.session.convertAllToModel(au.churchId, (await this.repos.session.loadByIds(au.churchId, sessionIds)) as any);
+            const sessions: Session[] = this.repos.session.convertAllToModel(au.churchId, await this.repos.session.loadByIds(au.churchId, sessionIds));
             visits?.forEach((v) => {
               v.visitSessions = [];
               visitSessions?.forEach((vs) => {
@@ -105,7 +113,7 @@ export class VisitController extends AttendanceBaseController {
         const checkDuplicates = req.query.checkDuplicates === "true";
 
         const existingVisits: Visit[] =
-          peopleIds.length === 0 ? [] : this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any);
+          peopleIds.length === 0 ? [] : this.repos.visit.convertAllToModel(au.churchId, await this.repos.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds));
 
         if (checkDuplicates && existingVisits.length > 0) {
           return { duplicates: existingVisits.map(v => v.personId) };
@@ -147,7 +155,7 @@ export class VisitController extends AttendanceBaseController {
         const existingVisitIds: string[] = [];
         if (existingVisits.length > 0) {
           existingVisits.forEach((v) => existingVisitIds.push(v.id));
-          const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(au.churchId, (await this.repos.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any);
+          const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(au.churchId, await this.repos.visitSession.loadByVisitIds(au.churchId, existingVisitIds));
           this.populateDeleteIds(existingVisits, submittedVisits, visitSessions, deleteVisitIds, deleteVisitSessionIds);
         }
 
@@ -157,7 +165,7 @@ export class VisitController extends AttendanceBaseController {
         const gateResponse = await this.evaluateGates(au.churchId, submittedVisits, peopleIds, req.query.acknowledgeWarnings === "true", heldSessions);
         if (gateResponse) return this.json(gateResponse.body, gateResponse.status);
 
-        const promises: Promise<any>[] = [];
+        const promises: Promise<unknown>[] = [];
         await this.getSavePromises(submittedVisits, promises);
         deleteVisitIds.forEach((visitId) => {
           promises.push(this.repos.visit.delete(au.churchId, visitId));
@@ -181,7 +189,7 @@ export class VisitController extends AttendanceBaseController {
       else {
         const peopleIds = (req.query.peopleIds?.toString() || "").split(",").map((id) => id.trim()).filter(Boolean);
         if (peopleIds.length === 0) return this.json({ error: "peopleIds is required" }, 400);
-        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadActiveTodayByPeople(au.churchId, peopleIds)) as any);
+        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, await this.repos.visit.loadActiveTodayByPeople(au.churchId, peopleIds));
         await this.populateSessions(au.churchId, visits);
         return visits;
       }
@@ -193,7 +201,7 @@ export class VisitController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
       else {
-        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadByCodeToday(au.churchId, code)) as any);
+        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, await this.repos.visit.loadByCodeToday(au.churchId, code));
         await this.populateSessions(au.churchId, visits);
         return visits;
       }
@@ -208,7 +216,7 @@ export class VisitController extends AttendanceBaseController {
         const { visitIds, checkedOutBy, checkedOutById } = req.body;
         if (!visitIds || visitIds.length === 0) return [];
         await this.repos.visit.checkout(au.churchId, visitIds, checkedOutBy, checkedOutById);
-        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadByIds(au.churchId, visitIds)) as any);
+        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, await this.repos.visit.loadByIds(au.churchId, visitIds));
         for (const visit of visits) await WebhookDispatcher.emit(au.churchId, "attendance.checkout", visit);
         return visits;
       }
@@ -241,10 +249,10 @@ export class VisitController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
-        let result = null;
+        let result: VisitRow[] = null;
         if (req.query.personId !== undefined) result = await this.repos.visit.loadForPerson(au.churchId, req.query.personId.toString());
         else result = await this.repos.visit.loadAll(au.churchId);
-        return this.repos.visit.convertAllToModel(au.churchId, result as any);
+        return this.repos.visit.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -293,9 +301,9 @@ export class VisitController extends AttendanceBaseController {
   private async populateSessions(churchId: string, visits: Visit[]) {
     if (visits.length === 0) return;
     const visitIds = visits.map((v) => v.id);
-    const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(churchId, (await this.repos.visitSession.loadByVisitIds(churchId, visitIds)) as any);
+    const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(churchId, await this.repos.visitSession.loadByVisitIds(churchId, visitIds));
     const sessionIds = visitSessions.map((vs) => vs.sessionId);
-    const sessions: Session[] = sessionIds.length === 0 ? [] : this.repos.session.convertAllToModel(churchId, (await this.repos.session.loadByIds(churchId, sessionIds)) as any);
+    const sessions: Session[] = sessionIds.length === 0 ? [] : this.repos.session.convertAllToModel(churchId, await this.repos.session.loadByIds(churchId, sessionIds));
     visits.forEach((v) => {
       v.visitSessions = visitSessions.filter((vs) => vs.visitId === v.id);
       v.visitSessions.forEach((vs) => (vs.session = sessions.find((s) => s.id === vs.sessionId)));
@@ -303,7 +311,7 @@ export class VisitController extends AttendanceBaseController {
   }
 
   // Returns a {body,status} 409 payload when the batch must be rejected, else null.
-  private async evaluateGates(churchId: string, submittedVisits: Visit[], batchPersonIds: string[], acknowledgeWarnings: boolean, heldSessions: Set<string>): Promise<{ body: any; status: number } | null> {
+  private async evaluateGates(churchId: string, submittedVisits: Visit[], batchPersonIds: string[], acknowledgeWarnings: boolean, heldSessions: Set<string>): Promise<{ body: GateRejection; status: number } | null> {
     const incoming: Record<string, GateIncoming> = {};
     const targetGroupIds = new Set<string>();
     const serviceTimeGroups: Record<string, Set<string>> = {};
@@ -400,7 +408,7 @@ export class VisitController extends AttendanceBaseController {
     });
   }
 
-  private async getSavePromises(submittedVisits: Visit[], promises: Promise<any>[]) {
+  private async getSavePromises(submittedVisits: Visit[], promises: Promise<unknown>[]) {
     submittedVisits.forEach((submittedVisit) => {
       promises.push(
         this.repos.visit.save(submittedVisit).then(async (sv) => {

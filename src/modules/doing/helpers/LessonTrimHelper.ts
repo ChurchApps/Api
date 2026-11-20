@@ -2,6 +2,7 @@ import { getProvider, ContentProviderAuthData, Instructions, InstructionItem } f
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Plan, PlanItem } from "../models/index.js";
+import { Repos } from "../repositories/index.js";
 import { ProviderAuthHelper } from "./ProviderAuthHelper.js";
 import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 
@@ -244,7 +245,7 @@ export class LessonTrimHelper {
     return { rows, notes, misses };
   }
 
-  public static async loadInstructions(repos: any, churchId: string, plan: Plan): Promise<Instructions | null> {
+  public static async loadInstructions(repos: Repos, churchId: string, plan: Plan): Promise<Instructions | null> {
     if (!plan.providerId || !plan.providerPlanId) return null;
     const provider = getProvider(plan.providerId) as unknown as ProviderLike | null;
     if (!provider?.getInstructions || provider.authTypes?.includes("network_discovery")) return null;
@@ -256,7 +257,7 @@ export class LessonTrimHelper {
 
   // Trims a lesson-linked plan to its plan type's saved trim. Skips plans that already have an order of service unless forced.
   // Never throws: a provider failure becomes the plan's warning, and the lesson plays whole.
-  public static async apply(repos: any, churchId: string, plan: Plan, opts: { force?: boolean } = {}): Promise<LessonTrimResult | null> {
+  public static async apply(repos: Repos, churchId: string, plan: Plan, opts: { force?: boolean } = {}): Promise<LessonTrimResult | null> {
     if (!plan?.id || !plan.planTypeId || !plan.providerId || !plan.providerPlanId) return null;
     const planType = await repos.planType.load(churchId, plan.planTypeId);
     const trim = this.parse(planType?.lessonTrim);
@@ -288,7 +289,7 @@ export class LessonTrimHelper {
     return { planId: plan.id, name: plan.name, serviceDate: plan.serviceDate, warning: stored };
   }
 
-  private static async saveTree(repos: any, churchId: string, planId: string, rows: PlanItem[], parentId?: string): Promise<void> {
+  private static async saveTree(repos: Repos, churchId: string, planId: string, rows: PlanItem[], parentId?: string): Promise<void> {
     for (let i = 0; i < rows.length; i++) {
       const { children, ...row } = rows[i];
       const saved = await repos.planItem.save({ ...row, churchId, planId, parentId, sort: i + 1 });

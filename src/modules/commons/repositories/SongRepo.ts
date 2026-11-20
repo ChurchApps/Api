@@ -149,7 +149,7 @@ export class SongRepo {
 
   public async loadSaved(userId: string): Promise<SongView[]> {
     return await this.joined().innerJoin("assetRatings", "assetRatings.assetId", "assets.id")
-      .select(SUMMARY_COLS).where("assetRatings.userId", "=", userId).where("assetRatings.saved", "=", true as any).where("assets.status", "=", "published")
+      .select(SUMMARY_COLS).where("assetRatings.userId", "=", userId).where("assetRatings.saved", "=", true).where("assets.status", "=", "published")
       .orderBy("assetRatings.modifiedAt", "desc").execute() as SongView[];
   }
 
@@ -200,11 +200,11 @@ export class SongRepo {
       writerCredit: song.writerCredit
     };
     for (const c of PACKAGE_COLS) if (song[c] !== undefined) row[c] = song[c];
-    await getDb().insertInto("songs").values(row as any).execute();
+    await getDb().insertInto("songs").values(row).execute();
   }
 
   public async update(assetId: string, fields: Partial<Song>): Promise<void> {
-    await getDb().updateTable("songs").set({ ...fields } as any).where("assetId", "=", assetId).execute();
+    await getDb().updateTable("songs").set({ ...fields }).where("assetId", "=", assetId).execute();
   }
 
   private joined() {

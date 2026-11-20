@@ -5,7 +5,7 @@ import { EventTriggerHelper } from "./EventTriggerHelper.js";
 import { ExecutionHelper } from "./ExecutionHelper.js";
 
 export class RuleEngine {
-  public static async onEvent(churchId: string, event: string, payload: any): Promise<void> {
+  public static async onEvent(churchId: string, event: string, payload: unknown): Promise<void> {
     return EventTriggerHelper.onEvent(churchId, event, payload);
   }
 

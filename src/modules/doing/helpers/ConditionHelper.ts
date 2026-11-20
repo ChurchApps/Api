@@ -16,7 +16,7 @@ export class ConditionHelper {
       case "giving": {
         const today = await this.churchToday(condition.churchId);
         // The giving module clamps the week counts and returns person ids only.
-        let rule: any = {};
+        let rule: { regularWeeks?: number; minWeeks?: number; lapsedWeeks?: number } = {};
         try { rule = JSON.parse(condition.fieldData || "{}"); } catch { /* defaults */ }
         condition.matchingIds = await getGivingModuleGateway().loadLapsedRegularGiverIds(condition.churchId || "", today.iso, { regularWeeks: rule.regularWeeks, minWeeks: rule.minWeeks, lapsedWeeks: rule.lapsedWeeks });
         break;
@@ -25,7 +25,7 @@ export class ConditionHelper {
         // Relative values ({currentDay}, {currentMonth}...) resolve to the church's date; the stored condition keeps the token.
         let query: Condition = condition;
         if (condition.value?.startsWith("{")) query = { ...condition, value: this.resolveRelativeValue(condition.value, await this.churchToday(condition.churchId)) };
-        condition.matchingIds = await getMembershipModuleGateway().loadIdsMatchingCondition(query as any);
+        condition.matchingIds = await getMembershipModuleGateway().loadIdsMatchingCondition(query as Condition & { churchId: string; field: string; operator: string });
         break;
       }
     }

@@ -1,4 +1,5 @@
 import { controller, httpGet, httpPost } from "inversify-express-utils";
+import type { results } from "inversify-express-utils";
 import express from "express";
 import { COMMONS_PRODUCT_LABELS } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
@@ -48,7 +49,7 @@ const RIGHTS_RE = /GEMA|PRS|publisher|licensing admin/i;
 export class CommonsAdminController extends CommonsBaseController {
   // lets the SPA decide what to render without provoking a 401 on every load
   @httpGet("/status")
-  public async status(req: express.Request, res: express.Response): Promise<any> {
+  public async status(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // the WorshipCommons site's user-level token has no church permissions, so a server admin is looked up there
       const admin = !!au.id && (au.checkAccess(Permissions.server.admin) || await isServerAdmin(au.id));
@@ -59,13 +60,13 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpGet("/types")
-  public async types(req: express.Request, res: express.Response): Promise<any> {
+  public async types(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => Object.values(ASSET_TYPES).map((t) => ({ key: t.key, label: t.label, product: t.product, productLabel: COMMONS_PRODUCT_LABELS[t.product], hasPreview: !!t.previewUrl })));
   }
 
   /** The one queue: every pending submission across every product, oldest first. */
   @httpGet("/submissions")
-  public async submissions(req: express.Request, res: express.Response): Promise<any> {
+  public async submissions(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!ReviewerHelper.canReview(au)) return this.json({}, 401);
       const product = req.query.product?.toString();
@@ -118,7 +119,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpGet("/submissions/:id")
-  public async submission(req: express.Request, res: express.Response): Promise<any> {
+  public async submission(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!ReviewerHelper.canReview(au)) return this.json({}, 401);
       const sub = await this.repos.submission.loadById(String(req.params.id));
@@ -158,7 +159,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpPost("/submissions/:id/approve")
-  public async approve(req: express.Request<{ id: string }, {}, { note?: string; declineFiles?: { name?: string; reason?: string }[] }>, res: express.Response): Promise<any> {
+  public async approve(req: express.Request<{ id: string }, {}, { note?: string; declineFiles?: { name?: string; reason?: string }[] }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!ReviewerHelper.canReview(au)) return this.json({}, 401);
       const sub = await this.repos.submission.loadById(String(req.params.id));
@@ -184,7 +185,7 @@ export class CommonsAdminController extends CommonsBaseController {
 
   /** pending → draft with a note the submitter can act on; nothing is published or discarded. */
   @httpPost("/submissions/:id/request-changes")
-  public async requestChanges(req: express.Request<{ id: string }, {}, { note?: string }>, res: express.Response): Promise<any> {
+  public async requestChanges(req: express.Request<{ id: string }, {}, { note?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!ReviewerHelper.canReview(au)) return this.json({}, 401);
       const note = String(req.body?.note || "").trim().slice(0, 500);
@@ -198,7 +199,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpPost("/submissions/:id/reject")
-  public async reject(req: express.Request<{ id: string }, {}, { reason?: string; note?: string }>, res: express.Response): Promise<any> {
+  public async reject(req: express.Request<{ id: string }, {}, { reason?: string; note?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!ReviewerHelper.canReview(au)) return this.json({}, 401);
       const reason = String(req.body?.reason || "");
@@ -215,7 +216,7 @@ export class CommonsAdminController extends CommonsBaseController {
 
   // signature-gated rather than JWT-gated: review players and <img> tags never send the Authorization header
   @httpGet("/pending-files/:submissionId/:name")
-  public async pendingFile(req: express.Request, res: express.Response): Promise<any> {
+  public async pendingFile(req: express.Request, res: express.Response): Promise<unknown> {
     const submissionId = String(req.params.submissionId);
     const name = String(req.params.name);
     if (!ContentLibraryHelper.verify(submissionId, name, Number(req.query.exp), String(req.query.sig || ""))) {
@@ -241,7 +242,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpGet("/reports")
-  public async reports(req: express.Request, res: express.Response): Promise<any> {
+  public async reports(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const reports = await this.repos.report.loadAll(req.query.status?.toString(), req.query.reason?.toString());
@@ -252,7 +253,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpPost("/reports/:id/claim")
-  public async claim(req: express.Request, res: express.Response): Promise<any> {
+  public async claim(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const report = await this.repos.report.loadById(String(req.params.id));
@@ -264,7 +265,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpPost("/reports/:id/resolve")
-  public async resolve(req: express.Request<{ id: string }, {}, { resolution?: string; note?: string; action?: string }>, res: express.Response): Promise<any> {
+  public async resolve(req: express.Request<{ id: string }, {}, { resolution?: string; note?: string; action?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const resolution = String(req.body?.resolution || "");
@@ -288,7 +289,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpGet("/assets")
-  public async assets(req: express.Request, res: express.Response): Promise<any> {
+  public async assets(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const assets = await this.repos.asset.adminSearch({ q: req.query.q?.toString(), status: req.query.status?.toString(), assetType: req.query.assetType?.toString(), page: Number(req.query.page) || 1 });
@@ -303,7 +304,7 @@ export class CommonsAdminController extends CommonsBaseController {
 
   /** Replaces an asset's publishers. The first id is the primary publisher; the rest co-publish it. */
   @httpPost("/assets/:id/publishers")
-  public async setPublishers(req: express.Request<{ id: string }, {}, { userIds?: unknown }>, res: express.Response): Promise<any> {
+  public async setPublishers(req: express.Request<{ id: string }, {}, { userIds?: unknown }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const asset = await this.repos.asset.loadById(String(req.params.id));
@@ -321,7 +322,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpPost("/assets/:id/unpublish")
-  public async unpublish(req: express.Request, res: express.Response): Promise<any> {
+  public async unpublish(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const asset = await this.repos.asset.loadById(String(req.params.id));
@@ -333,19 +334,19 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpPost("/assets/:id/republish")
-  public async republish(req: express.Request, res: express.Response): Promise<any> {
+  public async republish(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset) return this.json({}, 404);
       if (asset.status !== "unpublished") return this.json({ errors: [`asset is ${asset.status}`] }, 400);
-      await this.repos.asset.update(asset.id || "", { status: "published", unpublishedAt: null as any, removedReason: null as any });
+      await this.repos.asset.update(asset.id || "", { status: "published", unpublishedAt: null, removedReason: null });
       return { status: "published" };
     });
   }
 
   @httpPost("/assets/:id/remove")
-  public async remove(req: express.Request<{ id: string }, {}, { reason?: string }>, res: express.Response): Promise<any> {
+  public async remove(req: express.Request<{ id: string }, {}, { reason?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const reason = String(req.body?.reason || "");
@@ -359,7 +360,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpPost("/assets/:id/feature")
-  public async feature(req: express.Request, res: express.Response): Promise<any> {
+  public async feature(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const asset = await this.repos.asset.loadById(String(req.params.id));
@@ -375,7 +376,7 @@ export class CommonsAdminController extends CommonsBaseController {
    * serves a score, chords and slides makes it sunday-ready; an empty list clears back to the computed tier.
    */
   @httpPost("/songs/:id/listen")
-  public async listen(req: express.Request<{ id: string }, {}, { keys?: unknown }>, res: express.Response): Promise<any> {
+  public async listen(req: express.Request<{ id: string }, {}, { keys?: unknown }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!ReviewerHelper.canReview(au)) return this.json({}, 401);
       const raw = Array.isArray(req.body?.keys) ? req.body.keys : null;
@@ -402,7 +403,7 @@ export class CommonsAdminController extends CommonsBaseController {
 
   /** Register pipeline audio already in the bucket (titled stems zip, instrumental, preview) that seed skipped. */
   @httpPost("/sync-audio")
-  public async syncAudio(req: express.Request, res: express.Response): Promise<any> {
+  public async syncAudio(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const songs = await this.repos.song.loadPublishedSummaries();
@@ -426,7 +427,7 @@ export class CommonsAdminController extends CommonsBaseController {
 
   /** The content repo's publish job (tools/publish-approved.mjs) calls this after pushing output/ for these songs. */
   @httpPost("/sync-output")
-  public async syncOutput(req: express.Request<{}, {}, { ids?: unknown }>, res: express.Response): Promise<any> {
+  public async syncOutput(req: express.Request<{}, {}, { ids?: unknown }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String).filter(Boolean) : [];
@@ -439,7 +440,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpPost("/score-missing")
-  public async scoreMissing(req: express.Request, res: express.Response): Promise<any> {
+  public async scoreMissing(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       // ponytail: 8 per call fits the 30s Lambda; caller loops until remaining is 0
@@ -459,7 +460,7 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   /** Reports, visibility, featuring and rebuilds stay with server admins; a music editor gets a 403 they can read, everyone else the usual 401. */
-  private adminOnly(au: Reviewer): any {
+  private adminOnly(au: Reviewer): results.JsonResult {
     return ReviewerHelper.isMusicEditor(au) ? this.json({ errors: ["Server admin required"] }, 403) : this.json({}, 401);
   }
 }

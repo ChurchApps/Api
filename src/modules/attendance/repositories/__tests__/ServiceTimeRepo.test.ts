@@ -26,6 +26,6 @@ describe("ServiceTimeRepo.buildPublicTree", () => {
   });
 
   it("returns [] for non-array input", () => {
-    expect(new ServiceTimeRepo().buildPublicTree(null as any)).toEqual([]);
+    expect(new ServiceTimeRepo().buildPublicTree(null)).toEqual([]);
   });
 });

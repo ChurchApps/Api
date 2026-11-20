@@ -2,7 +2,7 @@ import { DateHelper } from "@churchapps/apihelper";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
-import { Task, Workflow, WorkflowStep, WorkflowStepRoute } from "../models/index.js";
+import { Task, Workflow, WorkflowStep, WorkflowStepAction, WorkflowStepRoute } from "../models/index.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
 import { AssignmentWorkflowHelper } from "./AssignmentWorkflowHelper.js";
 import { WorkflowTemplate } from "./WorkflowTemplates.js";
@@ -21,7 +21,7 @@ export class WorkflowHelper {
 
   private static rejectAssignmentWorkflow(workflow: Workflow) {
     if (workflow?.workflowType !== AssignmentWorkflowHelper.workflowType) return;
-    const err: any = new Error("Issue serving requests from a plan to use this workflow");
+    const err: Error & { status?: number } = new Error("Issue serving requests from a plan to use this workflow");
     err.status = 400;
     throw err;
   }
@@ -311,7 +311,7 @@ export class WorkflowHelper {
         if (newStep.id) createdStepIds.push(newStep.id);
         if (step.id && newStep.id) {
           stepMap.set(step.id, newStep.id);
-          const actions = (await repos.workflowStepAction.loadForStep(churchId, step.id)) as any[];
+          const actions = (await repos.workflowStepAction.loadForStep(churchId, step.id)) as WorkflowStepAction[];
           for (const action of actions) {
             await repos.workflowStepAction.save({ churchId, stepId: newStep.id, sort: action.sort, actionType: action.actionType, config: action.config });
           }

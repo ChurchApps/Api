@@ -4,6 +4,9 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { GroupServiceTime } from "../models/index.js";
 
+// A groupServiceTimes row, optionally joined with the display name of its service time.
+export type GroupServiceTimeRow = Omit<GroupServiceTime, "serviceTime"> & { serviceTimeName?: string };
+
 @injectable()
 export class GroupServiceTimeRepo {
   public async save(model: GroupServiceTime) {
@@ -44,7 +47,7 @@ export class GroupServiceTimeRepo {
   }
 
   public async loadWithServiceNames(churchId: string, groupId: string) {
-    const rows = await sql<any>`SELECT gst.*, concat_ws(' - ', c.name, s.name, st.name) as serviceTimeName FROM groupServiceTimes gst INNER JOIN serviceTimes st on st.id = gst.serviceTimeId INNER JOIN services s on s.id = st.serviceId LEFT JOIN campuses c on c.id = s.campusId AND IFNULL(c.removed, 0)=0 WHERE gst.churchId=${churchId} AND gst.groupId=${groupId}`.execute(getDb());
+    const rows = await sql<GroupServiceTimeRow>`SELECT gst.*, concat_ws(' - ', c.name, s.name, st.name) as serviceTimeName FROM groupServiceTimes gst INNER JOIN serviceTimes st on st.id = gst.serviceTimeId INNER JOIN services s on s.id = st.serviceId LEFT JOIN campuses c on c.id = s.campusId AND IFNULL(c.removed, 0)=0 WHERE gst.churchId=${churchId} AND gst.groupId=${groupId}`.execute(getDb());
     return rows.rows;
   }
 
@@ -56,15 +59,15 @@ export class GroupServiceTimeRepo {
       .execute();
   }
 
-  public convertToModel(_churchId: string, data: any): GroupServiceTime {
+  public convertToModel(_churchId: string, data: GroupServiceTimeRow): GroupServiceTime {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): GroupServiceTime[] {
+  public convertAllToModel(_churchId: string, data: GroupServiceTimeRow[]): GroupServiceTime[] {
     return data.map((row) => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): GroupServiceTime {
+  protected rowToModel(row: GroupServiceTimeRow): GroupServiceTime {
     const result: GroupServiceTime = { id: row.id, groupId: row.groupId, serviceTimeId: row.serviceTimeId };
     if (row.serviceTimeName !== undefined) result.serviceTime = { id: result.serviceTimeId, name: row.serviceTimeName };
     return result;

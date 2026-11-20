@@ -156,7 +156,7 @@ export function validateSubmission(def: AssetTypeDefinition, payload: Submission
   // a change to a published song carries its license through, even one this submitter could not pick for an upload
   // (a writer's grant); changing it is the writer's alone, checked in validateProposalType
   const carriedLicense = !!ctx.livePayload && !NEW_PACKAGE_TYPES.includes(type) && (payload.license || "") === (ctx.livePayload.license || "");
-  if (!carriedLicense && !licenses.includes(payload.license as any)) errors.push(`license must be one of: ${licenses.join(", ")}`);
+  if (!carriedLicense && !licenses.includes(payload.license)) errors.push(`license must be one of: ${licenses.join(", ")}`);
   const detail = payload.detail || {};
   for (const field of def.detailFields || []) {
     const v = detail[field.key];

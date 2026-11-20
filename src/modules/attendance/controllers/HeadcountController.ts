@@ -7,7 +7,7 @@ import { Permissions } from "../../../shared/helpers/index.js";
 @controller("/attendance/headcounts")
 export class HeadcountController extends AttendanceBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       const data = await this.repos.headcount.load(au.churchId, id);
@@ -19,7 +19,7 @@ export class HeadcountController extends AttendanceBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
-      let data: any;
+      let data: Headcount[];
       if (req.query.serviceTimeId !== undefined) data = await this.repos.headcount.loadByServiceTimeId(au.churchId, req.query.serviceTimeId.toString());
       else if (req.query.groupId !== undefined) data = await this.repos.headcount.loadByGroupId(au.churchId, req.query.groupId.toString());
       else data = await this.repos.headcount.loadAll(au.churchId);
@@ -28,7 +28,7 @@ export class HeadcountController extends AttendanceBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Headcount[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Headcount[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       const items = Array.isArray(req.body) ? req.body : [];
@@ -51,7 +51,7 @@ export class HeadcountController extends AttendanceBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       await this.repos.headcount.delete(au.churchId, id);
