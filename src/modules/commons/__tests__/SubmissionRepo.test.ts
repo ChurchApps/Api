@@ -1,13 +1,14 @@
 import "reflect-metadata";
 
 // A chainable stand-in for the Kysely builder that records the order clauses loadQueue applies.
-const calls: { orderBy: [string, string][]; where: any[] } = { orderBy: [], where: [] };
-const builder: any = new Proxy({}, {
+type Builder = Record<string | symbol, (...args: unknown[]) => unknown>;
+const calls: { orderBy: [string, string][]; where: unknown[][] } = { orderBy: [], where: [] };
+const builder: Builder = new Proxy({}, {
   get: (_t, prop) => {
-    if (prop === "execute") return async () => [];
-    if (prop === "executeTakeFirst") return async () => undefined;
+    if (prop === "execute") return async (): Promise<Record<string, unknown>[]> => [];
+    if (prop === "executeTakeFirst") return async (): Promise<Record<string, unknown> | undefined> => undefined;
     if (prop === "orderBy") return (col: string, dir: string) => { calls.orderBy.push([col, dir]); return builder; };
-    if (prop === "where") return (...args: any[]) => { calls.where.push(args); return builder; };
+    if (prop === "where") return (...args: unknown[]) => { calls.where.push(args); return builder; };
     return () => builder;
   }
 });
@@ -16,7 +17,7 @@ jest.mock("kysely", () => ({ sql: Object.assign(() => ({ as: () => "expr", execu
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "id000000001" } }), { virtual: true });
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 
-import { SubmissionRepo } from "../repositories/SubmissionRepo";
+import { SubmissionRepo } from "../repositories/SubmissionRepo.js";
 
 describe("SubmissionRepo.loadQueue", () => {
   it("orders by triage score first, then oldest submitted", async () => {

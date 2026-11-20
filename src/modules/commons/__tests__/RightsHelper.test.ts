@@ -1,4 +1,5 @@
-import { RightsHelper, USES } from "../helpers/RightsHelper";
+import { RightsHelper, USES } from "../helpers/RightsHelper.js";
+import type { RightsMatrix } from "../models/index.js";
 
 const CREDIT = "Credit the writer and link the license";
 const NOT_MONETIZED = "Not monetized: no ads, paid downloads, or ticketed streams";
@@ -7,8 +8,8 @@ const SA_ARRANGE = "Share alike: release your arrangement or translation under t
 const SA_RECORD = "Share alike: a recording carries the same license";
 const NO_DERIVATIVES = "No derivatives: no arrangements, translations, or transposed charts may be distributed";
 
-const allowed = (m: ReturnType<typeof RightsHelper.matrixForLicense>) => Object.fromEntries(USES.map((u) => [u, m[u].allowed]));
-const conditions = (m: ReturnType<typeof RightsHelper.matrixForLicense>) => Object.fromEntries(USES.map((u) => [u, m[u].conditions]));
+const allowed = (m: RightsMatrix) => Object.fromEntries(USES.map((u) => [u, m[u].allowed]));
+const conditions = (m: RightsMatrix) => Object.fromEntries(USES.map((u) => [u, m[u].conditions]));
 
 describe("RightsHelper.matrixForLicense — one row of the contract table each", () => {
   it("PD and CC0 allow everything unconditionally", () => {

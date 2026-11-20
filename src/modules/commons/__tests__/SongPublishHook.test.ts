@@ -1,13 +1,25 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
-jest.mock("../helpers/ContentLibraryHelper", () => ({ ContentLibraryHelper: { songJson: jest.fn((view: any) => ({ id: view.id, status: view.status })), renderChordpro: () => "{title: x}\n" } }));
+jest.mock("../helpers/ContentLibraryHelper", () => ({ ContentLibraryHelper: { songJson: jest.fn((view: SongView) => ({ id: view.id, status: view.status })), renderChordpro: () => "{title: x}\n" } }));
 
-import { licenseUrlFor, packageFields, songPublishHook } from "../helpers/publishHooks/song";
-import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
+import { licenseUrlFor, packageFields, songPublishHook } from "../helpers/publishHooks/song.js";
+import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
+import type { PublishContext } from "../helpers/publishHooks/index.js";
+import type { SongView } from "../models/index.js";
+import type { Repos } from "../repositories/Repos.js";
+import type { AuthorRepo } from "../repositories/AuthorRepo.js";
+import type { SongRepo } from "../repositories/SongRepo.js";
 
 const CHART = "Verse 1\n[G]Amazing grace! how [C]sweet the sound\n\nChorus\nPraise God";
 const LYRICS = "Verse 1\nAmazing grace! how sweet the sound";
-const parse = (v: any) => (typeof v === "string" ? JSON.parse(v) : v);
+const parse = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
+
+type SongMocks = Pick<SongRepo, "loadSatellite" | "upsert" | "loadById">;
+type AuthorMocks = Pick<AuthorRepo, "loadIdByName" | "findOrCreate" | "loadById" | "update">;
+// the hook only touches song and author; the rest of Repos is never read
+const mockRepos = (song: SongMocks, author: AuthorMocks) => ({ song, author }) as Repos;
+// these hook runs never read a live file, so the fixtures leave readFile out
+const hookCtx = (ctx: Omit<PublishContext, "readFile">) => ctx as PublishContext;
 
 describe("packageFields", () => {
   it("derives the chart-only tier, first line, rights, form and keys for a first publish", () => {
@@ -77,12 +89,12 @@ describe("packageFields", () => {
 
 describe("songPublishHook.onPublish", () => {
   it("upserts the package columns and writes song.json from the asset status, never a literal", async () => {
-    const repos: any = {
-      song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
-      author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
-    };
+    const repos = mockRepos(
+      { loadSatellite: jest.fn(async (): Promise<undefined> => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
+      { loadIdByName: jest.fn(async (): Promise<undefined> => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
+    );
     const written: Record<string, string> = {};
-    await songPublishHook.onPublish({
+    await songPublishHook.onPublish(hookCtx({
       asset: { id: "asset000001", assetType: "song", license: "WC", status: "unpublished" },
       submission: { id: "sub00000001", submittedBy: "user0000001", payload: {} },
       detail: { writer: "Ada", chordPro: CHART, songKey: "G" },
@@ -91,20 +103,20 @@ describe("songPublishHook.onPublish", () => {
       version: 1,
       repos,
       writeFile: async (name, _ct, body) => { written[name] = body.toString(); }
-    });
+    }));
     expect(repos.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000001", confidence: "chart-only", firstLine: "Amazing grace! how sweet the sound", hasChords: true, publishedKeys: '["G"]' }));
-    expect(parse(repos.song.upsert.mock.calls[0][0].rights).recording).toEqual({ license: "WC", holder: "Ada" });
+    expect(parse(jest.mocked(repos.song.upsert).mock.calls[0][0].rights).recording).toEqual({ license: "WC", holder: "Ada" });
     expect(ContentLibraryHelper.songJson).toHaveBeenCalledWith(expect.objectContaining({ status: "unpublished" }), expect.anything());
     expect(Object.keys(written).sort()).toEqual(["lyrics.chordpro", "song.json"]);
     expect(JSON.parse(written["song.json"])).toEqual({ id: "asset000001", status: "unpublished" });
   });
 
   it("copies an optional CCLI number from the payload onto the song row", async () => {
-    const repos: any = {
-      song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
-      author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
-    };
-    await songPublishHook.onPublish({
+    const repos = mockRepos(
+      { loadSatellite: jest.fn(async (): Promise<undefined> => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
+      { loadIdByName: jest.fn(async (): Promise<undefined> => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
+    );
+    await songPublishHook.onPublish(hookCtx({
       asset: { id: "asset000001", assetType: "song", license: "WC", status: "unpublished" },
       submission: { id: "sub00000001", submittedBy: "user0000001", payload: {} },
       detail: { writer: "Ada", chordPro: CHART, songKey: "G", ccli: "22025" },
@@ -113,18 +125,18 @@ describe("songPublishHook.onPublish", () => {
       version: 1,
       repos,
       writeFile: async () => {}
-    });
+    }));
     expect(repos.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ ccli: "22025" }));
   });
 
   it("keeps a credit naming several writers for display; a single writer shows the author's name", async () => {
     const publish = async (writer: string) => {
-      const repos: any = {
-        song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "T" })) },
-        author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async (n: string) => "id-" + n), loadById: jest.fn(async () => undefined), update: jest.fn(async () => {}) }
-      };
-      await songPublishHook.onPublish({ asset: { id: "asset000001", assetType: "song", license: "WC" }, submission: { id: "sub00000001", payload: {} }, detail: { writer, chordPro: CHART }, files: [], filesChanged: [], version: 1, repos, writeFile: async () => {} } as any);
-      return repos.song.upsert.mock.calls[0][0];
+      const repos = mockRepos(
+        { loadSatellite: jest.fn(async (): Promise<undefined> => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "T" })) },
+        { loadIdByName: jest.fn(async (): Promise<undefined> => undefined), findOrCreate: jest.fn(async (n: string) => "id-" + n), loadById: jest.fn(async (): Promise<undefined> => undefined), update: jest.fn(async () => {}) }
+      );
+      await songPublishHook.onPublish(hookCtx({ asset: { id: "asset000001", assetType: "song", license: "WC" }, submission: { id: "sub00000001", payload: {} }, detail: { writer, chordPro: CHART }, files: [], filesChanged: [], version: 1, repos, writeFile: async () => {} }));
+      return jest.mocked(repos.song.upsert).mock.calls[0][0];
     };
     expect(await publish("Words by Joy Marquéz • Music by Doug Gregan")).toMatchObject({ authorId: "id-Joy Marquéz", writerCredit: "Words by Joy Marquéz • Music by Doug Gregan" });
     expect(await publish("Isaac Watts")).toMatchObject({ authorId: "id-Isaac Watts", writerCredit: null });
@@ -132,11 +144,11 @@ describe("songPublishHook.onPublish", () => {
 
   describe("author claim", () => {
     const run = async (opts: { submittedBy: string; existingAuthor?: string }) => {
-      const repos: any = {
-        song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "published", title: "T" })) },
-        author: { loadIdByName: jest.fn(async () => opts.existingAuthor), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
-      };
-      await songPublishHook.onPublish({
+      const repos = mockRepos(
+        { loadSatellite: jest.fn(async (): Promise<undefined> => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "published", title: "T" })) },
+        { loadIdByName: jest.fn(async () => opts.existingAuthor), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
+      );
+      await songPublishHook.onPublish(hookCtx({
         asset: { id: "asset000001", assetType: "song", license: "WC", status: "published", publisherUserId: "publisher01" },
         submission: { id: "sub00000001", submittedBy: opts.submittedBy, payload: {} },
         detail: { writer: "Ada", chordPro: CHART },
@@ -145,7 +157,7 @@ describe("songPublishHook.onPublish", () => {
         version: 1,
         repos,
         writeFile: async () => {}
-      });
+      }));
       return repos.author.update;
     };
 

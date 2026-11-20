@@ -1,23 +1,27 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
-jest.mock("../helpers/PublishHelper", () => ({ PublishHelper: { discardProposed: jest.fn(async () => {}), syncOutput: jest.fn(async () => null) } }));
+jest.mock("../helpers/PublishHelper", () => ({ PublishHelper: { discardProposed: jest.fn(async () => {}), syncOutput: jest.fn(async (): Promise<null> => null) } }));
 jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyReviewerDigest: jest.fn(async () => {}) } }));
 
-import { MaintenanceHelper } from "../helpers/MaintenanceHelper";
-import { CommonsMailHelper } from "../helpers/CommonsMailHelper";
-import { PublishHelper } from "../helpers/PublishHelper";
+import { MaintenanceHelper } from "../helpers/MaintenanceHelper.js";
+import { CommonsMailHelper } from "../helpers/CommonsMailHelper.js";
+import { PublishHelper } from "../helpers/PublishHelper.js";
+import type { Repos } from "../repositories/index.js";
+import type { Submission } from "../models/index.js";
 
-function repos(overrides: any = {}) {
-  const r: any = {
+type RepoMocks = { [K in keyof Repos]?: Partial<Repos[K]> };
+
+function repos(overrides: RepoMocks = {}) {
+  const r: RepoMocks = {
     asset: { pruneDownloads: jest.fn(async () => 2), loadById: jest.fn(async () => ({ id: "asset000001", status: "pending" })) },
     submission: {
-      loadStaleDrafts: jest.fn(async () => []),
+      loadStaleDrafts: jest.fn(async (): Promise<Submission[]> => []),
       countByStatus: jest.fn(async () => 0),
       countPendingOlderThan: jest.fn(async () => 0)
     }
   };
-  for (const [k, v] of Object.entries(overrides)) Object.assign(r[k], v);
-  return r;
+  for (const [k, v] of Object.entries(overrides)) Object.assign(r[k as keyof Repos], v);
+  return r as Repos;
 }
 
 describe("MaintenanceHelper.nightly", () => {
@@ -61,9 +65,9 @@ describe("MaintenanceHelper.syncRecentOutput", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("syncs output/ for songs approved in the last week and totals what changed, skipping songs with no pipeline package", async () => {
-    const r: any = { submission: { loadRecentlyApprovedSongIds: jest.fn(async () => ["song0000001", "song0000002"]) } };
+    const r: RepoMocks = { submission: { loadRecentlyApprovedSongIds: jest.fn(async () => ["song0000001", "song0000002"]) } };
     (PublishHelper.syncOutput as jest.Mock).mockResolvedValueOnce({ added: 3, removed: 1 }).mockResolvedValueOnce(null);
-    expect(await MaintenanceHelper.syncRecentOutput(r)).toEqual({ songs: 1, added: 3, removed: 1 });
+    expect(await MaintenanceHelper.syncRecentOutput(r as Repos)).toEqual({ songs: 1, added: 3, removed: 1 });
     expect(r.submission.loadRecentlyApprovedSongIds).toHaveBeenCalledWith(7);
     expect(PublishHelper.syncOutput).toHaveBeenCalledWith(r, "song0000002");
   });
