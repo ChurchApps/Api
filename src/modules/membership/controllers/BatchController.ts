@@ -11,7 +11,7 @@ const UNDO_WINDOW_DAYS = 30;
 export class BatchController extends MembershipBaseController {
 
   @httpPost("/")
-  public async create(req: express.Request<{}, {}, { label?: string; source?: string }>, res: express.Response): Promise<any> {
+  public async create(req: express.Request<{}, {}, { label?: string; source?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const batch: Batch = {
         churchId: au.churchId,
@@ -25,7 +25,7 @@ export class BatchController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       return this.repos.batch.loadAll(au.churchId);
@@ -33,7 +33,7 @@ export class BatchController extends MembershipBaseController {
   }
 
   @httpGet("/:id/results")
-  public async getResults(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getResults(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const batch = await this.repos.batch.load(au.churchId, id);
       if (!batch) return this.json({}, 404);
@@ -44,7 +44,7 @@ export class BatchController extends MembershipBaseController {
   }
 
   @httpPost("/:id/complete")
-  public async complete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async complete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const batch = await this.repos.batch.load(au.churchId, id);
       if (!batch) return this.json({}, 404);
@@ -57,7 +57,7 @@ export class BatchController extends MembershipBaseController {
   }
 
   @httpPost("/:id/undo")
-  public async undo(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async undo(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const batch = await this.repos.batch.load(au.churchId, id);
       if (!batch) return this.json({}, 404);

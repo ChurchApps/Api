@@ -1,6 +1,6 @@
 import { controller, httpGet } from "inversify-express-utils";
 import express from "express";
-import { AuthenticatedUser } from "@churchapps/apihelper";
+import { AuthenticatedUser, IPermission } from "@churchapps/apihelper";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions } from "../helpers/index.js";
 import { getDb } from "../db/index.js";
@@ -107,7 +107,7 @@ export const staticItems = (c: Access): PaletteItem[] => {
 export class PaletteController extends MembershipBaseController {
 
   @httpGet("/")
-  public async get(req: express.Request, res: express.Response): Promise<any> {
+  public async get(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const access = await this.access(au);
       const [people, groups, plans, funds] = await Promise.all([
@@ -119,7 +119,7 @@ export class PaletteController extends MembershipBaseController {
       const items: PaletteItem[] = [
         ...staticItems(access),
         ...people,
-        ...groups.map((g: any) => ({ n: g.name, t: "group" as const, u: "/groups/" + g.id })),
+        ...groups.map((g) => ({ n: g.name, t: "group" as const, u: "/groups/" + g.id })),
         ...plans.map((p) => ({ n: p.name, t: "plan" as const, u: "/serving/plans/" + p.id })),
         ...funds.map((f) => ({ n: f.name, t: "fund" as const, u: "/donations/funds/" + f.id }))
       ];
@@ -128,10 +128,10 @@ export class PaletteController extends MembershipBaseController {
   }
 
   private async access(au: AuthenticatedUser): Promise<Access> {
-    const can = (p: any) => au.checkAccess(p);
+    const can = (p: IPermission) => au.checkAccess(p);
     let plans = can(Permissions.plans.edit);
     if (!plans && au.personId) {
-      const mine = (await this.repos.group.loadAllForPerson(au.personId)) as any[];
+      const mine = await this.repos.group.loadAllForPerson(au.personId);
       plans = mine.some((g) => (g.tags || "").indexOf("ministry") > -1);
     }
     return {
@@ -154,8 +154,8 @@ export class PaletteController extends MembershipBaseController {
 
   private async loadPeople(churchId: string): Promise<PaletteItem[]> {
     const rows = await getDb().selectFrom("people").select(["id", "displayName", "firstName", "nickName"])
-      .where("churchId", "=", churchId).where("removed", "=", false as any).orderBy("lastName").orderBy("firstName").execute();
-    return rows.map((r: any) => {
+      .where("churchId", "=", churchId).where("removed", "=", false).orderBy("lastName").orderBy("firstName").execute();
+    return rows.map((r) => {
       const item: PaletteItem = { n: r.displayName, t: "person", u: "/people/" + r.id };
       if (r.nickName && r.nickName !== r.firstName) item.a = [r.nickName];
       return item;
@@ -164,8 +164,8 @@ export class PaletteController extends MembershipBaseController {
 
   private loadGroups(churchId: string) {
     return getDb().selectFrom("groups").select(["id", "name"])
-      .where("churchId", "=", churchId).where("removed", "=", false as any)
-      .where((eb) => eb.or([eb("archived", "is", null), eb("archived", "=", false as any)]))
+      .where("churchId", "=", churchId).where("removed", "=", false)
+      .where((eb) => eb.or([eb("archived", "is", null), eb("archived", "=", false)]))
       .orderBy("name").execute();
   }
 }

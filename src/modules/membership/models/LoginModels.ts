@@ -1,5 +1,8 @@
 // Login-related models
 import { Church } from "./Church.js";
+import { User } from "./User.js";
+import { Setting } from "./Setting.js";
+import { Api } from "./Api.js";
 
 export interface LoginRequest {
   email: string;
@@ -12,7 +15,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  user: any;
+  user: User;
   userChurches: LoginUserChurch[];
   token?: string;
   errors?: string[];
@@ -30,7 +33,7 @@ export interface LoginUserChurch {
     state?: string;
     zip?: string;
     country?: string;
-    settings?: any[];
+    settings?: Setting[];
   };
   person?: {
     id: string;
@@ -40,8 +43,8 @@ export interface LoginUserChurch {
       last: string;
     };
   };
-  groups?: Array<{ id: string; [key: string]: any }>;
-  apis?: any[];
+  groups?: Array<{ id: string; name?: string; tags?: string; leader?: boolean; [key: string]: unknown }>;
+  apis?: Api[];
   jwt?: string;
   mfaToken?: string;
   mfaCode?: string;

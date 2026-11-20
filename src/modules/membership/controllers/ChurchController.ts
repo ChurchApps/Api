@@ -1,5 +1,5 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
-import { RegistrationRequest, Church, RegisterChurchRequest, LoginUserChurch, Group, RoleMember, User } from "../models/index.js";
+import { RegistrationRequest, Church, RegisterChurchRequest, LoginUserChurch, Group, RoleMember, User, Person } from "../models/index.js";
 import express from "express";
 import { body, validationResult } from "express-validator";
 import { AuthenticatedUser } from "../auth/index.js";
@@ -22,7 +22,7 @@ const churchRegisterValidation = [
 @controller("/membership/churches")
 export class ChurchController extends MembershipBaseController {
   @httpGet("/all")
-  public async loadAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const term = req.query.term?.toString() ?? "";
@@ -45,7 +45,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpPost("/search")
-  public async searchPost(req: express.Request<{}, {}, { name: string }>, res: express.Response): Promise<any> {
+  public async searchPost(req: express.Request<{}, {}, { name: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         let result: Church[] = [];
@@ -67,7 +67,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpGet("/search/")
-  public async search(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async search(req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         let result: Church[] = [];
@@ -90,7 +90,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpGet("/lookup/")
-  public async getBySubDomain(req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<any> {
+  public async getBySubDomain(req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         let result = {};
@@ -128,7 +128,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpDelete("/deleteAbandoned")
-  public async deleteAbandoned(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteAbandoned(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       else {
@@ -139,7 +139,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (au.churchId !== id && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const data = await this.repos.church.loadById(id);
@@ -149,13 +149,13 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpGet("/:id/getDomainAdmin")
-  public async getDomainAdmin(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getDomainAdmin(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (id !== au.churchId && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      const roles = (await this.repos.role.loadByChurchId(id)) as any[];
+      const roles = await this.repos.role.loadByChurchId(id);
       const domainRole = ArrayHelper.getOne(roles, "name", "Domain Admins");
       if (!domainRole) return null;
-      const members = (await this.repos.roleMember.loadByRoleId(domainRole.id, id)) as any[];
+      const members = await this.repos.roleMember.loadByRoleId(domainRole.id, id);
       let domainAdmin: RoleMember;
       if (members.length > 0) {
         const member: RoleMember = members[0];
@@ -168,7 +168,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpGet("/:id/impersonate")
-  public async impersonate(@requestParam("id") id: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<any> {
+  public async impersonate(@requestParam("id") id: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
 
@@ -191,7 +191,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async loadForUser(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadForUser(req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const churches = await this.repos.rolePermission.loadForUser(au.id, true);
       return this.json(churches, 200);
@@ -199,7 +199,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpPost("/byIds")
-  public async loadByIds(req: express.Request<{}, {}, string[]>, res: express.Response): Promise<any> {
+  public async loadByIds(req: express.Request<{}, {}, string[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       let result: { id?: string; name: string; subDomain?: string }[] = [];
       const ids = req.body;
@@ -230,7 +230,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpPost("/:id/archive")
-  public async archive(@requestParam("id") id: string, req: express.Request<{}, {}, { archived: boolean }>, res: express.Response): Promise<any> {
+  public async archive(@requestParam("id") id: string, req: express.Request<{}, {}, { archived: boolean }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       else {
@@ -245,7 +245,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpPost("/:id/emailApproval")
-  public async emailApproval(@requestParam("id") id: string, req: express.Request<{}, {}, { approved: boolean }>, res: express.Response): Promise<any> {
+  public async emailApproval(@requestParam("id") id: string, req: express.Request<{}, {}, { approved: boolean }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       if (!(await this.repos.church.loadById(id))) return this.json({}, 404);
@@ -255,7 +255,7 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Church[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Church[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
@@ -303,7 +303,7 @@ export class ChurchController extends MembershipBaseController {
 
   // authz-exempt: open to any authenticated user — self-service church registration; caller becomes owner via RoleHelper(savedChurch.id, au.id)
   @httpPost("/add", ...churchRegisterValidation)
-  public async addChurch(req: express.Request<{}, {}, RegisterChurchRequest>, res: express.Response): Promise<any> {
+  public async addChurch(req: express.Request<{}, {}, RegisterChurchRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au?.id) return this.json({}, 401);
       const validationErrors = validationResult(req);
@@ -311,7 +311,7 @@ export class ChurchController extends MembershipBaseController {
         return res.status(400).json({ errors: validationErrors.array() });
       }
 
-      let church = { ...req.body } as any;
+      let church: RegisterChurchRequest = { ...req.body };
       // A body id would route ChurchRepo.save to update and hand the caller someone else's church
       delete church.id;
       delete church.archivedDate;
@@ -319,7 +319,7 @@ export class ChurchController extends MembershipBaseController {
 
       // Idempotency guard: double-submits sail past subdomain validation because selectSubDomain auto-increments (issue #957)
       const existing = await this.repos.church.loadForUser(au.id);
-      const sameName = (existing || []).find((uc: any) => uc.church?.name === church.name);
+      const sameName = (existing || []).find((uc) => uc.church?.name === church.name);
       if (sameName) {
         const recent = await this.repos.church.loadById(sameName.church.id);
         if (recent?.registrationDate && Date.now() - new Date(recent.registrationDate).getTime() < 5 * 60 * 1000) return recent;
@@ -331,7 +331,7 @@ export class ChurchController extends MembershipBaseController {
       if (errors.length > 0) return this.json({ errors }, 401);
       else {
         // create the church
-        const savedChurch = (await this.repos.church.save(church)) as any;
+        const savedChurch = await this.repos.church.save(church);
         church = savedChurch;
         // The SES vetting gate protects ChurchApps' sender reputation; a self-hosted SMTP server has no approver.
         if (process.env.SELF_HOSTED || process.env.RAILWAY_ENVIRONMENT) await this.repos.church.setEmailApproved(savedChurch.id, true);
@@ -342,9 +342,9 @@ export class ChurchController extends MembershipBaseController {
 
         // Start giving on the country's currency instead of usd (#1483); a failed seed must not fail registration
         const currency = CurrencyDefaults.currencyForCountry(church.country);
-        if (currency) await this.repos.setting.save({ churchId: savedChurch.id, keyName: "currency", value: currency, public: "1" } as any).catch((): null => null);
+        if (currency) await this.repos.setting.save({ churchId: savedChurch.id, keyName: "currency", value: currency, public: "1" }).catch((): null => null);
 
-        const postInitPromises: Promise<any>[] = [];
+        const postInitPromises: Promise<unknown>[] = [];
         if (Environment.emailOnRegistration) {
           postInitPromises.push(TransactionalEmailHelper.sendTransactional(
             Environment.supportEmail,
@@ -371,7 +371,7 @@ export class ChurchController extends MembershipBaseController {
   private async appendLogos(churches: Church[]) {
     const ids = ArrayHelper.getIds(churches, "id");
     const settings = await this.repos.setting.loadMulipleChurches(["favicon_400x400"], ids);
-    (settings as any[]).forEach((s: any) => {
+    settings.forEach((s) => {
       const church = ArrayHelper.getOne(churches, "id", s.churchId);
       if (church.settings === undefined) church.settings = [];
       church.settings.push(s);
@@ -381,7 +381,7 @@ export class ChurchController extends MembershipBaseController {
   // Used by select church modal after registration.
   // if both values (churchId and subDomain) are found in body, churchId will have first preference.
   @httpPost("/select")
-  public async select(req: express.Request<{}, {}, { churchId: string; subDomain: string }>, res: express.Response): Promise<any> {
+  public async select(req: express.Request<{}, {}, { churchId: string; subDomain: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au?.id) return this.json({ message: "Unauthorized" }, 401);
       // PersonHelper.claim needs an email to find or create the person; API keys authenticate without one.
@@ -406,7 +406,7 @@ export class ChurchController extends MembershipBaseController {
 
   private async appendPersonInfo(userChurch: LoginUserChurch, au: AuthenticatedUser, churchId: string) {
     const uc = (await PersonHelper.claim(au, churchId)).userChurch;
-    const p = (await this.repos.person.load(uc.churchId, uc.personId)) as any;
+    const p = (await this.repos.person.load(uc.churchId, uc.personId)) as Person;
     const groups: Group[] = (await this.repos.group.loadAllForPerson(uc.personId)) as Group[];
     if (p) {
       userChurch.person = {

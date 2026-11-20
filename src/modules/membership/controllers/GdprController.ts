@@ -10,7 +10,7 @@ import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js
 export class GdprController extends MembershipBaseController {
 
   @httpGet("/people/:personId/export")
-  public async exportPerson(req: express.Request, res: express.Response): Promise<any> {
+  public async exportPerson(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.denyAccess(["Access denied"]);
       const personId = req.params.personId;
@@ -20,14 +20,14 @@ export class GdprController extends MembershipBaseController {
   }
 
   @httpDelete("/people/:personId/anonymize")
-  public async anonymizePerson(req: express.Request, res: express.Response): Promise<any> {
+  public async anonymizePerson(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.denyAccess(["Access denied"]);
       const personId = req.params.personId;
       const userChurch = await this.repos.userChurch.loadByPersonId(personId, au.churchId);
       const userId = userChurch?.userId || null;
 
-      const person: any = await this.repos.person.load(au.churchId, personId);
+      const person = await this.repos.person.load(au.churchId, personId);
       try {
         await GdprErasureHelper.anonymize(au.churchId, personId, userId, this.repos);
       } catch (e) {

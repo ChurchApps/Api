@@ -11,7 +11,7 @@ const CONNECTOR_TYPES = ["standard", "slack", "discord", "mailchimp"];
 @controller("/membership/webhooks")
 export class WebhookController extends MembershipBaseController {
   @httpGet("/events")
-  public async getEvents(req: express.Request, res: express.Response): Promise<any> {
+  public async getEvents(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       return { groups: WEBHOOK_EVENTS, all: ALL_WEBHOOK_EVENTS };
@@ -19,7 +19,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   @httpGet("/deliveries/:deliveryId")
-  public async getDelivery(@requestParam("deliveryId") deliveryId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getDelivery(@requestParam("deliveryId") deliveryId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const delivery = await this.repos.webhookDelivery.load(au.churchId, deliveryId);
@@ -28,7 +28,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   @httpPost("/deliveries/:deliveryId/redeliver")
-  public async redeliver(@requestParam("deliveryId") deliveryId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async redeliver(@requestParam("deliveryId") deliveryId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const original = await this.repos.webhookDelivery.load(au.churchId, deliveryId);
@@ -45,7 +45,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   @httpPost("/:id/test")
-  public async test(@requestParam("id") id: string, req: express.Request<{}, {}, { event?: string }>, res: express.Response): Promise<any> {
+  public async test(@requestParam("id") id: string, req: express.Request<{}, {}, { event?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const webhook = await this.repos.webhook.load(au.churchId, id);
@@ -68,7 +68,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   @httpGet("/:id/deliveries")
-  public async getDeliveries(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getDeliveries(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       return this.repos.webhookDelivery.loadByWebhook(au.churchId, id, 50);
@@ -76,7 +76,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const webhook = await this.repos.webhook.load(au.churchId, id);
@@ -85,7 +85,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const webhooks = await this.repos.webhook.loadAll(au.churchId);
@@ -95,7 +95,7 @@ export class WebhookController extends MembershipBaseController {
 
   // Secret is returned only on create — the church must store it.
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Webhook>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Webhook>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const input = req.body;
@@ -155,7 +155,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   @httpPost("/:id/regenerate-secret")
-  public async regenerateSecret(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async regenerateSecret(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const webhook = await this.repos.webhook.load(au.churchId, id);
@@ -168,7 +168,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       await this.repos.webhook.delete(au.churchId, id);

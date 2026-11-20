@@ -16,20 +16,20 @@ import type { AuthenticatedUser } from "@churchapps/apihelper";
 export class FormSubmissionController extends MembershipBaseController {
   // Self-scoped: stand-alone forms the signed-in member submitted or an admin assigned to them. Person forms (staff fill those in about someone) are left out by the repo.
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.personId) return this.json([], 401);
-      const result: FormSubmission[] = this.repos.formSubmission.convertAllToModel(au.churchId, (await this.repos.formSubmission.loadForSubmitter(au.churchId, au.personId)) as any[]);
+      const result: FormSubmission[] = this.repos.formSubmission.convertAllToModel(au.churchId, await this.repos.formSubmission.loadForSubmitter(au.churchId, au.personId));
       if (result.length === 0) return result;
       if (this.include(req, "questions")) {
         const questionsByForm: Record<string, Question[]> = {};
         for (const formId of Array.from(new Set(result.map((s) => s.formId)))) {
-          questionsByForm[formId] = this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, formId)) as any[]);
+          questionsByForm[formId] = this.repos.question.convertAllToModel(au.churchId, await this.repos.question.loadForForm(au.churchId, formId));
         }
         result.forEach((s) => { s.questions = questionsByForm[s.formId]; });
       }
       if (this.include(req, "answers")) {
-        const answers: Answer[] = this.repos.answer.convertAllToModel(au.churchId, (await this.repos.answer.loadForFormSubmissions(au.churchId, result.map((s) => s.id))) as any[]);
+        const answers: Answer[] = this.repos.answer.convertAllToModel(au.churchId, await this.repos.answer.loadForFormSubmissions(au.churchId, result.map((s) => s.id)));
         result.forEach((s) => { s.answers = answers.filter((a) => a.formSubmissionId === s.id); });
       }
       return result;
@@ -37,7 +37,7 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result: FormSubmission = this.repos.formSubmission.convertToModel(au.churchId, await this.repos.formSubmission.load(au.churchId, id));
       if (!result) return this.json({ error: "Form submission not found" }, 404);
@@ -51,34 +51,34 @@ export class FormSubmissionController extends MembershipBaseController {
 
   // Leader-only: answers to the forms linked to this group and to the registration forms of its events.
   @httpGet("/group/:groupId")
-  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.leadsGroup(au, groupId)) return this.json([], 401);
-      const result: { form: Form; event?: { id: string; title: string; start: Date }; questions: Question[]; submissions: FormSubmission[] }[] = [];
-      const forms: Form[] = this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadForGroup(au.churchId, groupId)) as any[]);
+      const result: { form: Form; event?: { id: string; title: string; start: Date }; questions: Question[]; submissions: (FormSubmission & { personName?: string })[] }[] = [];
+      const forms: Form[] = this.repos.form.convertAllToModel(au.churchId, await this.repos.form.loadForGroup(au.churchId, groupId));
       for (const form of forms) {
-        const submissions = this.repos.formSubmission.convertAllToModel(au.churchId, (await this.repos.formSubmission.loadByFormId(au.churchId, form.id)) as any[]);
+        const submissions = this.repos.formSubmission.convertAllToModel(au.churchId, await this.repos.formSubmission.loadByFormId(au.churchId, form.id));
         result.push({ form, questions: [], submissions });
       }
       const events = await getContentModuleGateway().loadEventsForGroup(au.churchId, groupId);
       for (const event of events) {
         const form = this.repos.form.convertToModel(au.churchId, await this.repos.form.load(au.churchId, event.formId));
         if (!form) continue;
-        const rows = (await this.repos.formSubmission.loadForContent(au.churchId, "event", event.id)) as any[];
+        const rows = await this.repos.formSubmission.loadForContent(au.churchId, "event", event.id);
         const submissions = this.repos.formSubmission.convertAllToModel(au.churchId, rows.filter((r) => r.formId === form.id));
         result.push({ form, event: { id: event.id, title: event.title, start: event.start }, questions: [], submissions });
       }
       const allSubmissions = result.flatMap((r) => r.submissions);
-      const answers: Answer[] = allSubmissions.length === 0 ? [] : this.repos.answer.convertAllToModel(au.churchId, (await this.repos.answer.loadForFormSubmissions(au.churchId, allSubmissions.map((s) => s.id))) as any[]);
+      const answers: Answer[] = allSubmissions.length === 0 ? [] : this.repos.answer.convertAllToModel(au.churchId, await this.repos.answer.loadForFormSubmissions(au.churchId, allSubmissions.map((s) => s.id)));
       // Leaders can't list people, so name each submitter here.
       const personIdOf = (s: FormSubmission) => (s.contentType === "person" ? s.contentId : s.submittedBy);
       const personIds = Array.from(new Set(allSubmissions.map(personIdOf).filter(Boolean)));
-      const people = personIds.length === 0 ? [] : ((await this.repos.person.loadByIds(au.churchId, personIds)) as any[]);
+      const people = personIds.length === 0 ? [] : (await this.repos.person.loadByIds(au.churchId, personIds));
       for (const r of result) {
-        r.questions = this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, r.form.id)) as any[]);
+        r.questions = this.repos.question.convertAllToModel(au.churchId, await this.repos.question.loadForForm(au.churchId, r.form.id));
         r.submissions.forEach((s) => {
           s.answers = answers.filter((a) => a.formSubmissionId === s.id);
-          (s as any).personName = people.find((p) => p.id === personIdOf(s) && !p.removed)?.displayName || null;
+          s.personName = people.find((p) => p.id === personIdOf(s) && !p.removed)?.displayName || null;
         });
       }
       return result;
@@ -86,7 +86,7 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else {
@@ -100,15 +100,15 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   @httpGet("/formId/:formId")
-  public async getByFormId(@requestParam("formId") formId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByFormId(@requestParam("formId") formId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!(await this.formAccess(au, formId, "view"))) return this.json([], 401);
       else {
-        const formSubmissions: FormSubmission[] = await this.repos.formSubmission.convertAllToModel(au.churchId, (await this.repos.formSubmission.loadByFormId(au.churchId, formId)) as any[]);
+        const formSubmissions: FormSubmission[] = await this.repos.formSubmission.convertAllToModel(au.churchId, await this.repos.formSubmission.loadByFormId(au.churchId, formId));
         if (formSubmissions.length === 0) return formSubmissions;
         const form = this.repos.form.convertToModel(au.churchId, await this.repos.form.load(au.churchId, formId));
-        const questions = this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, formId)) as any[]);
-        const answers = this.repos.answer.convertAllToModel(au.churchId, (await this.repos.answer.loadForFormSubmissions(au.churchId, formSubmissions.map((fs) => fs.id))) as any[]);
+        const questions = this.repos.question.convertAllToModel(au.churchId, await this.repos.question.loadForForm(au.churchId, formId));
+        const answers = this.repos.answer.convertAllToModel(au.churchId, await this.repos.answer.loadForFormSubmissions(au.churchId, formSubmissions.map((fs) => fs.id)));
         formSubmissions.forEach((formSubmission) => {
           formSubmission.form = form;
           formSubmission.questions = questions;
@@ -121,10 +121,10 @@ export class FormSubmissionController extends MembershipBaseController {
 
   // authz-exempt: open form submission — public forms accept any submitter; restricted forms need a signed-in user of the form's church (or form access), churchId derived from the loaded form not the request
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, FormSubmission[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, FormSubmission[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (req.body?.length > 0) {
-        const results: any[] = [];
+        const results: (FormSubmission | { error: string })[] = [];
         for (const formSubmission of req.body) {
           const { formId } = formSubmission;
 
@@ -153,7 +153,7 @@ export class FormSubmissionController extends MembershipBaseController {
                 results.push({ error: `You're not allowed to edit this submission` });
                 continue;
               }
-              existingAnswerIds = ((await this.repos.answer.loadForFormSubmission(churchId, formSubmission.id)) as any[]).map((a) => a.id);
+              existingAnswerIds = (await this.repos.answer.loadForFormSubmission(churchId, formSubmission.id)).map((a) => a.id);
             }
             if (!canManage && formSubmission.contentType === "person" && formSubmission.contentId !== au?.personId) {
               formSubmission.contentType = null;
@@ -162,7 +162,7 @@ export class FormSubmissionController extends MembershipBaseController {
 
             const wantsPerson = form.autoCreatePerson === true;
             const wantsFollowUp = !!(form.followUpSubject && form.followUpBody);
-            const questions = this.repos.question.convertAllToModel(churchId, (await this.repos.question.loadForForm(churchId, formId)) as any[]);
+            const questions = this.repos.question.convertAllToModel(churchId, await this.repos.question.loadForForm(churchId, formId));
             const questionIds = new Set(questions.map((q) => q.id));
             formSubmission.answers = (formSubmission.answers || []).filter((a) => questionIds.has(a.questionId));
             formSubmission.answers.forEach((a) => { if (a.id && !existingAnswerIds.includes(a.id)) delete a.id; });
@@ -235,7 +235,7 @@ export class FormSubmissionController extends MembershipBaseController {
 
   // authz-exempt: gated by this.formAccess(au, submission.formId); submission and person both loaded under au.churchId
   @httpPost("/:id/person")
-  public async setPerson(@requestParam("id") id: string, req: express.Request<{}, {}, { personId: string | null }>, res: express.Response): Promise<any> {
+  public async setPerson(@requestParam("id") id: string, req: express.Request<{}, {}, { personId: string | null }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.churchId) return this.json({}, 401);
       const submission = this.repos.formSubmission.convertToModel(au.churchId, await this.repos.formSubmission.load(au.churchId, id));
@@ -271,7 +271,7 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   private async addToGroup(churchId: string, groupId: string, personId: string) {
-    const existing = (await this.repos.groupMember.loadForGroup(churchId, groupId)) as any[];
+    const existing = await this.repos.groupMember.loadForGroup(churchId, groupId);
     if (existing?.some((gm) => gm.personId === personId)) return;
     const saved = await this.repos.groupMember.save({ churchId, groupId, personId, leader: false });
     await UserChurchHelper.createForGroupMember(churchId, personId);
@@ -281,15 +281,15 @@ export class FormSubmissionController extends MembershipBaseController {
 
   private async sendEmails(formSubmission: FormSubmission, questions: Question[], form: Form, churchId: string) {
     // send email to form members that have emailNotification set to true
-    const memberPermissions = (await this.repos.memberPermission.loadByEmailNotification(churchId, "form", form.id, true)) as any;
+    const memberPermissions = await this.repos.memberPermission.loadByEmailNotification(churchId, "form", form.id, true);
     const church: Church = await this.repos.church.loadById(churchId);
-    if ((memberPermissions as any[])?.length > 0) {
-      const ids = (memberPermissions as any[]).map((mp: MemberPermission) => mp.memberId);
+    if (memberPermissions?.length > 0) {
+      const ids = memberPermissions.map((mp: MemberPermission) => mp.memberId);
       if (ids?.length > 0) {
         // Removed people keep their memberPermissions row but no longer show in the form's Members list.
-        const people = ((await this.repos.person.loadByIds(formSubmission.churchId, ids)) as any[]).filter((p) => !p.removed);
-        if ((people as any[])?.length > 0) {
-          const contentRows: any[] = [];
+        const people = (await this.repos.person.loadByIds(formSubmission.churchId, ids)).filter((p) => !p.removed);
+        if (people?.length > 0) {
+          const contentRows: string[] = [];
           questions.forEach((q) => {
             (formSubmission.answers || []).forEach((a) => {
               if (q.id === a.questionId) {
@@ -299,8 +299,8 @@ export class FormSubmissionController extends MembershipBaseController {
           });
 
           const contents = "<table role=\"presentation\" style=\"text-align: left;\" cellspacing=\"8\" width=\"80%\"><tablebody>" + contentRows.join(" ") + "</tablebody></table>";
-          const promises: Promise<any>[] = [];
-          (people as any[]).forEach((p: Person) => {
+          const promises: Promise<unknown>[] = [];
+          people.forEach((p: Person) => {
             if (p.email) promises.push(TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church.name), p.email, church.name, Environment.b1AdminRoot, "New Submissions for " + form.name, contents));
           });
           promises.push(this.sendNotifications(churchId, form, people.map((p: Person) => p.id)));
@@ -320,8 +320,8 @@ export class FormSubmissionController extends MembershipBaseController {
     try {
       await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church?.name), email, church?.name, Environment.b1AdminRoot, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
       await ChurchEmailLimiter.settle(churchId, reserved[0], true);
-    } catch (err: any) {
-      await ChurchEmailLimiter.settle(churchId, reserved[0], false, err?.message || "Send failed");
+    } catch (err) {
+      await ChurchEmailLimiter.settle(churchId, reserved[0], false, (err as { message?: string } | undefined)?.message || "Send failed");
       throw err;
     }
   }
@@ -332,7 +332,7 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else {
@@ -351,13 +351,13 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   private async appendQuestions(churchId: string, formSubmission: FormSubmission) {
-    const data = (await this.repos.question.loadForForm(churchId, formSubmission.formId)) as any[];
+    const data = await this.repos.question.loadForForm(churchId, formSubmission.formId);
     formSubmission.questions = this.repos.question.convertAllToModel(churchId, data);
     return formSubmission;
   }
 
   private async appendAnswers(churchId: string, formSubmission: FormSubmission) {
-    const data = (await this.repos.answer.loadForFormSubmission(churchId, formSubmission.id)) as any[];
+    const data = await this.repos.answer.loadForFormSubmission(churchId, formSubmission.id);
     formSubmission.answers = this.repos.answer.convertAllToModel(churchId, data);
     return formSubmission;
   }

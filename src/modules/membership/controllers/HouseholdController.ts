@@ -8,11 +8,11 @@ import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 @controller("/membership/households")
 export class HouseholdController extends MembershipBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.people.edit)) {
         const self = au.personId ? await this.repos.person.load(au.churchId, au.personId) : null;
-        if (!self || (self as any).householdId !== id) return this.json({}, 401);
+        if (!self || self.householdId !== id) return this.json({}, 401);
       }
       const data = await this.repos.household.load(au.churchId, id);
       return this.repos.household.convertToModel(au.churchId, data);
@@ -20,7 +20,7 @@ export class HouseholdController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const data = await this.repos.household.loadAll(au.churchId);
@@ -29,7 +29,7 @@ export class HouseholdController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Household[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Household[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const promises: Promise<Household>[] = [];
@@ -49,7 +49,7 @@ export class HouseholdController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       await this.repos.household.delete(au.churchId, id);

@@ -8,7 +8,7 @@ import { PersonField } from "../models/index.js";
 export class PersonFieldController extends MembershipBaseController {
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       const data = await this.repos.personField.loadAll(au.churchId);
@@ -17,7 +17,7 @@ export class PersonFieldController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, PersonField[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, PersonField[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const promises: Promise<PersonField>[] = [];
@@ -28,7 +28,7 @@ export class PersonFieldController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       await this.repos.personFieldValue.deleteForField(au.churchId, id);

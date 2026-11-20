@@ -8,7 +8,7 @@ import { PersonFieldValue } from "../models/index.js";
 export class PersonFieldValueController extends MembershipBaseController {
 
   @httpGet("/person/:personId")
-  public async getForPerson(@requestParam("personId") personId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getForPerson(@requestParam("personId") personId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       const data = await this.repos.personFieldValue.loadForPerson(au.churchId, personId);
@@ -17,7 +17,7 @@ export class PersonFieldValueController extends MembershipBaseController {
   }
 
   @httpGet("/field/:fieldId")
-  public async getForField(@requestParam("fieldId") fieldId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getForField(@requestParam("fieldId") fieldId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       const data = await this.repos.personFieldValue.loadForField(au.churchId, fieldId);
@@ -26,7 +26,7 @@ export class PersonFieldValueController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, PersonFieldValue[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, PersonFieldValue[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const personIds = new Set<string>();

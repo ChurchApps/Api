@@ -11,7 +11,7 @@ export class AnswerController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else {
-        let data: any = null;
+        let data: Answer[] = null;
         if (req.query.formSubmissionId !== undefined) data = await this.repos.answer.loadForFormSubmission(au.churchId, req.query.formSubmissionId.toString());
         else data = await this.repos.answer.loadAll(au.churchId);
         return this.repos.answer.convertAllToModel(au.churchId, data);
@@ -20,11 +20,11 @@ export class AnswerController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Answer[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Answer[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
 
-      const results: any[] = [];
+      const results: Answer[] = [];
       for (const answer of req.body) {
         answer.churchId = au.churchId;
         const savedAnswer = await this.repos.answer.save(answer);

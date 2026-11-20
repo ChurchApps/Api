@@ -3,11 +3,15 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { OpenAiHelper, Permissions, PersonHelper } from "../helpers/index.js";
+import { Person } from "../models/index.js";
+
+// Person rows plus the derived fields the AI filters compare against.
+type QueriedPerson = Person & { age?: string; yearsMarried?: string; birthMonth?: number; anniversaryMonth?: number };
 
 @controller("/membership/query")
 export class QueryController extends MembershipBaseController {
   @httpPost("/members")
-  public async queryMembers(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async queryMembers(req: express.Request<{}, {}, { text?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       const { text } = req.body;
@@ -17,7 +21,7 @@ export class QueryController extends MembershipBaseController {
         const apiRequestPrompt = await OpenAiHelper.buildPrompt(text);
         const aiResponse = await OpenAiHelper.getCompletion(apiRequestPrompt);
         if (aiResponse && aiResponse.length > 0) {
-          let peopleData: any[] = (await this.repos.person.loadAll(au.churchId)) as any[];
+          let peopleData: QueriedPerson[] = await this.repos.person.loadAll(au.churchId);
           aiResponse.forEach((resp: { field: string; value: string; operator: string }) => {
             switch (resp.field) {
               case "age":

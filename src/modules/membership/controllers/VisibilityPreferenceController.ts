@@ -6,7 +6,7 @@ import { VisibilityPreference } from "../models/index.js";
 @controller("/membership/visibilityPreferences")
 export class VisibilityPreferenceController extends MembershipBaseController {
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, VisibilityPreference[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, VisibilityPreference[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existing = await this.repos.visibilityPreference.loadForPerson(au.churchId, au.personId);
       const promises: Promise<VisibilityPreference>[] = [];
@@ -22,7 +22,7 @@ export class VisibilityPreferenceController extends MembershipBaseController {
   }
 
   @httpGet("/my")
-  public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // loadForPerson returns a single row (or null); an empty list is the legacy "nothing saved" shape clients expect.
       const result = await this.repos.visibilityPreference.loadForPerson(au.churchId, au.personId);
