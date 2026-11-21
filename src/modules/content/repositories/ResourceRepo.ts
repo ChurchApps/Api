@@ -27,7 +27,7 @@ export class ResourceRepo {
     await getDb().updateTable("resources").set({
       name: model.name,
       description: model.description,
-      quantity: model.quantity,
+      quantity: model.quantity ?? null,
       approvalGroupId: model.approvalGroupId ?? null,
       active: model.active ?? true
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
