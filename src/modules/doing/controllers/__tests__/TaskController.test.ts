@@ -1,6 +1,6 @@
 const appendHistory = jest.fn();
 jest.mock("../../helpers/StepActionHelper.js", () => ({ StepActionHelper: { appendHistory: (...args: any[]) => appendHistory.apply(null, args as any) } }));
-jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn() } }));
+jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn(), stopIfResolved: jest.fn(async () => false) } }));
 import "reflect-metadata";
 
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
@@ -288,6 +288,44 @@ describe("TaskController.save reassignment history", () => {
     repos.task.load.mockResolvedValue({ id: "t1", assignedToId: "p1", assignedToLabel: "Donald Clark", data: JSON.stringify({ history: [] }) });
     await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", assignedToId: "p2", assignedToLabel: "Carol Clark" }] }, {});
     expect(appendHistory.mock.calls[0][0].data).toBe(JSON.stringify({ history: [] }));
+  });
+});
+
+describe("TaskController.save reopen", () => {
+  const closedAt = new Date("2026-11-21T09:14:00Z");
+  let repos: any;
+  beforeEach(() => {
+    repos = {
+      task: {
+        save: jest.fn(async (t: any) => t),
+        load: jest.fn(async () => ({ id: "t1", title: "Call", status: "Closed", dateClosed: closedAt })),
+        loadByFollowupKey: jest.fn(async () => null),
+        withAssignmentLock: jest.fn(async (_c: string, _a: string, fn: () => any) => fn())
+      }
+    };
+  });
+
+  it("clears the closed date when a plain task is reopened", async () => {
+    await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", title: "Call", status: "Open" }] }, {});
+    expect(repos.task.save.mock.calls[0][0].dateClosed).toBeNull();
+  });
+
+  it("clears the closed date when a serving follow-up is reopened", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", title: "Call", status: "Closed", dateClosed: closedAt, assignmentId: "a1" });
+    await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", title: "Call", status: "Open" }] }, {});
+    expect(repos.task.save.mock.calls[0][0].dateClosed).toBeNull();
+  });
+
+  it("keeps the original close time when a closed serving follow-up is edited", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", title: "Call", status: "Closed", dateClosed: closedAt, assignmentId: "a1" });
+    await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", title: "Renamed", status: "Closed" }] }, {});
+    expect(repos.task.save.mock.calls[0][0].dateClosed).toBe(closedAt);
+  });
+
+  it("stamps a close date when an open task is closed", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", title: "Call", status: "Open", dateClosed: null });
+    await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", title: "Call", status: "Closed" }] }, {});
+    expect(repos.task.save.mock.calls[0][0].dateClosed).toBeInstanceOf(Date);
   });
 });
 

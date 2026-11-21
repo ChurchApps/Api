@@ -155,7 +155,7 @@ export class TaskController extends DoingBaseController {
                 assignedToType: task.assignedToType ?? linked.assignedToType,
                 assignedToId: task.assignedToId ?? linked.assignedToId,
                 assignedToLabel: task.assignedToLabel ?? linked.assignedToLabel,
-                dateClosed: task.status === "Closed" ? new Date() : linked.dateClosed
+                dateClosed: TaskController.closedDate(task.status ?? linked.status, linked, task.dateClosed)
               });
             });
             if (saved) {
@@ -172,12 +172,20 @@ export class TaskController extends DoingBaseController {
           task.data = task.data ?? existing.data;
           StepActionHelper.appendHistory(task, `Reassigned from ${existing.assignedToLabel || "unassigned"} to ${task.assignedToLabel || "unassigned"}`);
         }
+        if (existing && task.status) task.dateClosed = TaskController.closedDate(task.status, existing, task.dateClosed);
         const saved = await this.repos.task.save(task);
         await InternalEventBus.publish(au.churchId, "task.updated", saved);
         result.push(saved);
       }
       return result;
     });
+  }
+
+  // Reopening clears the close date (null, so the update writes NULL); closing stamps it once and later edits keep it.
+  private static closedDate(status: string, existing: Task, requested?: Date): Date | null {
+    if (status !== "Closed") return null;
+    if (existing.status === "Closed" && existing.dateClosed) return existing.dateClosed;
+    return requested ?? new Date();
   }
 
   // Hard delete of a plain task; workflow cards use /:id/remove and account deletion requests are decided, not deleted.
