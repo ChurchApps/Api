@@ -59,6 +59,13 @@ export const handle30MinTimer = async (_event: ScheduledEvent, _context: Context
     return WorkflowHelper.processSnoozed(doingRepos);
   });
 
+  // Scheduled rules (birthdays, anniversaries...) run just after each church's local midnight.
+  await JobRunHelper.run("scheduledRules", async () => {
+    const { RuleEngine } = await import("../modules/doing/helpers/RuleEngine.js");
+    const doingRepos = await RepoManager.getRepos<DoingRepos>("doing");
+    return RuleEngine.runScheduled(doingRepos, { nearChurchMidnight: true });
+  });
+
   await JobRunHelper.run("scanReminders", async () => {
     const { scanReminders } = await import("../modules/messaging/helpers/ReminderBootstrap.js");
     const messagingRepos = await RepoManager.getRepos<MessagingRepos>("messaging");
@@ -188,12 +195,6 @@ export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Con
   await JobRunHelper.run("workflowOverdue", async () => {
     const { WorkflowHelper } = await import("../modules/doing/helpers/WorkflowHelper.js");
     return WorkflowHelper.processOverdue(doingRepos);
-  });
-
-  // Recurring scheduled rules (pull path of the unified RuleEngine).
-  await JobRunHelper.run("scheduledRules", async () => {
-    const { RuleEngine } = await import("../modules/doing/helpers/RuleEngine.js");
-    return RuleEngine.runScheduled(doingRepos);
   });
 
   console.log("Scheduled tasks completed");
