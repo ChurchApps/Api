@@ -127,7 +127,7 @@ export class PersonController extends MembershipBaseController {
       }
       if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
-        const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
+        const filterOptedOut = !au.checkAccess(Permissions.people.view);
         const data = (await this.repos.person.loadRecent(au.churchId, filterOptedOut)) as any[];
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
         return await this.filterPeople(result, au);
@@ -141,7 +141,7 @@ export class PersonController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         const pageSize = req.query.pageSize ? Math.max(parseInt(req.query.pageSize as string, 10) || 0, 0) : 0;
-        const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
+        const filterOptedOut = !au.checkAccess(Permissions.people.view);
         const data = (await this.repos.person.loadAlphabetical(au.churchId, pageSize, filterOptedOut)) as any[];
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
         return await this.filterPeople(result, au);
@@ -302,7 +302,7 @@ export class PersonController extends MembershipBaseController {
         if (email) data = await this.repos.person.searchEmail(au.churchId, email);
         else {
           const term = req.query.term?.toString() ?? "";
-          const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
+          const filterOptedOut = !au.checkAccess(Permissions.people.view);
           data = await this.repos.person.search(au.churchId, term, filterOptedOut);
         }
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));

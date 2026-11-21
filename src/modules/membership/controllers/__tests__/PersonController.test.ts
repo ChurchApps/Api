@@ -885,3 +885,47 @@ describe("PersonController.addFamilyMember", () => {
     expect(blank.repos.person.save).not.toHaveBeenCalled();
   });
 });
+
+// "Hide me from the member directory" must only hide a person from the directory,
+// not from the staff People list or recent-people picker (ChurchAppsSupport#1648).
+describe("PersonController opted-out people in staff lists", () => {
+  const rows = [
+    { id: "p2", name: { display: "Donald Clark" }, membershipStatus: "Member", optedOut: false },
+    { id: "p3", name: { display: "Carol Clark" }, membershipStatus: "Member", optedOut: true }
+  ];
+  const visible = (filterOptedOut: boolean) => rows.filter((r) => !filterOptedOut || !r.optedOut);
+  function listController(access: string[], membershipStatus = "Guest") {
+    const settings = [{ keyName: "directoryVisibility", value: "Members" }];
+    const { controller, repos } = personController({ access, membershipStatus, settings });
+    repos.person.loadAlphabetical = jest.fn(async (_c: string, _size: number, filterOptedOut: boolean) => visible(filterOptedOut));
+    repos.person.loadRecent = jest.fn(async (_c: string, filterOptedOut: boolean) => visible(filterOptedOut));
+    repos.person.search = jest.fn(async (_c: string, _t: string, filterOptedOut: boolean) => visible(filterOptedOut));
+    return { controller, repos };
+  }
+
+  it("GET /list includes an opted-out person for a View People caller who is not a server admin", async () => {
+    const { controller } = listController(["peopleView"]);
+    const result: any[] = await (controller as any).getList({ query: {} }, {});
+    expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
+  });
+
+  it("GET /recent includes an opted-out person for a View People caller who is not a server admin", async () => {
+    const { controller } = listController(["peopleView"]);
+    const result: any[] = await (controller as any).getRecent({ query: {} }, {});
+    expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
+  });
+
+  it("GET /search includes an opted-out person for a View People caller who is not a server admin", async () => {
+    const { controller } = listController(["peopleView"]);
+    const result: any[] = await (controller as any).search({ query: { term: "Clark" } }, {});
+    expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
+  });
+
+  it("still hides an opted-out person from a member browsing the directory", async () => {
+    const { controller } = listController([], "Member");
+    const list: any[] = await (controller as any).getList({ query: {} }, {});
+    const recent: any[] = await (controller as any).getRecent({ query: {} }, {});
+    expect(list.map((p) => p.id)).toEqual(["p2"]);
+    expect(recent.map((p) => p.id)).toEqual(["p2"]);
+  });
+});
