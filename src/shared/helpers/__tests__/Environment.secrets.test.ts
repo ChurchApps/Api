@@ -5,6 +5,10 @@ jest.mock("@churchapps/apihelper", () => ({
   AwsHelper: { readParameter: jest.fn().mockResolvedValue("") }
 }));
 
+jest.mock("../SsmParameters.js", () => ({
+  readSsmParameters: jest.fn().mockResolvedValue({})
+}));
+
 import { Environment } from "../Environment.js";
 
 const SAMPLE_JWT = "jwt-secret-dev";
