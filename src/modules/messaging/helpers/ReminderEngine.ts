@@ -154,6 +154,8 @@ export class ReminderEngine {
         const channels: string[] = ((def as any).channels || "").split(",").map((c: string) => c.trim());
         if (channels.includes("email")) {
           options.emailImmediate = true;
+          // Send now rows can be made at will, so their emails draw on ChurchEmailLimiter like workflow email (also on a timer retry).
+          if (this.isSendNowKey(occ.occurrenceKey)) options.churchAuthored = true;
           const emailByPerson = adapter.buildEmails ? await adapter.buildEmails(entity, occ.occLocalISO!, fresh, occ.message || undefined) : null;
           if (emailByPerson) options.emailByPerson = emailByPerson;
         }
@@ -224,6 +226,10 @@ export class ReminderEngine {
     const occ = (await this.repos.reminderOccurrence.loadByKey(occurrenceKey)) as ReminderOccurrence | undefined;
     if (!occ || !(await this.repos.reminderOccurrence.claim(occ.id!))) return { recipients: 0, textsSent: 0, textsSkipped: 0 }; // the 30-minute timer won the row and is sending it
     return this.dispatch(occ);
+  }
+
+  private static isSendNowKey(occurrenceKey?: string): boolean {
+    return (occurrenceKey || "").includes(":now:");
   }
 
   // "Church: message Reply STOP to opt out." trimmed to one 160-char segment.
