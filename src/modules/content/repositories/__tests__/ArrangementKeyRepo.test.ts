@@ -5,26 +5,28 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "ge
 import { getDb } from "../../db/index.js";
 import { ArrangementKeyRepo } from "../ArrangementKeyRepo.js";
 
+type Call = { method: string; args: unknown[] };
+
 // Each query builder chain is recorded separately so a test can tell the select from the delete.
-function recordingDb(selectRows: any[]) {
-  const queries: { method: string; args: any[] }[][] = [];
-  const chain = (first: string, args: any[]) => {
-    const calls = [{ method: first, args }];
+function recordingDb(selectRows: { id: string }[]) {
+  const queries: Call[][] = [];
+  const chain = (first: string, args: unknown[]): object => {
+    const calls: Call[] = [{ method: first, args }];
     queries.push(calls);
-    const proxy: any = new Proxy({}, {
+    const proxy: object = new Proxy({}, {
       get(_t, prop) {
         if (typeof prop === "symbol" || prop === "then") return undefined;
         if (prop === "execute") return async () => (first === "selectFrom" ? selectRows : []);
-        return (...a: any[]) => { calls.push({ method: prop as string, args: a }); return proxy; };
+        return (...a: unknown[]) => { calls.push({ method: prop, args: a }); return proxy; };
       }
     });
     return proxy;
   };
-  const db: any = { selectFrom: (...a: any[]) => chain("selectFrom", a), deleteFrom: (...a: any[]) => chain("deleteFrom", a) };
+  const db = { selectFrom: (...a: unknown[]) => chain("selectFrom", a), deleteFrom: (...a: unknown[]) => chain("deleteFrom", a) };
   return { db, queries };
 }
 
-const whereArgs = (calls: { method: string; args: any[] }[]) => calls.filter((c) => c.method === "where").map((c) => c.args);
+const whereArgs = (calls: Call[]) => calls.filter((c) => c.method === "where").map((c) => c.args);
 
 describe("ArrangementKeyRepo.deleteForArrangement", () => {
   afterEach(() => jest.restoreAllMocks());
