@@ -42,8 +42,13 @@ export class ArrangementKeyRepo {
     return getDb().selectFrom("arrangementKeys").selectAll().where("churchId", "=", churchId).execute() as any;
   }
 
+  // arrangementKeys has no index on arrangementId, so a DELETE filtered by it scans the table and
+  // locks every row it reads: bulk song deletes queued one at a time until requests timed out.
+  // Read the ids first (a plain select takes no locks), then delete only those rows by primary key.
   public async deleteForArrangement(churchId: string, arrangementId: string) {
-    await getDb().deleteFrom("arrangementKeys").where("churchId", "=", churchId).where("arrangementId", "=", arrangementId).execute();
+    const rows = await getDb().selectFrom("arrangementKeys").select("id").where("churchId", "=", churchId).where("arrangementId", "=", arrangementId).execute();
+    if (rows.length === 0) return;
+    await getDb().deleteFrom("arrangementKeys").where("churchId", "=", churchId).where("id", "in", rows.map((r) => r.id)).execute();
   }
 
   public async loadByArrangementId(churchId: string, arrangementId: string) {
