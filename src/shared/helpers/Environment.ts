@@ -1,4 +1,5 @@
-import { EnvironmentBase, AwsHelper } from "@churchapps/apihelper";
+import { EnvironmentBase } from "@churchapps/apihelper";
+import { readSsmParameters } from "./SsmParameters.js";
 import { DatabaseUrlParser, DatabaseConfig } from "./DatabaseUrlParser.js";
 
 // Settings read from the per-environment config file (config/<env>.json) that initBase loads.
@@ -155,20 +156,20 @@ export class Environment extends EnvironmentBase {
     this.assertRuntimeSecrets(environment);
     this.currentEnvironment = environment;
 
-    // gocurriculum OAuth client secret: env var first (parity with other integration secrets),
-    // else the SSM param the deploy created. Consumed by setProviderSecret in ProviderProxyController,
-    // whose controller module is imported after this runs.
-    if (!process.env.GOCURRICULUM_CLIENT_SECRET) {
-      process.env.GOCURRICULUM_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/gocurriculumClientSecret`);
-    }
-    if (!process.env.GOCURRICULUM_FEEDS) {
-      process.env.GOCURRICULUM_FEEDS = await AwsHelper.readParameter(`/${environment}/gocurriculumFeeds`);
-    }
-    if (!process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
-      process.env.GOOGLE_DRIVE_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/googleDriveClientSecret`);
-    }
-    if (!process.env.ONEDRIVE_CLIENT_SECRET) {
-      process.env.ONEDRIVE_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/onedriveClientSecret`);
+    // Integration secrets: env var first (parity with other integration secrets), else the SSM params
+    // the deploy created, read in one batched call so a burst of cold starts is not throttled.
+    // GOCURRICULUM_CLIENT_SECRET is consumed by setProviderSecret in ProviderProxyController, whose
+    // controller module is imported after this runs.
+    const ssmSecrets: Record<string, string> = {
+      GOCURRICULUM_CLIENT_SECRET: `/${environment}/gocurriculumClientSecret`,
+      GOCURRICULUM_FEEDS: `/${environment}/gocurriculumFeeds`,
+      GOOGLE_DRIVE_CLIENT_SECRET: `/${environment}/googleDriveClientSecret`,
+      ONEDRIVE_CLIENT_SECRET: `/${environment}/onedriveClientSecret`
+    };
+    const missing = Object.keys(ssmSecrets).filter((key) => !process.env[key]);
+    if (missing.length > 0) {
+      const values = await readSsmParameters(missing.map((key) => ssmSecrets[key]));
+      missing.forEach((key) => { process.env[key] = values[ssmSecrets[key]]; });
     }
 
     this.initializeModuleConfigs(data);
