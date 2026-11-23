@@ -62,6 +62,14 @@ export class LinkRepo {
     return getDb().selectFrom("links").selectAll().where("churchId", "=", churchId).where("siteId", "=", siteId).orderBy("sort").execute() as any;
   }
 
+  public async loadByCategoryAndData(churchId: string, category: string, linkData: string): Promise<Link[]> {
+    return getDb().selectFrom("links").selectAll()
+      .where("churchId", "=", churchId)
+      .where("category", "=", category)
+      .where("linkData", "=", linkData)
+      .orderBy("sort").execute() as any;
+  }
+
   public async loadByCategory(churchId: string, category: string, siteId = ""): Promise<Link[]> {
     return getDb().selectFrom("links").selectAll()
       .where("churchId", "=", churchId)

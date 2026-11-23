@@ -24,7 +24,8 @@ const contentGateway = {
   loadRegistrationsByPerson: jest.fn(async () => [{ id: "r1" }]),
   loadRegistrationMembersByPerson: jest.fn(async () => [{ id: "rm1" }]),
   loadEventRsvpsByPerson: jest.fn(async () => [{ id: "rsvp1" }]),
-  loadEventBookingsByPerson: jest.fn(async () => [{ id: "bk1" }])
+  loadEventBookingsByPerson: jest.fn(async () => [{ id: "bk1" }]),
+  loadPersonDocuments: jest.fn(async () => ({ files: [{ id: "pf1", fileName: "baptism.pdf" }], links: [{ id: "pl1", text: "Certificate" }] }))
 };
 
 jest.mock("../../../../shared/modules/index.js", () => ({
@@ -70,6 +71,8 @@ describe("GdprExportHelper.exportPersonData", () => {
     expect(result.registrationMembers).toEqual([{ id: "rm1" }]);
     expect(result.eventRsvps).toEqual([{ id: "rsvp1" }]);
     expect(result.eventBookings).toEqual([{ id: "bk1" }]);
+    expect(contentGateway.loadPersonDocuments).toHaveBeenCalledWith("c1", "p1");
+    expect(result.documents).toEqual({ files: [{ id: "pf1", fileName: "baptism.pdf" }], links: [{ id: "pl1", text: "Certificate" }] });
   });
 
   it("nests form submission answers under each submission", async () => {

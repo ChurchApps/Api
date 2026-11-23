@@ -149,6 +149,20 @@ export class GdprErasureHelper {
       await db.deleteFrom("registrations").where("personId", "=", personId)
         .where("churchId", "=", churchId).execute();
     }
+
+    // Documents on the person's record are about this person only; remove the bytes and the rows.
+    const files = await db.selectFrom("files").select(["id", "externalId"])
+      .where("churchId", "=", churchId).where("contentType", "=", "person").where("contentId", "=", personId).execute();
+    for (const file of files) {
+      if (!file.externalId) continue;
+      try {
+        await FileStorageHelper.remove(file.externalId);
+      } catch {
+        // Object may already be gone
+      }
+    }
+    await db.deleteFrom("files").where("churchId", "=", churchId).where("contentType", "=", "person").where("contentId", "=", personId).execute();
+    await db.deleteFrom("links").where("churchId", "=", churchId).where("category", "=", "personLink").where("linkData", "=", personId).execute();
   }
 
   private static async deletePhoto(churchId: string, personId: string) {
