@@ -15,11 +15,13 @@ jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGatewa
 const prepareRequest = jest.fn();
 const completeDecision = jest.fn();
 const notifyReviewers = jest.fn();
+const prepareHouseholdEdit = jest.fn();
 const snooze = jest.fn(async (task: Task, ..._rest: unknown[]) => task);
 const reassign = jest.fn(async (task: Task, ..._rest: unknown[]) => task);
 jest.mock("../../helpers/index", () => ({
   WorkflowHelper: { snooze: (...args: Parameters<typeof snooze>) => snooze.apply(null, args), reassign: (...args: Parameters<typeof reassign>) => reassign.apply(null, args) },
   DirectoryUpdateHelper: { handleDirectoryUpdate: jest.fn() },
+  HouseholdEditHelper: { prepareRequest: (...args: unknown[]) => prepareHouseholdEdit.apply(null, args) },
   AccountDeletionHelper: {
     taskType: "accountDeletion",
     prepareRequest: (...args: unknown[]) => prepareRequest.apply(null, args),
@@ -132,8 +134,29 @@ describe("TaskController member directory updates and reads", () => {
   });
 
   it("pins a member's directory update to their own person", async () => {
-    await makeController([], repos).save(req({ query: { type: "directoryUpdate" }, body: [{ associatedWithType: "person", associatedWithId: "pVictim", status: "Closed", data: "[]" }] }), res);
+    await makeController([], repos).save(req({ query: { type: "directoryUpdate" }, body: [{ associatedWithType: "person", status: "Closed", data: "[]" }] }), res);
     expect(repos.task.save).toHaveBeenCalledWith(expect.objectContaining({ associatedWithId: "p1", createdById: "p1", status: "Open" }));
+  });
+
+  it("sends a request about someone else through the household edit checks", async () => {
+    prepareHouseholdEdit.mockReset().mockImplementation(async (_au: unknown, task: Task) => { Object.assign(task, { status: "Open", createdById: "p1", assignedToType: "group", assignedToId: "gApprovers" }); return {}; });
+    await makeController([], repos).save(req({ query: { type: "directoryUpdate" }, body: [{ associatedWithType: "person", associatedWithId: "pChild", status: "Closed", data: "[]" }] }), res);
+    expect(prepareHouseholdEdit).toHaveBeenCalledTimes(1);
+    expect(repos.task.save).toHaveBeenCalledWith(expect.objectContaining({ associatedWithId: "pChild", createdById: "p1", status: "Open", assignedToId: "gApprovers" }));
+  });
+
+  it("saves nothing when the household edit checks refuse", async () => {
+    prepareHouseholdEdit.mockReset().mockResolvedValue({ status: 401 });
+    const result = await makeController([], repos).save(req({ query: { type: "directoryUpdate" }, body: [{ associatedWithType: "person", associatedWithId: "p1", data: "[]" }, { associatedWithType: "person", associatedWithId: "pVictim", data: "[]" }] }), res);
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.task.save).not.toHaveBeenCalled();
+  });
+
+  it("returns the household edit error message", async () => {
+    prepareHouseholdEdit.mockReset().mockResolvedValue({ status: 400, error: "no approval group" });
+    const result = await makeController([], repos).save(req({ query: { type: "directoryUpdate" }, body: [{ associatedWithId: "pChild", data: "[]" }] }), res);
+    expect(result).toEqual({ obj: { message: "no approval group" }, status: 400 });
+    expect(repos.task.save).not.toHaveBeenCalled();
   });
 
   it("401s a member directory update that targets an existing task", async () => {
