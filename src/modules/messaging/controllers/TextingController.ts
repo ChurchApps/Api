@@ -150,17 +150,28 @@ export class TextingController extends MessagingBaseController {
     });
   }
 
-  @httpPost("/send")
-  public async sendToGroup(req: express.Request<{}, {}, { groupId: string; message: string }>, res: express.Response): Promise<any> {
+  @httpPost("/preview")
+  public async previewPeople(req: express.Request<{}, {}, { personIds?: string[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
-      const { groupId, message } = req.body;
-      if (!groupId || !message) return this.json({ error: "groupId and message are required" }, 400);
+      const personIds = req.body?.personIds || [];
+      const members = personIds.length ? await this.getPersonDetails(au.churchId, personIds) : [];
+      const { eligible, optedOut, noPhone } = this.categorizeRecipients(members);
+      return { totalMembers: members.length, eligibleCount: eligible.length, optedOutCount: optedOut.length, noPhoneCount: noPhone.length };
+    });
+  }
+
+  @httpPost("/send")
+  public async sendToGroup(req: express.Request<{}, {}, { groupId?: string; personIds?: string[]; message: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
+      const { groupId, personIds, message } = req.body;
+      if ((!groupId && !personIds?.length) || !message) return this.json({ error: "groupId or personIds, and message are required" }, 400);
 
       const config = await this.getProviderConfig(au.churchId);
       if (!config) return this.json({ error: "No texting provider configured" }, 400);
 
-      const members = await this.getGroupMemberDetails(au.churchId, groupId, au.jwt);
+      const members = groupId ? await this.getGroupMemberDetails(au.churchId, groupId, au.jwt) : await this.getPersonDetails(au.churchId, personIds || []);
       const { eligible, optedOut, noPhone } = this.categorizeRecipients(members);
 
       if (eligible.length === 0) return this.json({ error: "No eligible recipients" }, 400);
@@ -355,6 +366,19 @@ export class TextingController extends MessagingBaseController {
         optedOut: m.person?.optedOut === true || m.person?.optedOut === 1
       };
     });
+  }
+
+  private async getPersonDetails(churchId: string, personIds: string[]): Promise<GroupMemberDetail[]> {
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    const people: any[] = await membershipRepos.person.loadByIds(churchId, [...new Set(personIds)]);
+    return people.map((p: any) => ({
+      personId: p.id,
+      displayName: p.displayName || "",
+      firstName: p.firstName || "",
+      lastName: p.lastName || "",
+      mobilePhone: p.mobilePhone || "",
+      optedOut: p.optedOut === true || p.optedOut === 1
+    }));
   }
 
   private categorizeRecipients(members: GroupMemberDetail[]): CategorizedRecipients {

@@ -764,7 +764,8 @@ export class NotificationHelper {
     }
 
     try {
-      await EmailHelper.sendTemplatedEmail(await this.churchFrom(notification.churchId), email, "B1.church", NotificationHelper.adminRoot(), subject, html, "ChurchEmailTemplate.html");
+      const logo = options.churchAuthored ? await this.churchLogo(notification.churchId) : undefined;
+      await EmailHelper.sendTemplatedEmail(await this.churchFrom(notification.churchId), email, "B1.church", NotificationHelper.adminRoot(), subject, html, "ChurchEmailTemplate.html", undefined, logo);
       if (reservationId) await ChurchEmailLimiter.settle(notification.churchId, reservationId, true);
       else await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", true, email);
       notification.deliveryMethod = "complete";
@@ -787,7 +788,7 @@ export class NotificationHelper {
     const reservation = await ChurchEmailLimiter.reserve(churchId, "workflowEmail", [{ address: email, personId, contentId: taskId }]);
     if (!reservation) return "blocked (church email approval or daily limit)";
     try {
-      await EmailHelper.sendTemplatedEmail(await this.churchFrom(churchId), email, "B1.church", NotificationHelper.adminRoot(), subject, html, "ChurchEmailTemplate.html");
+      await EmailHelper.sendTemplatedEmail(await this.churchFrom(churchId), email, "B1.church", NotificationHelper.adminRoot(), subject, html, "ChurchEmailTemplate.html", undefined, await this.churchLogo(churchId));
       await ChurchEmailLimiter.settle(churchId, reservation[0], true);
       return "sent";
     } catch (err) {
@@ -808,6 +809,14 @@ export class NotificationHelper {
       return TransactionalEmailHelper.fromAddress(church?.name);
     } catch {
       return TransactionalEmailHelper.fromAddress();
+    }
+  }
+
+  private static async churchLogo(churchId: string): Promise<string | undefined> {
+    try {
+      return TransactionalEmailHelper.logoUrl(await getMembershipModuleGateway().loadSetting(churchId, "logoLight"));
+    } catch {
+      return undefined;
     }
   }
 
