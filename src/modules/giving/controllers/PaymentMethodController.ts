@@ -396,6 +396,18 @@ export class PaymentMethodController extends GivingBaseController {
       }
       if (!permission) return this.json({}, 401);
 
+      // If the lookup fails we can't tell, so the delete goes ahead as it always has.
+      const inUse = await GatewayService.activeSubscriptionIdsUsingMethod(gateway, id, customerId).catch((e): null => {
+        console.warn("[PM Delete] Could not check recurring gifts for payment method:", (e as Error)?.message || e);
+        return null;
+      });
+      if (inUse?.length) {
+        return this.json({
+          error: "This payment method is used by a recurring gift. Move the gift to another payment method, then delete this one.",
+          code: "payment_method_in_use"
+        }, 409);
+      }
+
       try {
         await GatewayService.deletePaymentMethod(gateway, id, customerId, this.repos);
         return this.json({});

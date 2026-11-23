@@ -435,6 +435,10 @@ export class StripeGatewayProvider implements IGatewayProvider {
     }
   }
 
+  async activeSubscriptionIdsUsingMethod(config: GatewayConfig, paymentMethodId: string, customerId: string): Promise<string[]> {
+    return await StripeHelper.getActiveSubscriptionIdsUsingMethod(config.privateKey, customerId, paymentMethodId);
+  }
+
   async deletePaymentMethod(config: GatewayConfig, paymentMethodId: string, customerId: string, _repos: GivingRepos): Promise<void> {
     if (paymentMethodId.startsWith("ba_")) await this.deleteBankAccount(config, customerId, paymentMethodId);
     else await this.detachPaymentMethod(config, paymentMethodId);

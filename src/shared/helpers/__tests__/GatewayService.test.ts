@@ -348,4 +348,30 @@ describe("GatewayService", () => {
       expect(mockConsoleDebug).not.toHaveBeenCalled();
     });
   });
+
+  describe("activeSubscriptionIdsUsingMethod", () => {
+    const gateway = { id: "GAT1", churchId: "CHU1", provider: "kingdomfunding", privateKey: "k" } as Gateway;
+
+    it("uses the provider's own lookup when it has one", async () => {
+      const activeSubscriptionIdsUsingMethod = jest.fn().mockResolvedValue(["sub_1"]);
+      (GatewayFactory.getProvider as jest.Mock).mockReturnValue({ activeSubscriptionIdsUsingMethod });
+      expect(await GatewayService.activeSubscriptionIdsUsingMethod(gateway, "pm_1", "cus_1")).toEqual(["sub_1"]);
+      expect(activeSubscriptionIdsUsingMethod).toHaveBeenCalledWith(expect.anything(), "pm_1", "cus_1");
+    });
+
+    it("otherwise matches the customer's listed recurring gifts by default_payment_method", async () => {
+      const listNormalizedSubscriptions = jest.fn().mockResolvedValue([
+        { id: "s1", default_payment_method: "123" },
+        { id: "s2", default_payment_method: "456" }
+      ]);
+      (GatewayFactory.getProvider as jest.Mock).mockReturnValue({ listNormalizedSubscriptions });
+      expect(await GatewayService.activeSubscriptionIdsUsingMethod(gateway, "123", "cus_1")).toEqual(["s1"]);
+      expect(listNormalizedSubscriptions).toHaveBeenCalledWith(expect.anything(), "cus_1");
+    });
+
+    it("returns null when the provider can't list recurring gifts", async () => {
+      (GatewayFactory.getProvider as jest.Mock).mockReturnValue({});
+      expect(await GatewayService.activeSubscriptionIdsUsingMethod(gateway, "pm_1", "cus_1")).toBeNull();
+    });
+  });
 });
