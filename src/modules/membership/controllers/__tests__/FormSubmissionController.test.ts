@@ -10,6 +10,8 @@ jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emi
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn(), fromAddress: (name?: string) => (name ? `"${name}" <support@churchapps.org>` : "support@churchapps.org") } }));
 jest.mock("axios", () => ({ post: jest.fn() }));
 jest.mock("../../../../shared/modules/index.js", () => ({ getContentModuleGateway: () => ({ loadEvent: jest.fn(async (): Promise<unknown> => null), loadEventsForGroup: jest.fn(async (): Promise<unknown[]> => []) }) }));
+const sharedEnv: { captchaEnforce: boolean } = { captchaEnforce: false };
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: sharedEnv }));
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
 
 import express from "express";
@@ -19,6 +21,7 @@ import { ConversationalFormHelper } from "../../helpers/index.js";
 import { NotificationService } from "../../../../shared/helpers/NotificationService.js";
 import axios from "axios";
 import { Answer, Form, FormSubmission, GroupMember, Person, Question } from "../../models/index.js";
+import { CaptchaPass } from "../../../../shared/helpers/CaptchaPass.js";
 
 type TestUser = { churchId?: string; id?: string; personId?: string; checkAccess: () => boolean };
 type JsonResult = { obj: unknown; status: number };
@@ -399,5 +402,37 @@ describe("FormSubmissionController.get missing submission", () => {
     const result = (await controller.get("missing", queryRequest({ query: { include: "form,questions,answers" } }), res)) as JsonResult;
     expect(result.status).toBe(404);
     expect(repos.form.load).not.toHaveBeenCalled();
+  });
+});
+
+describe("FormSubmissionController.save captcha", () => {
+  beforeEach(() => { Object.assign(sharedEnv, { captchaEnforce: true, jwtSecret: "test-secret" }); });
+  afterEach(() => { Object.assign(sharedEnv, { captchaEnforce: false, jwtSecret: undefined }); });
+
+  it("refuses a signed-out submission without a captcha pass", async () => {
+    const { controller, repos } = formSubmissionController({ au: { checkAccess: () => false } });
+    const result: any = await (controller as any).save({ body: [{ formId: "f1" }] }, {});
+    expect(result.status).toBe(403);
+    expect(repos.formSubmission.save).not.toHaveBeenCalled();
+  });
+
+  it("refuses a pass issued for another church", async () => {
+    const { controller, repos } = formSubmissionController({ au: { checkAccess: () => false } });
+    const result: any = await (controller as any).save({ body: [{ formId: "f1", captchaPass: CaptchaPass.create("c2") }] }, {});
+    expect(result.status).toBe(403);
+    expect(repos.formSubmission.save).not.toHaveBeenCalled();
+  });
+
+  it("accepts a signed-out submission with a valid pass and doesn't store the pass", async () => {
+    const { controller, repos } = formSubmissionController({ au: { checkAccess: () => false } });
+    await (controller as any).save({ body: [{ formId: "f1", captchaPass: CaptchaPass.create("c1") }] }, {});
+    expect(repos.formSubmission.save).toHaveBeenCalledTimes(1);
+    expect(repos.formSubmission.save.mock.calls[0][0].captchaPass).toBeUndefined();
+  });
+
+  it("doesn't ask signed-in submitters for a pass", async () => {
+    const { controller, repos } = formSubmissionController({ auChurchId: "c1", auId: "u1" });
+    await (controller as any).save({ body: [{ formId: "f1" }] }, {});
+    expect(repos.formSubmission.save).toHaveBeenCalledTimes(1);
   });
 });
