@@ -850,6 +850,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-23_person_sms_opted_out": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "people",
+     "column": "smsOptedOut",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {
@@ -1663,6 +1674,23 @@
      "kind": "column",
      "table": "resources",
      "column": "active",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-11-22_rooms_resources_category": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "rooms",
+     "column": "categoryName",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "resources",
+     "column": "categoryName",
      "present": true
     }
    ],
@@ -2528,6 +2556,17 @@
     }
    ],
    "schemaChanges": 2
+  },
+  "2026-11-23_workflowSteps_instructions": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "workflowSteps",
+     "column": "instructions",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  }
 }

@@ -11,7 +11,7 @@ describe("DirectoryUpdateHelper photo checks", () => {
   beforeEach(() => store.mockClear());
 
   it("stores a small jpeg photo", async () => {
-    const task: Task = { status: "Open", associatedWithId: "p1", data: JSON.stringify([{ field: "photo", value: "data:image/jpeg;base64,AAAA" }]) };
+    const task: Task = { status: "Open", associatedWithId: "p1", data: JSON.stringify([{ field: "photo", value: "data:image/jpeg;base64,/9j/4AAQ" }]) };
     await DirectoryUpdateHelper.handleDirectoryUpdate("c1", task);
     expect(store).toHaveBeenCalledTimes(1);
     expect(JSON.parse(task.data)[0].value).toContain("https://cdn.test/c1/membership/people/pending/p1-");
@@ -31,7 +31,7 @@ describe("DirectoryUpdateHelper family member photos", () => {
   beforeEach(() => store.mockClear());
 
   it("parks a family member's photo as a pending file and keeps the email", async () => {
-    const member = { first: "Ann", last: "Clark", email: "ann@example.com", photo: "data:image/png;base64,AAAA" };
+    const member = { first: "Ann", last: "Clark", email: "ann@example.com", photo: "data:image/png;base64,iVBORw0KGgo=" };
     const task: Task = { status: "Open", associatedWithId: "p1", data: JSON.stringify([{ field: "familyMember", value: JSON.stringify(member) }]) };
     await DirectoryUpdateHelper.handleDirectoryUpdate("c1", task);
     expect(store).toHaveBeenCalledTimes(1);

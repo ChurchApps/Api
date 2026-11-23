@@ -8,7 +8,8 @@ jest.mock("../../../../shared/modules/index", () => ({
 jest.mock("../PersonConditionHelper", () => ({
   PersonConditionHelper: {
     apply: (data: Record<string, unknown>[], conditions: SearchCondition[]) => conditions.reduce((rows: Record<string, unknown>[], c) => rows.filter((r) => String(r[c.field]) === String(c.value)), data),
-    applyOne: (data: Record<string, unknown>[]) => data
+    applyOne: jest.fn((data: Record<string, unknown>[]) => data),
+    usesThisMonth: (conditions: SearchCondition[]) => conditions.some((c) => c.value === "thisMonth")
   }
 }));
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
@@ -156,5 +157,42 @@ describe("PersonFieldValueRepo.upsert (blank clears the row)", () => {
 
     expect(save).not.toHaveBeenCalled();
     expect(del).not.toHaveBeenCalled();
+  });
+});
+
+describe("household inclusion", () => {
+  const people = [
+    { id: "dad", householdId: "h1", householdRole: "Head" },
+    { id: "mom", householdId: "h1", householdRole: "Spouse" },
+    { id: "kid", householdId: "h1", householdRole: "Child" },
+    { id: "grandma", householdId: "h1", householdRole: "Other" },
+    { id: "neighbor", householdId: "h2", householdRole: "Head" }
+  ];
+  const groupRules = { match: "all" as const, conditions: [{ provider: "group" as const, entityId: "g1" }] };
+  const repos = {
+    person: { loadAll: jest.fn().mockResolvedValue(people) },
+    groupMember: { loadForGroup: jest.fn().mockResolvedValue([{ personId: "kid" }]) }
+  } as any;
+
+  it("replaces matches with the adults of their households", async () => {
+    expect((await ListRuleHelper.evaluate("ch1", groupRules, "adults", repos)).sort()).toEqual(["dad", "mom"]);
+  });
+
+  it("still adds children or the whole household for the other modes", async () => {
+    expect((await ListRuleHelper.evaluate("ch1", groupRules, "household", repos)).sort()).toEqual(["dad", "grandma", "kid", "mom"]);
+    expect((await ListRuleHelper.evaluate("ch1", groupRules, "children", repos)).sort()).toEqual(["kid"]);
+  });
+});
+
+describe("this month person conditions", () => {
+  it("evaluates with the church's time zone", async () => {
+    const repos = {
+      person: { loadAll: jest.fn().mockResolvedValue([{ id: "p1" }]) },
+      church: { loadById: jest.fn().mockResolvedValue({ timeZone: "America/Chicago" }) }
+    } as any;
+    const rules = { match: "all" as const, conditions: [{ provider: "person" as const, field: "birthMonth", operator: "equals", value: "thisMonth" }] };
+    await ListRuleHelper.evaluate("ch1", rules, undefined, repos);
+    expect(PersonConditionHelper.applyOne).toHaveBeenLastCalledWith(expect.any(Array), expect.objectContaining({ value: "thisMonth" }), "America/Chicago");
+    expect(repos.church.loadById).toHaveBeenCalledWith("ch1");
   });
 });

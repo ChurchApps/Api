@@ -60,12 +60,13 @@ export class TextingController extends MessagingBaseController {
     });
   }
 
-  // Unauthenticated provider webhook; the HMAC token in the path ties it to one church. Non-STOP replies are acknowledged and ignored.
+  // Unauthenticated provider webhook; the HMAC token in the path ties it to one church. Replies other than STOP/START are acknowledged and ignored.
   @httpPost("/inbound/:churchId/:token")
   public async inbound(@requestParam("churchId") churchId: string, @requestParam("token") token: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!SmsOptOutHelper.verify(churchId, token)) return this.json({}, 401);
       const { from, text } = SmsOptOutHelper.parse(req.body);
+      if (from && SmsOptOutHelper.isStart(text)) return { optedIn: await SmsOptOutHelper.optIn(churchId, from) };
       if (!from || !SmsOptOutHelper.isStop(text)) return { optedOut: 0 };
       return { optedOut: await SmsOptOutHelper.optOut(churchId, from) };
     });
@@ -256,7 +257,7 @@ export class TextingController extends MessagingBaseController {
       if (!person) return this.json({ error: "Person not found" }, 404);
       const phoneNumber: string = (person.mobilePhone || "").trim();
       if (!phoneNumber) return this.json({ error: "Person has no mobile phone" }, 400);
-      if (person.optedOut === true || person.optedOut === 1) return this.json({ error: "Person has opted out of text messages" }, 400);
+      if (person.smsOptedOut === true || person.smsOptedOut === 1) return this.json({ error: "Person has opted out of text messages" }, 400);
 
       const config = await this.getProviderConfig(au.churchId);
       if (!config) return this.json({ error: "No texting provider configured" }, 400);
@@ -352,7 +353,7 @@ export class TextingController extends MessagingBaseController {
         firstName: m.person?.name?.first || parts[0] || "",
         lastName: m.person?.name?.last || parts.slice(1).join(" ") || "",
         mobilePhone: m.person?.contactInfo?.mobilePhone || "",
-        optedOut: m.person?.optedOut === true || m.person?.optedOut === 1
+        optedOut: m.person?.smsOptedOut === true || m.person?.smsOptedOut === 1
       };
     });
   }

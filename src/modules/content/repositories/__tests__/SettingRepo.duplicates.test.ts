@@ -16,6 +16,9 @@ jest.mock("@churchapps/apihelper", () => ({ __esModule: true, ArrayHelper: {}, U
 import { SettingRepo } from "../SettingRepo";
 
 const CHURCH_ID = "tst1173";
+// settings.public is BIT(1): clients post a number even though Setting types it as a string, and "1" is too long for the column.
+const PUBLIC_ON = 1 as unknown as string;
+const PUBLIC_OFF = 0 as unknown as string;
 
 describe("content SettingRepo with duplicate church-level rows", () => {
   beforeEach(cleanup);
@@ -45,8 +48,8 @@ describe("content SettingRepo with duplicate church-level rows", () => {
 
   it("a save without an id updates the existing church-level row", async () => {
     const repo = new SettingRepo();
-    const first = await repo.save({ churchId: CHURCH_ID, keyName: "hidePublicSite", value: "true", public: "1" });
-    const second = await repo.save({ churchId: CHURCH_ID, keyName: "hidePublicSite", value: "false", public: "1" });
+    const first = await repo.save({ churchId: CHURCH_ID, keyName: "hidePublicSite", value: "true", public: PUBLIC_ON });
+    const second = await repo.save({ churchId: CHURCH_ID, keyName: "hidePublicSite", value: "false", public: PUBLIC_ON });
 
     const rows = (await repo.loadAll(CHURCH_ID)).filter((s) => s.keyName === "hidePublicSite");
     expect(rows).toHaveLength(1);
@@ -59,10 +62,10 @@ describe("content SettingRepo with duplicate church-level rows", () => {
     await sql`INSERT INTO settings (id, churchId, userId, keyName, value, public) VALUES
       ('ccccccccccc', ${CHURCH_ID}, NULL, 'youtubeChannelId', 'chan1', 1),
       ('ddddddddddd', ${CHURCH_ID}, NULL, 'youtubeChannelId', 'chan2', 1)`.execute(db);
-    await repo.save({ churchId: CHURCH_ID, keyName: "theme", value: "church", public: "0" });
-    await repo.save({ churchId: CHURCH_ID, userId: "user1173", keyName: "theme", value: "dark", public: "0" });
-    await repo.save({ churchId: CHURCH_ID, userId: "user1173", keyName: "theme", value: "light", public: "0" });
-    await repo.save({ churchId: CHURCH_ID, keyName: "youtubeChannelId", value: "chan3", public: "1" });
+    await repo.save({ churchId: CHURCH_ID, keyName: "theme", value: "church", public: PUBLIC_OFF });
+    await repo.save({ churchId: CHURCH_ID, userId: "user1173", keyName: "theme", value: "dark", public: PUBLIC_OFF });
+    await repo.save({ churchId: CHURCH_ID, userId: "user1173", keyName: "theme", value: "light", public: PUBLIC_OFF });
+    await repo.save({ churchId: CHURCH_ID, keyName: "youtubeChannelId", value: "chan3", public: PUBLIC_ON });
 
     expect((await repo.loadAll(CHURCH_ID)).filter((s) => s.keyName === "youtubeChannelId")).toHaveLength(3);
     expect((await repo.loadAll(CHURCH_ID)).find((s) => s.keyName === "theme").value).toBe("church");

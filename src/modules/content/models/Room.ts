@@ -6,4 +6,5 @@ export class Room {
   capacity?: number;
   approvalGroupId?: string;
   active?: boolean;
+  categoryName?: string;
 }

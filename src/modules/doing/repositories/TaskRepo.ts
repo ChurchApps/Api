@@ -147,21 +147,15 @@ export class TaskRepo {
     return query.execute();
   }
 
-  public async loadByTriggerIdContent(churchId: string, triggerId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
+  // since: start of the rule's current period; null means any prior card from this trigger dedups.
+  public async loadByTriggerIdContent(churchId: string, triggerId: string, since: Date | null, associatedWithType: string, associatedWithIds: string[]) {
     if (associatedWithIds.length === 0) return [];
     let query = getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
       .where("triggerId", "=", triggerId)
       .where("associatedWithType", "=", associatedWithType)
       .where("associatedWithId", "in", associatedWithIds);
-    const threshold = new Date();
-    switch (recurs) {
-      case "yearly": threshold.setFullYear(threshold.getFullYear() - 1); query = query.where("dateCreated", ">", threshold); break;
-      case "monthly": threshold.setMonth(threshold.getMonth() - 1); query = query.where("dateCreated", ">", threshold); break;
-      case "weekly": threshold.setDate(threshold.getDate() - 7); query = query.where("dateCreated", ">", threshold); break;
-      case "daily": threshold.setDate(threshold.getDate() - 1); query = query.where("dateCreated", ">", threshold); break;
-      default: break; // no repeat: any prior card from this trigger dedups
-    }
+    if (since) query = query.where("dateCreated", ">=", since);
     return query.orderBy("taskNumber").execute();
   }
 
