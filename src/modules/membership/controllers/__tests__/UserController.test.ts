@@ -482,6 +482,18 @@ describe("UserController.sendInviteEmail", () => {
     expect(result.status).toBe(200);
     expect(result.obj).toEqual({ success: true });
   });
+
+  // Prod 2026-11-15: a person record whose address has a space in the domain went to SES,
+  // which threw "Domain contains control or whitespace" and the invite answered 500 four times.
+  it("answers 400 without sending when the address has whitespace in it", async () => {
+    const { controller, repos } = userController(null);
+    repos.person.searchEmail.mockResolvedValue([{ email: "new@b .c" }]);
+    repos.church = { loadById: jest.fn(async () => ({ name: "Grace" })) };
+    const res: any = { status: jest.fn(function (this: any, code: number) { this.code = code; return this; }), json: jest.fn(function (this: any) { return this; }) };
+    await (controller as any).sendInviteEmail({ body: { email: "new@b .c", personName: "New", contextName: "Staff" }, headers: {} }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(send).not.toHaveBeenCalled();
+  });
 });
 
 describe("UserController.Delete (#1627)", () => {

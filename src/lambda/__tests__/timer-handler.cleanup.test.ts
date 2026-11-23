@@ -25,4 +25,11 @@ describe("handle30MinTimer", () => {
     await handle30MinTimer({} as ScheduledEvent, {} as Context);
     expect(jobNames).toContain("workflowSnoozed");
   });
+
+  // Birthday and anniversary rules run just after each church's local midnight (ChurchAppsSupport#1656).
+  it("runs scheduled workflow rules every 30 minutes", async () => {
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    await handle30MinTimer({} as ScheduledEvent, {} as Context);
+    expect(jobNames).toContain("scheduledRules");
+  });
 });

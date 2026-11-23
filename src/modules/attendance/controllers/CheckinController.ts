@@ -63,7 +63,7 @@ export class CheckinController extends AttendanceBaseController {
     for (const a of adults) {
       const phone = (a.mobilePhone || "").trim();
       if (!phone) { skippedNoPhone++; continue; }
-      if (a.optedOut) { skippedOptedOut++; continue; }
+      if (a.smsOptedOut) { skippedOptedOut++; continue; }
       if (seen.has(phone)) continue;
       seen.add(phone);
       eligible.push({ personId: a.personId, phoneNumber: phone });
