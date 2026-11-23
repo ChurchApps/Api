@@ -8,6 +8,10 @@ import { SsoHelper } from "./SsoHelper.js";
 import type { GuestMember, GuestRegistration } from "./GuestRegistrationHelper.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js";
 import { getAttendanceModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
+import type { Selectable } from "kysely";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
+
+type PeopleRow = Selectable<MembershipDatabase["people"]>;
 
 export class PersonHelper extends BasePersonHelper {
   private static async repos(): Promise<Repos> {
@@ -18,9 +22,9 @@ export class PersonHelper extends BasePersonHelper {
     // searchEmail hides removed people, so a caller without allowRestore never even loads a deleted
     // person - it creates a fresh one instead. Only the restoring path looks at removed rows.
     const normalized = (email || "").trim().toLowerCase();
-    const data: Person[] = ((allowRestore
+    const data: PeopleRow[] = (allowRestore
       ? await repos.person.searchEmailIncludingRemoved(churchId, email)
-      : await repos.person.searchEmail(churchId, email)) as any[]).filter((p) => normalized && (p.email || "").trim().toLowerCase() === normalized);
+      : await repos.person.searchEmail(churchId, email)).filter((p) => normalized && (p.email || "").trim().toLowerCase() === normalized);
     if (data.length === 0) {
       const household: Household = { churchId, name: lastName };
       await repos.household.save(household);
@@ -123,7 +127,8 @@ export class PersonHelper extends BasePersonHelper {
       if (m.email) person.contactInfo.email = m.email;
       if (m.phone) person.contactInfo.mobilePhone = m.phone;
       // birthDate is a validated YYYY-MM-DD string; PersonRepo stores it as a date-only value.
-      if (m.birthDate) person.birthDate = m.birthDate as any;
+      // Person.birthDate is typed Date, so the string is assigned without converting it.
+      if (m.birthDate) Object.assign(person, { birthDate: m.birthDate });
       if (m.gender) person.gender = m.gender;
       if (m.grade) person.grade = m.grade;
       if (i === 0 && registration.maritalStatus) person.maritalStatus = registration.maritalStatus;
@@ -139,7 +144,7 @@ export class PersonHelper extends BasePersonHelper {
       try {
         const group = await repos.group.load(churchId, groupId);
         if (group) {
-          const memberIds = new Set((await repos.groupMember.loadForGroup(churchId, groupId)).map((gm: any) => gm.personId));
+          const memberIds = new Set((await repos.groupMember.loadForGroup(churchId, groupId)).map((gm) => gm.personId));
           for (const p of people) {
             if (memberIds.has(p.id)) continue;
             const gm = await repos.groupMember.save({ churchId, groupId, personId: p.id, joinDate: new Date() });

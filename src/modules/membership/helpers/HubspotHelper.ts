@@ -1,13 +1,14 @@
+import type { FilterGroup } from "@hubspot/api-client/lib/codegen/crm/companies/models/FilterGroup.js";
 import { Environment } from "./index.js";
 
-// Define types locally to avoid ESM import issues with internal HubSpot paths
+// Define types locally to avoid ESM import issues with internal HubSpot paths (type-only imports are erased at runtime)
 interface PublicObjectSearchRequest {
   query: string;
   limit: number;
   after: string;
-  sorts: any[];
+  sorts: string[];
   properties: string[];
-  filterGroups: any[];
+  filterGroups: FilterGroup[];
 }
 
 enum AssociationSpecAssociationCategoryEnum {
@@ -49,7 +50,7 @@ export class HubspotHelper {
     if (Environment.hubspotKey) {
       const client = await this.getClient();
 
-      const company: any = {
+      const company: { properties: Record<string, string> } = {
         properties: {
           church_id: churchId,
           name: companyName,
@@ -62,7 +63,7 @@ export class HubspotHelper {
         }
       };
 
-      const contact: any = {
+      const contact: { properties: Record<string, string> } = {
         properties: {
           firstname: firstName,
           lastname: lastName,
@@ -88,7 +89,7 @@ export class HubspotHelper {
     }
   };
 
-  static setProperties = async (companyId: string, properties: any) => {
+  static setProperties = async (companyId: string, properties: Record<string, string>) => {
     const client = await this.getClient();
     try {
       const response = await client.crm.companies.basicApi.update(companyId, { properties });

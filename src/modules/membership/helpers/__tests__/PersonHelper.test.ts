@@ -1,43 +1,55 @@
 jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { getRepos: jest.fn() } }));
 const mockStore = jest.fn();
 const mockMove = jest.fn();
-jest.mock("@churchapps/apihelper", () => ({ PersonHelper: class {}, FileStorageHelper: { store: (...a: any[]) => mockStore(...a), move: (...a: any[]) => mockMove(...a) } }));
+jest.mock("@churchapps/apihelper", () => ({ PersonHelper: class {}, FileStorageHelper: { store: (...a: unknown[]) => mockStore(...a), move: (...a: unknown[]) => mockMove(...a) } }));
 jest.mock("../../../../shared/helpers/index.js", () => ({ Permissions: { people: { edit: "peopleEdit" } } }));
 jest.mock("../SsoHelper.js", () => ({ SsoHelper: { applyStashedPhoto: jest.fn() } }));
 jest.mock("../../../../shared/webhooks/WebhookDispatcher.js", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 const mockCreatePersonNote = jest.fn();
 const mockRecordAttendance = jest.fn();
 jest.mock("../../../../shared/modules/index.js", () => ({
-  getMessagingModuleGateway: () => ({ createPersonNote: (...args: any[]) => mockCreatePersonNote(...args) }),
-  getAttendanceModuleGateway: () => ({ recordAttendance: (...args: any[]) => mockRecordAttendance(...args) })
+  getMessagingModuleGateway: () => ({ createPersonNote: (...args: unknown[]) => mockCreatePersonNote(...args) }),
+  getAttendanceModuleGateway: () => ({ recordAttendance: (...args: unknown[]) => mockRecordAttendance(...args) })
 }));
 
 import { RepoManager } from "../../../../shared/infrastructure/index.js";
 import { PersonHelper } from "../PersonHelper.js";
 import { WebhookDispatcher } from "../../../../shared/webhooks/WebhookDispatcher.js";
+import type { GroupMember, Household, Person, UserChurch } from "../../models/index.js";
+import type { AuthenticatedUser } from "../../auth/index.js";
+
+interface GuestMatchQuery { firstName: string; email?: string; phone?: string }
+interface MockOpts {
+  loaded?: Person;
+  guestMatch?: (q: GuestMatchQuery) => Person | null;
+  householdPeople?: Person[];
+  groups?: { id: string }[];
+  groupMembers?: GroupMember[];
+}
+type MockPersonRepo = ReturnType<typeof mockRepos>["person"];
 
 // Mirrors the real PersonRepo: searchEmail filters `removed = false`, searchEmailIncludingRemoved does not.
 // The rows fixture is the whole table for the church, so a test can never hand searchEmail a deleted
 // person the real query would have hidden.
-function mockRepos(rows: any[] = [], opts: any = {}) {
+function mockRepos(rows: Person[] = [], opts: MockOpts = {}) {
   const person = {
     searchEmail: jest.fn(async () => rows.filter((r) => !r.removed)),
     searchEmailIncludingRemoved: jest.fn(async () => [...rows].sort((a, b) => Number(!!a.removed) - Number(!!b.removed))),
-    save: jest.fn(async (p: any) => { if (!p.id) p.id = "newP"; return p; }),
-    load: jest.fn(async () => opts.loaded ?? { id: "newP", churchId: "c1", removed: false, name: {} }),
-    convertAllToModelWithPermissions: (_c: string, data: any[]) => data.map((d) => ({ ...d })),
-    convertToModel: (_c: string, d: any) => (d ? { ...d } : null),
-    convertAllToModel: (_c: string, data: any[]) => data.map((d) => ({ ...d })),
-    findGuestMatch: jest.fn(async (_c: string, q: any) => (opts.guestMatch ? opts.guestMatch(q) : null)),
-    loadByHousehold: jest.fn(async (_c: string, hId: string) => (opts.householdPeople ?? []).filter((p: any) => p.householdId === hId)),
+    save: jest.fn(async (p: Person) => { if (!p.id) p.id = "newP"; return p; }),
+    load: jest.fn(async (): Promise<Person> => opts.loaded ?? { id: "newP", churchId: "c1", removed: false, name: {} }),
+    convertAllToModelWithPermissions: (_c: string, data: Person[]) => data.map((d) => ({ ...d })),
+    convertToModel: (_c: string, d: Person) => (d ? { ...d } : null),
+    convertAllToModel: (_c: string, data: Person[]) => data.map((d) => ({ ...d })),
+    findGuestMatch: jest.fn(async (_c: string, q: GuestMatchQuery) => (opts.guestMatch ? opts.guestMatch(q) : null)),
+    loadByHousehold: jest.fn(async (_c: string, hId: string) => (opts.householdPeople ?? []).filter((p) => p.householdId === hId)),
     updateFieldsByIds: jest.fn(),
     restore: jest.fn()
   };
-  const household = { save: jest.fn(async (h: any) => { h.id = "h1"; return h; }) };
-  const group = { load: jest.fn(async (_c: string, id: string) => (opts.groups ?? []).find((g: any) => g.id === id) ?? null) };
+  const household = { save: jest.fn(async (h: Household) => { h.id = "h1"; return h; }) };
+  const group = { load: jest.fn(async (_c: string, id: string) => (opts.groups ?? []).find((g) => g.id === id) ?? null) };
   const groupMember = {
-    save: jest.fn(async (gm: any) => ({ ...gm, id: "gm-" + gm.personId })),
-    loadForGroup: jest.fn(async (_c: string, gId: string) => (opts.groupMembers ?? []).filter((gm: any) => gm.groupId === gId))
+    save: jest.fn(async (gm: GroupMember) => ({ ...gm, id: "gm-" + gm.personId })),
+    loadForGroup: jest.fn(async (_c: string, gId: string) => (opts.groupMembers ?? []).filter((gm) => gm.groupId === gId))
   };
   const groupMemberHistory = { log: jest.fn() };
   (RepoManager.getRepos as jest.Mock).mockResolvedValue({ person, household, group, groupMember, groupMemberHistory });
@@ -111,10 +123,10 @@ describe("PersonHelper.getPerson without allowRestore (the anon path)", () => {
 describe("PersonHelper.claim", () => {
   it("does not link another church to the caller's person from their current church", async () => {
     const { person } = mockRepos([]);
-    const userChurch = { loadByUserId: jest.fn(async () => null), save: jest.fn(async (uc: any) => uc) };
-    (RepoManager.getRepos as jest.Mock).mockResolvedValue({ person, household: { save: jest.fn(async (h: any) => { h.id = "h1"; return h; }) }, userChurch });
-    const au: any = { id: "u1", email: "a@b.com", firstName: "A", lastName: "B", churchId: "churchA", personId: "personA", checkAccess: () => false };
-    const result = await PersonHelper.claim(au, "churchB");
+    const userChurch = { loadByUserId: jest.fn(async (): Promise<UserChurch> => null), save: jest.fn(async (uc: UserChurch) => uc) };
+    (RepoManager.getRepos as jest.Mock).mockResolvedValue({ person, household: { save: jest.fn(async (h: Household) => { h.id = "h1"; return h; }) }, userChurch });
+    const au: Partial<AuthenticatedUser> = { id: "u1", email: "a@b.com", firstName: "A", lastName: "B", churchId: "churchA", personId: "personA", checkAccess: () => false };
+    const result = await PersonHelper.claim(au as AuthenticatedUser, "churchB");
     expect(person.load).not.toHaveBeenCalledWith("churchA", "personA");
     expect(result.userChurch.personId).toBe("newP");
     expect(result.userChurch.churchId).toBe("churchB");
@@ -123,9 +135,9 @@ describe("PersonHelper.claim", () => {
 
 describe("PersonHelper.registerGuestHousehold", () => {
   it("records every new person as a Visitor and writes the included profile fields", async () => {
-    const saved: any[] = [];
+    const saved: Person[] = [];
     const { person } = mockRepos();
-    person.save.mockImplementation(async (p: any) => { p.id = "p" + (saved.length + 1); saved.push({ ...p, contactInfo: { ...p.contactInfo } }); return p; });
+    person.save.mockImplementation(async (p: Person) => { p.id = "p" + (saved.length + 1); saved.push({ ...p, contactInfo: { ...p.contactInfo } }); return p; });
     await PersonHelper.registerGuestHousehold("c1", {
       members: [
         { firstName: "Pat", lastName: "Visitor", email: "pat@example.com", phone: "555-0100", birthDate: "1990-04-02", gender: "Female", title: "Dr" },
@@ -147,9 +159,9 @@ describe("PersonHelper.registerGuestHousehold", () => {
 // ChurchAppsSupport#1448: the sign-up asks each later person's household role; the first person still heads a new household.
 describe("PersonHelper.registerGuestHousehold household roles", () => {
   it("files later people under the role they picked and keeps the first as Head", async () => {
-    const saved: any[] = [];
+    const saved: Person[] = [];
     const { person } = mockRepos();
-    person.save.mockImplementation(async (p: any) => { p.id = "p" + (saved.length + 1); saved.push({ ...p, contactInfo: { ...p.contactInfo } }); return p; });
+    person.save.mockImplementation(async (p: Person) => { p.id = "p" + (saved.length + 1); saved.push({ ...p, contactInfo: { ...p.contactInfo } }); return p; });
     await PersonHelper.registerGuestHousehold("c1", {
       members: [
         { firstName: "Pat", lastName: "Visitor", householdRole: "Child" },
@@ -166,9 +178,9 @@ describe("PersonHelper.registerGuestHousehold household roles", () => {
 // Issue #1374: the guest QR sign-up can add the household to the church's chosen group and save a comment as a note.
 describe("PersonHelper.registerGuestHousehold group and comments", () => {
   const registration = { members: [{ firstName: "Pat", lastName: "Visitor" }, { firstName: "Sam", lastName: "Visitor" }] };
-  const savePeople = (person: any) => {
+  const savePeople = (person: MockPersonRepo) => {
     let n = 0;
-    person.save.mockImplementation(async (p: any) => { if (!p.id) p.id = "p" + (++n); return p; });
+    person.save.mockImplementation(async (p: Person) => { if (!p.id) p.id = "p" + (++n); return p; });
   };
 
   beforeEach(() => { mockCreatePersonNote.mockReset().mockResolvedValue("conv1"); (WebhookDispatcher.emit as jest.Mock).mockClear(); });
@@ -177,7 +189,7 @@ describe("PersonHelper.registerGuestHousehold group and comments", () => {
     const { person, groupMember, groupMemberHistory } = mockRepos([], { groups: [{ id: "g1" }] });
     savePeople(person);
     await PersonHelper.registerGuestHousehold("c1", registration, "g1");
-    expect(groupMember.save.mock.calls.map((c: any[]) => c[0])).toEqual([
+    expect(groupMember.save.mock.calls.map((c) => c[0])).toEqual([
       expect.objectContaining({ churchId: "c1", groupId: "g1", personId: "p1" }),
       expect.objectContaining({ churchId: "c1", groupId: "g1", personId: "p2" })
     ]);
@@ -214,9 +226,9 @@ describe("PersonHelper.registerGuestHousehold group and comments", () => {
 // Issue #1375: with the church's switch on, guests who sign up during one of the group's service times are marked present.
 describe("PersonHelper.registerGuestHousehold attendance", () => {
   const registration = { members: [{ firstName: "Pat", lastName: "Visitor" }, { firstName: "Sam", lastName: "Visitor" }] };
-  const savePeople = (person: any) => {
+  const savePeople = (person: MockPersonRepo) => {
     let n = 0;
-    person.save.mockImplementation(async (p: any) => { if (!p.id) p.id = "p" + (++n); return p; });
+    person.save.mockImplementation(async (p: Person) => { if (!p.id) p.id = "p" + (++n); return p; });
   };
 
   beforeEach(() => { mockRecordAttendance.mockReset().mockResolvedValue(1); });
@@ -225,7 +237,7 @@ describe("PersonHelper.registerGuestHousehold attendance", () => {
     const { person } = mockRepos([], { groups: [{ id: "g1" }] });
     savePeople(person);
     await PersonHelper.registerGuestHousehold("c1", registration, "g1", true);
-    expect(mockRecordAttendance.mock.calls.map((c: any[]) => c.slice(0, 3))).toEqual([["c1", "p1", "g1"], ["c1", "p2", "g1"]]);
+    expect(mockRecordAttendance.mock.calls.map((c) => c.slice(0, 3))).toEqual([["c1", "p1", "g1"], ["c1", "p2", "g1"]]);
     expect(mockRecordAttendance.mock.calls[0][3]).toBeInstanceOf(Date);
   });
 
@@ -252,15 +264,15 @@ describe("PersonHelper.registerGuestHousehold attendance", () => {
 describe("PersonHelper.registerGuestHousehold reuses existing people", () => {
   const donald = { id: "pDonald", churchId: "c1", householdId: "hClark", householdRole: "Head", name: { first: "Donald", last: "Clark" }, conversationId: null as string };
   const carol = { id: "pCarol", churchId: "c1", householdId: "hClark", householdRole: "Spouse", name: { first: "Carol", last: "Clark" } };
-  const savePeople = (person: any) => {
+  const savePeople = (person: MockPersonRepo) => {
     let n = 0;
-    person.save.mockImplementation(async (p: any) => { if (!p.id) p.id = "new" + (++n); return p; });
+    person.save.mockImplementation(async (p: Person) => { if (!p.id) p.id = "new" + (++n); return p; });
   };
 
   beforeEach(() => { mockCreatePersonNote.mockReset().mockResolvedValue("conv1"); (WebhookDispatcher.emit as jest.Mock).mockClear(); });
 
   it("reuses the one person with the same first name and email, and changes nothing on them", async () => {
-    const { person, household } = mockRepos([], { guestMatch: (q: any) => (q.email === "donald@example.com" ? { ...donald } : null) });
+    const { person, household } = mockRepos([], { guestMatch: (q: GuestMatchQuery) => (q.email === "donald@example.com" ? { ...donald } : null) });
     savePeople(person);
     const result = await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clarke", email: "donald@example.com" }] });
     expect(person.findGuestMatch).toHaveBeenCalledWith("c1", { firstName: "Donald", email: "donald@example.com", phone: undefined });
@@ -272,7 +284,7 @@ describe("PersonHelper.registerGuestHousehold reuses existing people", () => {
   });
 
   it("reuses a person matched by phone", async () => {
-    const { person } = mockRepos([], { guestMatch: (q: any) => (q.phone === "(555) 010-0101" ? { ...donald } : null) });
+    const { person } = mockRepos([], { guestMatch: (q: GuestMatchQuery) => (q.phone === "(555) 010-0101" ? { ...donald } : null) });
     savePeople(person);
     const result = await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clark", phone: "(555) 010-0101" }] });
     expect(result.people.map((p) => p.id)).toEqual(["pDonald"]);
@@ -289,7 +301,7 @@ describe("PersonHelper.registerGuestHousehold reuses existing people", () => {
 
   it("reuses a child without contact details inside the matched household and adds new people to it", async () => {
     const { person, household } = mockRepos([], {
-      guestMatch: (q: any) => (q.firstName === "Donald" ? { ...donald } : null),
+      guestMatch: (q: GuestMatchQuery) => (q.firstName === "Donald" ? { ...donald } : null),
       householdPeople: [donald, carol]
     });
     savePeople(person);
@@ -308,13 +320,13 @@ describe("PersonHelper.registerGuestHousehold reuses existing people", () => {
 
   it("does not re-add someone who is already in the group", async () => {
     const { person, groupMember } = mockRepos([], {
-      guestMatch: (q: any) => (q.firstName === "Donald" ? { ...donald } : null),
+      guestMatch: (q: GuestMatchQuery) => (q.firstName === "Donald" ? { ...donald } : null),
       groups: [{ id: "g1" }],
       groupMembers: [{ groupId: "g1", personId: "pDonald" }]
     });
     savePeople(person);
     await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clark", email: "donald@example.com" }, { firstName: "Timmy", lastName: "Clark" }] }, "g1");
-    expect(groupMember.save.mock.calls.map((c: any[]) => c[0].personId)).toEqual(["new1"]);
+    expect(groupMember.save.mock.calls.map((c) => c[0].personId)).toEqual(["new1"]);
   });
 
   it("links a comment to a reused head only when they have no notes conversation yet", async () => {
@@ -337,9 +349,9 @@ describe("PersonHelper.registerGuestHousehold photos", () => {
   beforeEach(() => mockStore.mockClear());
 
   it("stores each new person's photo at their profile photo path", async () => {
-    const saved: any[] = [];
+    const saved: Person[] = [];
     const { person } = mockRepos();
-    person.save.mockImplementation(async (p: any) => { if (!p.id) { p.id = "p" + (saved.length + 1); saved.push(p); } return p; });
+    person.save.mockImplementation(async (p: Person) => { if (!p.id) { p.id = "p" + (saved.length + 1); saved.push(p); } return p; });
     await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Pat", lastName: "Visitor", photo: png }, { firstName: "Sam", lastName: "Visitor" }] });
     expect(mockStore).toHaveBeenCalledTimes(1);
     expect(mockStore).toHaveBeenCalledWith("/c1/membership/people/p1.png", "image/png", Buffer.from("iVBORw0KGgo=", "base64"));
@@ -360,7 +372,7 @@ describe("PersonHelper.applyPendingPhoto", () => {
 
   it("moves this church's pending photo to the person's photo path", async () => {
     mockRepos();
-    const p: any = { id: "p5", churchId: "c1", photo: "http://localhost:8084/content/c1/membership/people/pending/p1-family-1700000000000.png?dt=1700000000000" };
+    const p: Person = { id: "p5", churchId: "c1", photo: "http://localhost:8084/content/c1/membership/people/pending/p1-family-1700000000000.png?dt=1700000000000" };
     expect(await PersonHelper.applyPendingPhoto("c1", p)).toBe(true);
     expect(mockMove).toHaveBeenCalledWith("/c1/membership/people/pending/p1-family-1700000000000.png", "/c1/membership/people/p5.png");
     expect(p.photoUpdated).toBeInstanceOf(Date);
@@ -368,9 +380,9 @@ describe("PersonHelper.applyPendingPhoto", () => {
 
   it("ignores another church's file and anything outside the pending folder", async () => {
     mockRepos();
-    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "http://x/content/c2/membership/people/pending/p1-1.png" } as any)).toBe(false);
-    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "http://x/content/c1/membership/people/pending/../p7.png" } as any)).toBe(false);
-    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "/c1/membership/people/p5.png?dt=1" } as any)).toBe(false);
+    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "http://x/content/c2/membership/people/pending/p1-1.png" })).toBe(false);
+    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "http://x/content/c1/membership/people/pending/../p7.png" })).toBe(false);
+    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "/c1/membership/people/p5.png?dt=1" })).toBe(false);
     expect(mockMove).not.toHaveBeenCalled();
   });
 });

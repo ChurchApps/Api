@@ -1,5 +1,6 @@
-import { sql } from "kysely";
+import { sql, UpdateObject } from "kysely";
 import { getDb } from "../db/index.js";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Batch } from "../models/index.js";
 
@@ -14,20 +15,20 @@ export class BatchRepo {
       source: batch.source,
       status: batch.status || "open",
       itemCount: batch.itemCount ?? 0,
-      created: sql`NOW()` as any
+      created: sql<Date>`NOW()`
     }).execute();
     return batch;
   }
 
   public async complete(churchId: string, id: string, itemCount: number): Promise<void> {
     await getDb().updateTable("batches")
-      .set({ status: "completed", itemCount, completedAt: sql`NOW()` as any })
+      .set({ status: "completed", itemCount, completedAt: sql<Date>`NOW()` })
       .where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async setStatus(churchId: string, id: string, status: string, undone = false): Promise<void> {
-    const patch: any = { status };
-    if (undone) patch.undoneAt = sql`NOW()` as any;
+    const patch: UpdateObject<MembershipDatabase, "batches"> = { status };
+    if (undone) patch.undoneAt = sql<Date>`NOW()`;
     await getDb().updateTable("batches").set(patch).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
@@ -39,6 +40,6 @@ export class BatchRepo {
     return getDb().selectFrom("batches").selectAll().where("churchId", "=", churchId).orderBy("created", "desc").limit(500).execute() as Promise<Batch[]>;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: Batch) { return data; }
+  public convertAllToModel(_churchId: string, data: Batch[]) { return data || []; }
 }

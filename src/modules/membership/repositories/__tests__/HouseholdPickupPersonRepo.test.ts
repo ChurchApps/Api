@@ -7,12 +7,12 @@ import { HouseholdPickupPersonRepo } from "../HouseholdPickupPersonRepo.js";
 
 // Records every builder call so we can assert every query is scoped by churchId (+ householdId).
 function recordingDb() {
-  const wheres: { col: any; op: any; val: any }[] = [];
-  const proxy: any = new Proxy({}, {
+  const wheres: { col: unknown; op: unknown; val: unknown }[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (prop === "execute") return async () => [];
       if (prop === "executeTakeFirst") return async () => null;
-      if (prop === "where") return (col: any, op: any, val: any) => { wheres.push({ col, op, val }); return proxy; };
+      if (prop === "where") return (col: unknown, op: unknown, val: unknown) => { wheres.push({ col, op, val }); return proxy; };
       return () => proxy;
     }
   });

@@ -21,8 +21,8 @@ export class FormRepo {
       name: form.name,
       description: form.description,
       contentType: form.contentType,
-      accessStartTime: accessStartTime as any,
-      accessEndTime: accessEndTime as any,
+      accessStartTime: sql<Date>`${accessStartTime}`,
+      accessEndTime: sql<Date>`${accessEndTime}`,
       restricted: form.restricted,
       thankYouMessage: form.thankYouMessage,
       photoUrl: form.photoUrl || null,
@@ -31,10 +31,10 @@ export class FormRepo {
       groupId: form.groupId || null,
       followUpSubject: form.followUpSubject,
       followUpBody: form.followUpBody,
-      createdTime: sql`NOW()` as any,
-      modifiedTime: sql`NOW()` as any,
-      archived: false as any,
-      removed: false as any
+      createdTime: sql<Date>`NOW()`,
+      modifiedTime: sql<Date>`NOW()`,
+      archived: false,
+      removed: false
     }).execute();
     return form;
   }
@@ -47,8 +47,8 @@ export class FormRepo {
       description: form.description,
       contentType: form.contentType,
       restricted: form.restricted,
-      accessStartTime: accessStartTime as any,
-      accessEndTime: accessEndTime as any,
+      accessStartTime: sql<Date>`${accessStartTime}`,
+      accessEndTime: sql<Date>`${accessEndTime}`,
       archived: form.archived,
       thankYouMessage: form.thankYouMessage,
       photoUrl: form.photoUrl || null,
@@ -57,25 +57,25 @@ export class FormRepo {
       groupId: form.groupId || null,
       followUpSubject: form.followUpSubject,
       followUpBody: form.followUpBody,
-      modifiedTime: sql`NOW()` as any
+      modifiedTime: sql<Date>`NOW()`
     }).where("id", "=", form.id).where("churchId", "=", form.churchId).execute();
     return form;
   }
 
   public async delete(churchId: string, id: string) {
-    await getDb().updateTable("forms").set({ removed: true as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
+    await getDb().updateTable("forms").set({ removed: true }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async load(churchId: string, id: string) {
-    return (await getDb().selectFrom("forms").selectAll().where("id", "=", id).where("churchId", "=", churchId).where("removed", "=", false as any).executeTakeFirst()) ?? null;
+    return (await getDb().selectFrom("forms").selectAll().where("id", "=", id).where("churchId", "=", churchId).where("removed", "=", false).executeTakeFirst()) ?? null;
   }
 
   public async loadAll(churchId: string) {
-    return getDb().selectFrom("forms").selectAll().where("churchId", "=", churchId).where("removed", "=", false as any).where("archived", "=", false as any).orderBy("name").execute();
+    return getDb().selectFrom("forms").selectAll().where("churchId", "=", churchId).where("removed", "=", false).where("archived", "=", false).orderBy("name").execute();
   }
 
   public async loadAllArchived(churchId: string) {
-    return getDb().selectFrom("forms").selectAll().where("churchId", "=", churchId).where("removed", "=", false as any).where("archived", "=", true as any).execute();
+    return getDb().selectFrom("forms").selectAll().where("churchId", "=", churchId).where("removed", "=", false).where("archived", "=", true).execute();
   }
 
   // Archived forms are included on purpose: this hydrates a person's existing
@@ -84,7 +84,7 @@ export class FormRepo {
     if (ids.length === 0) return [];
     return getDb().selectFrom("forms").selectAll()
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any)
+      .where("removed", "=", false)
       .where("id", "in", ids)
       .orderBy("name")
       .execute();
@@ -94,8 +94,8 @@ export class FormRepo {
     return getDb().selectFrom("forms").selectAll()
       .where("churchId", "=", churchId)
       .where("groupId", "=", groupId)
-      .where("removed", "=", false as any)
-      .where("archived", "=", false as any)
+      .where("removed", "=", false)
+      .where("archived", "=", false)
       .orderBy("name")
       .execute();
   }
@@ -104,8 +104,8 @@ export class FormRepo {
     return getDb().selectFrom("forms").selectAll()
       .where("contentType", "<>", "form")
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any)
-      .where("archived", "=", false as any)
+      .where("removed", "=", false)
+      .where("archived", "=", false)
       .execute();
   }
 
@@ -113,8 +113,8 @@ export class FormRepo {
     return getDb().selectFrom("forms").selectAll()
       .where("contentType", "<>", "form")
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any)
-      .where("archived", "=", true as any)
+      .where("removed", "=", false)
+      .where("archived", "=", true)
       .execute();
   }
 
@@ -125,8 +125,8 @@ export class FormRepo {
       .select("mp.action")
       .where("mp.memberId", "=", personId)
       .where("f.churchId", "=", churchId)
-      .where("f.removed", "=", 0 as any)
-      .where("f.archived", "=", 0 as any)
+      .where("f.removed", "=", sql<boolean>`${0}`)
+      .where("f.archived", "=", sql<boolean>`${0}`)
       .execute();
   }
 
@@ -136,8 +136,8 @@ export class FormRepo {
       .selectAll("f")
       .where("mp.memberId", "=", personId)
       .where("f.churchId", "=", churchId)
-      .where("f.removed", "=", 0 as any)
-      .where("f.archived", "=", 1 as any)
+      .where("f.removed", "=", sql<boolean>`${0}`)
+      .where("f.archived", "=", sql<boolean>`${1}`)
       .execute();
   }
 
@@ -149,8 +149,8 @@ export class FormRepo {
       .where("f.id", "=", formId)
       .where("f.churchId", "=", churchId)
       .where("mp.memberId", "=", personId)
-      .where("f.removed", "=", 0 as any)
-      .where("f.archived", "=", 0 as any)
+      .where("f.removed", "=", sql<boolean>`${0}`)
+      .where("f.archived", "=", sql<boolean>`${0}`)
       .executeTakeFirst()) ?? null;
   }
 
@@ -160,8 +160,8 @@ export class FormRepo {
         "id", "name", "restricted", "churchId", "autoCreatePerson", "groupId", "followUpSubject", "followUpBody", "accessStartTime", "accessEndTime"
       ])
       .where("id", "=", id)
-      .where("removed", "=", 0 as any)
-      .where("archived", "=", 0 as any)
+      .where("removed", "=", sql<boolean>`${0}`)
+      .where("archived", "=", sql<boolean>`${0}`)
       .executeTakeFirst()) ?? null;
   }
 
@@ -175,7 +175,7 @@ export class FormRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): Form {
+  protected rowToModel(row: Form): Form {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -199,12 +199,12 @@ export class FormRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Form) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: Form[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

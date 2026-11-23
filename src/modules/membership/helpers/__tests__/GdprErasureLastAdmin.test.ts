@@ -1,6 +1,6 @@
-const execute = jest.fn(async () => []);
-const executeTakeFirst = jest.fn(async () => null);
-const chain: any = new Proxy({}, {
+const execute = jest.fn(async (): Promise<unknown[]> => []);
+const executeTakeFirst = jest.fn(async (): Promise<null> => null);
+const chain: Record<string, unknown> = new Proxy({}, {
   get: (_t, prop) => {
     if (prop === "execute") return execute;
     if (prop === "executeTakeFirst") return executeTakeFirst;
@@ -14,7 +14,7 @@ jest.mock("@churchapps/apihelper", () => ({ FileStorageHelper: { remove: jest.fn
 import { GdprErasureHelper } from "../GdprErasureHelper.js";
 
 function repos(sole: boolean) {
-  return { roleMember: { isSoleDomainAdmin: jest.fn(async () => sole), deleteSelf: jest.fn() }, user: { delete: jest.fn() } } as any;
+  return { roleMember: { isSoleDomainAdmin: jest.fn(async () => sole), deleteSelf: jest.fn() }, user: { delete: jest.fn() } };
 }
 
 describe("GdprErasureHelper.anonymize and the last Domain Admin (#1627)", () => {

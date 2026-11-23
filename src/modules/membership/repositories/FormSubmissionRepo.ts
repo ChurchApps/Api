@@ -5,6 +5,9 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { FormSubmission } from "../models/index.js";
 import { DateHelper } from "../helpers/index.js";
 
+// A formSubmissions row; loadForSubmitter also joins the form name.
+type FormSubmissionRow = FormSubmission & { formName?: string };
+
 @injectable()
 export class FormSubmissionRepo {
   public async save(model: FormSubmission) {
@@ -21,9 +24,9 @@ export class FormSubmissionRepo {
       formId: formSubmission.formId,
       contentType: formSubmission.contentType,
       contentId: formSubmission.contentId,
-      submissionDate: submissionDate as any,
+      submissionDate: sql<Date>`${submissionDate}`,
       submittedBy: formSubmission.submittedBy,
-      revisionDate: revisionDate as any,
+      revisionDate: sql<Date>`${revisionDate}`,
       revisedBy: formSubmission.revisedBy
     }).execute();
     return formSubmission;
@@ -33,7 +36,7 @@ export class FormSubmissionRepo {
     await getDb().updateTable("formSubmissions").set({
       contentId: formSubmission.contentId,
       revisedBy: formSubmission.revisedBy,
-      revisionDate: sql`NOW()` as any
+      revisionDate: sql<Date>`NOW()`
     }).where("id", "=", formSubmission.id).where("churchId", "=", formSubmission.churchId).execute();
     return formSubmission;
   }
@@ -44,7 +47,7 @@ export class FormSubmissionRepo {
       contentId,
       submittedBy,
       revisedBy,
-      revisionDate: sql`NOW()` as any
+      revisionDate: sql<Date>`NOW()`
     }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
@@ -86,7 +89,7 @@ export class FormSubmissionRepo {
         eb("fs.submittedBy", "=", personId),
         eb.and([eb("fs.contentType", "=", "person"), eb("fs.contentId", "=", personId)])
       ]))
-      .where("f.removed", "=", false as any)
+      .where("f.removed", "=", false)
       .where("f.contentType", "=", "form")
       .orderBy("fs.submissionDate", "desc")
       .limit(50)
@@ -103,7 +106,7 @@ export class FormSubmissionRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): FormSubmission {
+  protected rowToModel(row: FormSubmissionRow): FormSubmission {
     const result: FormSubmission = {
       id: row.id,
       churchId: row.churchId,
@@ -119,12 +122,12 @@ export class FormSubmissionRepo {
     return result;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: FormSubmissionRow) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: FormSubmissionRow[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

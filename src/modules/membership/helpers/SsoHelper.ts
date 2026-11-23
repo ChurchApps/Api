@@ -19,6 +19,20 @@ export interface ProviderConfig {
   scope: string;
 }
 
+/** ID-token claims read from Google / Microsoft. */
+export interface SsoClaims {
+  email?: string;
+  preferred_username?: string;
+  email_verified?: boolean | string;
+  tid?: string;
+  xms_edov?: boolean | string;
+  given_name?: string;
+  family_name?: string;
+  name?: string;
+  picture?: string;
+  [claim: string]: unknown;
+}
+
 interface StatePayload {
   returnUrl: string;
   nonce: string;
@@ -97,7 +111,7 @@ export class SsoHelper {
     try {
       const decoded = jwt.verify(token, Environment.jwtSecret, { algorithms: ["HS256"] });
       if (typeof decoded === "string") return null;
-      const { returnUrl, nonce } = decoded as any;
+      const { returnUrl, nonce } = decoded as Partial<StatePayload>;
       if (!returnUrl || !nonce) return null;
       return { returnUrl, nonce };
     } catch {
@@ -133,12 +147,12 @@ export class SsoHelper {
       body: body.toString()
     });
     if (!res.ok) throw new Error(`Token exchange failed (${res.status})`);
-    const json = (await res.json()) as any;
+    const json = (await res.json()) as { id_token?: string; access_token?: string };
     if (!json.id_token) throw new Error("No id_token in token response");
     return { id_token: json.id_token, access_token: json.access_token };
   }
 
-  public static checkEmailTrust(provider: string, claims: any): { ok: boolean; email?: string; reason?: string } {
+  public static checkEmailTrust(provider: string, claims: SsoClaims): { ok: boolean; email?: string; reason?: string } {
     const rawEmail: string = claims.email || claims.preferred_username || "";
     const email = rawEmail.trim().toLowerCase();
     if (!email) return { ok: false, reason: "No email address was provided by the identity provider." };
@@ -157,7 +171,7 @@ export class SsoHelper {
     return { ok: false, reason: "Your organization's email could not be verified. Please sign in with email and password." };
   }
 
-  public static extractNames(claims: any): { firstName: string; lastName: string } {
+  public static extractNames(claims: SsoClaims): { firstName: string; lastName: string } {
     let firstName: string = claims.given_name || "";
     let lastName: string = claims.family_name || "";
     if (!firstName && !lastName && claims.name) {
@@ -181,7 +195,7 @@ export class SsoHelper {
     return { user, isNew: true };
   }
 
-  public static async fetchProviderPhoto(provider: string, claims: any, accessToken?: string): Promise<string | null> {
+  public static async fetchProviderPhoto(provider: string, claims: SsoClaims, accessToken?: string): Promise<string | null> {
     try {
       if (provider === "google") {
         let pictureUrl: string = claims.picture || "";
@@ -216,13 +230,13 @@ export class SsoHelper {
     return `data:${contentType};base64,${buffer.toString("base64")}`;
   }
 
-  public static async importPhoto(provider: string, claims: any, accessToken: string | undefined, user: User, repos: Repos): Promise<void> {
+  public static async importPhoto(provider: string, claims: SsoClaims, accessToken: string | undefined, user: User, repos: Repos): Promise<void> {
     try {
       const dataUrl = await this.fetchProviderPhoto(provider, claims, accessToken);
       if (!dataUrl) return;
 
       const userChurches = await repos.userChurch.loadForUser(user.id);
-      const withPerson = userChurches.filter((uc: any) => uc.personId);
+      const withPerson = userChurches.filter((uc) => uc.personId);
       if (withPerson.length === 0) {
         await this.stashPhoto(user.id, dataUrl);
         return;
@@ -258,7 +272,7 @@ export class SsoHelper {
 
   private static async getApprovalAssignment(churchId: string, repos: Repos): Promise<{ type: string; id: string } | undefined> {
     const settings = await repos.setting.loadAll(churchId);
-    const setting = settings.find((s: any) => s.keyName === "directoryApprovalGroupId");
+    const setting = settings.find((s) => s.keyName === "directoryApprovalGroupId");
     return setting?.value ? { type: "group", id: setting.value } : undefined;
   }
 

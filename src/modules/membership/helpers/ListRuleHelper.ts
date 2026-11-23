@@ -2,11 +2,15 @@ import { List, ListRuleCondition, ListRuleGroup, SearchCondition } from "../mode
 import { Repos } from "../repositories/index.js";
 import { getAttendanceModuleGateway, getGivingModuleGateway } from "../../../shared/modules/index.js";
 import { PersonConditionHelper } from "./PersonConditionHelper.js";
+import type { Selectable } from "kysely";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
+
+type PeopleRow = Selectable<MembershipDatabase["people"]>;
 
 interface EvalContext {
   churchId: string;
   repos: Repos;
-  peopleRows?: any[];
+  peopleRows?: PeopleRow[];
   visitedListIds: Set<string>;
   viewerPersonId?: string;
   timeZone?: string | null;
@@ -73,15 +77,15 @@ export class ListRuleHelper {
 
   private static async evalPerson(c: ListRuleCondition, ctx: EvalContext): Promise<Set<string>> {
     const rows = await this.getPeopleRows(ctx);
-    const condition: SearchCondition = { field: c.field, operator: c.operator as any, value: c.value ?? "" };
+    const condition: SearchCondition = { field: c.field, operator: c.operator as SearchCondition["operator"], value: c.value ?? "" };
     const timeZone = PersonConditionHelper.usesThisMonth([condition]) ? await this.getTimeZone(ctx) : undefined;
     const matched = PersonConditionHelper.applyOne(rows.slice(), condition, timeZone);
-    return new Set(matched.map((r: any) => r.id));
+    return new Set(matched.map((r) => r.id));
   }
 
   private static async evalGroup(c: ListRuleCondition, ctx: EvalContext): Promise<Set<string>> {
     if (!c.entityId) return new Set();
-    const members = (await ctx.repos.groupMember.loadForGroup(ctx.churchId, c.entityId)) as any[];
+    const members = await ctx.repos.groupMember.loadForGroup(ctx.churchId, c.entityId);
     const ids = new Set<string>((members || []).map((m) => m.personId));
     if (c.operator === "notIn") return this.complement(ids, ctx);
     return ids;
@@ -91,7 +95,7 @@ export class ListRuleHelper {
     if (!c.entityId) return new Set();
     // ponytail: only "answer" field is produced by B1Admin; "submitted" path removed
     if (c.field !== "answer") return new Set();
-    const question: any = await ctx.repos.question.load(ctx.churchId, c.entityId);
+    const question = await ctx.repos.question.load(ctx.churchId, c.entityId);
     if (!question) return new Set();
     const answers = await ctx.repos.answer.loadForQuestionWithPerson(ctx.churchId, c.entityId);
     const ids = new Set<string>();
@@ -103,9 +107,9 @@ export class ListRuleHelper {
 
   private static async evalField(c: ListRuleCondition, ctx: EvalContext): Promise<Set<string>> {
     if (!c.entityId) return new Set();
-    const field: any = await ctx.repos.personField.load(ctx.churchId, c.entityId);
+    const field = await ctx.repos.personField.load(ctx.churchId, c.entityId);
     if (!field) return new Set();
-    const values = (await ctx.repos.personFieldValue.loadForField(ctx.churchId, c.entityId)) as any[];
+    const values = await ctx.repos.personFieldValue.loadForField(ctx.churchId, c.entityId);
     const ids = new Set<string>();
     values.forEach((v) => {
       if (v.personId && this.matchAnswer(field.fieldType, v.value, c.operator ?? "contains", c.value ?? "")) ids.add(v.personId);
@@ -114,13 +118,13 @@ export class ListRuleHelper {
   }
 
   // Filters people rows by custom-field conditions (field = "personField_<fieldId>"), ANDed together.
-  public static async filterByFieldConditions(churchId: string, data: any[], conditions: SearchCondition[], repos: Repos): Promise<any[]> {
+  public static async filterByFieldConditions<T extends { id?: string }>(churchId: string, data: T[], conditions: SearchCondition[], repos: Repos): Promise<T[]> {
     let result = data;
     for (const c of conditions) {
       const fieldId = c.field.substring("personField_".length);
-      const field: any = await repos.personField.load(churchId, fieldId);
+      const field = await repos.personField.load(churchId, fieldId);
       if (!field) return [];
-      const values = (await repos.personFieldValue.loadForField(churchId, fieldId)) as any[];
+      const values = await repos.personFieldValue.loadForField(churchId, fieldId);
       const matchedIds = new Set<string>();
       values.forEach((v) => {
         if (v.personId && this.matchAnswer(field.fieldType, v.value, c.operator ?? "contains", c.value ?? "")) matchedIds.add(v.personId);
@@ -194,8 +198,8 @@ export class ListRuleHelper {
     return { start, end };
   }
 
-  private static async getPeopleRows(ctx: EvalContext): Promise<any[]> {
-    if (!ctx.peopleRows) ctx.peopleRows = (await ctx.repos.person.loadAll(ctx.churchId)) as any[];
+  private static async getPeopleRows(ctx: EvalContext): Promise<PeopleRow[]> {
+    if (!ctx.peopleRows) ctx.peopleRows = await ctx.repos.person.loadAll(ctx.churchId);
     return ctx.peopleRows;
   }
 
@@ -220,7 +224,7 @@ export class ListRuleHelper {
     const householdIds = new Set<string>();
     rows.forEach((r) => { if (ids.has(r.id) && r.householdId) householdIds.add(r.householdId); });
     if (mode === "adults") {
-      const isAdult = (r: any) => r.householdRole === "Head" || r.householdRole === "Spouse";
+      const isAdult = (r: PeopleRow) => r.householdRole === "Head" || r.householdRole === "Spouse";
       return new Set(rows.filter((r) => r.householdId && householdIds.has(r.householdId) && isAdult(r)).map((r) => r.id));
     }
     rows.forEach((r) => {

@@ -32,8 +32,8 @@ export class ChurchHelper {
     if (!churches || churches.length === 0) return;
     const ids = ArrayHelper.getIds(churches, "id");
     const repos = await RepoManager.getRepos<Repos>("membership");
-    const settings = (await repos.setting.loadMulipleChurches(["logoLight", "logoDark"], ids)) as any[];
-    settings.forEach((s: any) => {
+    const settings = await repos.setting.loadMulipleChurches(["logoLight", "logoDark"], ids);
+    settings.forEach((s) => {
       const church = ArrayHelper.getOne(churches, "id", s.churchId);
       if (church.settings === undefined) church.settings = [];
       church.settings.push(s);

@@ -16,6 +16,8 @@ export const GUEST_MARITAL_STATUSES = ["Unknown", "Single", "Married", "Divorced
 
 export interface GuestMember { title?: string; firstName: string; lastName: string; email?: string; phone?: string; householdRole?: string; birthDate?: string; gender?: string; grade?: string; photo?: string }
 export interface GuestAddress { address1?: string; address2?: string; city?: string; state?: string; zip?: string }
+/** Untrusted request body for a guest registration, before sanitize(). */
+export interface GuestRegistrationBody { members?: Partial<Record<keyof GuestMember, unknown>>[]; address?: Partial<Record<keyof GuestAddress, unknown>>; maritalStatus?: unknown; comments?: unknown }
 export interface GuestRegistration { members: GuestMember[]; address?: GuestAddress; maritalStatus?: string; comments?: string }
 
 const MODES: GuestFieldMode[] = ["off", "optional", "required"];
@@ -28,7 +30,7 @@ export class GuestRegistrationHelper {
   static parseModes(raw: string | undefined | null): GuestFieldModes {
     const result: GuestFieldModes = { ...DEFAULT_GUEST_FIELDS };
     if (!raw) return result;
-    let parsed: any = null;
+    let parsed: Partial<Record<GuestFieldKey, GuestFieldMode>> = null;
     try { parsed = JSON.parse(raw); } catch { return result; }
     if (!parsed || typeof parsed !== "object") return result;
     GUEST_FIELD_KEYS.forEach((k) => { if (MODES.includes(parsed[k])) result[k] = parsed[k]; });
@@ -48,8 +50,8 @@ export class GuestRegistrationHelper {
   }
 
   // Keeps only the fields the church included, and rejects missing required or unknown values.
-  static sanitize(body: any, modes: GuestFieldModes): { error?: string; registration?: GuestRegistration } {
-    const rawMembers: any[] = body?.members;
+  static sanitize(body: GuestRegistrationBody, modes: GuestFieldModes): { error?: string; registration?: GuestRegistration } {
+    const rawMembers = body?.members;
     const on = (k: GuestFieldKey) => modes[k] !== "off";
     const required = (k: GuestFieldKey) => modes[k] === "required";
 
@@ -102,7 +104,7 @@ export class GuestRegistrationHelper {
       if (on("photo")) {
         if (m.photo) {
           if (!PhotoDataUrl.isAcceptable(m.photo, true)) return { error: "photo is not valid" };
-          member.photo = m.photo;
+          member.photo = m.photo as string;
         } else if (i === 0 && required("photo")) return { error: "photo is required" };
       }
       members.push(member);

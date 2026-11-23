@@ -64,7 +64,7 @@ export class AnswerRepo {
       .where("a.questionId", "=", questionId)
       .where("fs.contentType", "=", "person")
       .execute();
-    return rows as any[];
+    return rows;
   }
 
   public saveAll(models: Answer[]) {
@@ -77,7 +77,7 @@ export class AnswerRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): Answer {
+  protected rowToModel(row: Answer): Answer {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -87,12 +87,12 @@ export class AnswerRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Answer) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: Answer[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

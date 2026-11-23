@@ -5,19 +5,19 @@ import { MauticHelper } from "../MauticHelper.js";
 // Production: POST /api/companies/new answered 400 "companyaddress1: This value is too long. It should have 64 characters
 // or less." for churches registered with a long street address, so the whole Mautic sync for that church failed.
 describe("MauticHelper.register", () => {
-  const calls: { path: string; body: any }[] = [];
+  const calls: { path: string; body: Record<string, string> }[] = [];
 
   beforeEach(() => {
     calls.length = 0;
-    (global as any).fetch = jest.fn(async (url: string, init: any) => {
+    global.fetch = jest.fn(async (url: string, init: RequestInit) => {
       const path = url.replace("https://mautic.test", "");
-      const body = init.body ? JSON.parse(init.body) : undefined;
+      const body: Record<string, string> = init.body ? JSON.parse(init.body as string) : undefined;
       calls.push({ path, body });
-      if (path === "/api/companies/new" && body.companyaddress1.length > 64) return { ok: false, status: 400, text: async () => "companyaddress1: This value is too long." };
-      if (path === "/api/companies/new") return { ok: true, status: 200, json: async () => ({ company: { id: 7 } }) };
-      if (path === "/api/contacts/new") return { ok: true, status: 200, json: async () => ({ contact: { id: 9 } }) };
-      return { ok: true, status: 200, json: async () => ({}) };
-    });
+      if (path === "/api/companies/new" && body.companyaddress1.length > 64) return { ok: false, status: 400, text: async () => "companyaddress1: This value is too long." } as Response;
+      if (path === "/api/companies/new") return { ok: true, status: 200, json: async () => ({ company: { id: 7 } }) } as Response;
+      if (path === "/api/contacts/new") return { ok: true, status: 200, json: async () => ({ contact: { id: 9 } }) } as Response;
+      return { ok: true, status: 200, json: async () => ({}) } as Response;
+    }) as typeof fetch;
   });
 
   it("registers a church whose street address is longer than Mautic's 64-character company field", async () => {

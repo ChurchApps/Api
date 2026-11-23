@@ -61,7 +61,7 @@ export class AuditLogHelper {
     "clientsecret"
   ]);
 
-  private static sanitizeValue(value: any, depth: number): any {
+  private static sanitizeValue(value: unknown, depth: number): unknown {
     if (depth > 8) return null;
     if (typeof value === "string") {
       if (value.startsWith("data:") || value.length > 4096) return "[stripped]";
@@ -72,7 +72,7 @@ export class AuditLogHelper {
     if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString();
     if (Array.isArray(value)) return value.map((v) => AuditLogHelper.sanitizeValue(v, depth + 1));
     if (value && typeof value === "object") {
-      const out: Record<string, any> = {};
+      const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(value)) {
         if (AuditLogHelper.SENSITIVE_KEYS.has(k.toLowerCase())) out[k] = "[redacted]";
         else out[k] = AuditLogHelper.sanitizeValue(v, depth + 1);
@@ -90,7 +90,7 @@ export class AuditLogHelper {
     try { json = JSON.stringify(stripped); } catch { return { truncated: true }; }
     if (json === undefined) return undefined;
     if (json.length > 64000) return { truncated: true };
-    return stripped;
+    return stripped as object;
   }
 
   public static async logLogin(repos: Repos, churchId: string, userId: string, success: boolean, ipAddress: string, details?: object): Promise<void> {
@@ -121,8 +121,8 @@ export class AuditLogHelper {
     await AuditLogHelper.log(repos, churchId, userId, "settings", action, "setting", undefined, details, ipAddress);
   }
 
-  public static diffFields(oldObj: any, newObj: any, fields: string[]): object | null {
-    const changes: Record<string, { old: any; new: any }> = {};
+  public static diffFields(oldObj: Record<string, unknown>, newObj: Record<string, unknown>, fields: string[]): object | null {
+    const changes: Record<string, { old: unknown; new: unknown }> = {};
     let hasChanges = false;
     for (const field of fields) {
       const oldVal = oldObj?.[field];

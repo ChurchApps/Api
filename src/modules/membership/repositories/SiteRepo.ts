@@ -45,7 +45,7 @@ export class SiteRepo {
     return (await getDb().selectFrom("sites").selectAll().where("subDomain", "=", subDomain).executeTakeFirst()) ?? null;
   }
 
-  protected rowToModel(row: any): Site {
+  protected rowToModel(row: Site): Site {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -54,12 +54,12 @@ export class SiteRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Site) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: Site[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

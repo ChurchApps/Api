@@ -22,7 +22,7 @@ export class HouseholdPickupPersonRepo {
       relationship: model.relationship ?? null,
       status: model.status,
       notes: model.notes ?? null,
-      createdDate: model.createdDate as any
+      createdDate: model.createdDate
     }).execute();
     return model;
   }
@@ -57,7 +57,7 @@ export class HouseholdPickupPersonRepo {
     await getDb().deleteFrom("householdPickupPeople").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(row: any): HouseholdPickupPerson {
+  protected rowToModel(row: HouseholdPickupPerson): HouseholdPickupPerson {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -72,12 +72,12 @@ export class HouseholdPickupPersonRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: HouseholdPickupPerson) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: HouseholdPickupPerson[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

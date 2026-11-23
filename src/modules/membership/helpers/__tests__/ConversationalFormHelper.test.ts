@@ -1,4 +1,6 @@
 import { ConversationalFormHelper } from "../ConversationalFormHelper.js";
+import type { Household, Person } from "../../models/index.js";
+import type { Repos } from "../../repositories/index.js";
 
 const q = (id: string, fieldType: string, title: string) => ({ id, fieldType, title });
 const a = (questionId: string, value: string) => ({ questionId, value });
@@ -56,7 +58,7 @@ describe("ConversationalFormHelper.applyTokens", () => {
 
   it("returns falsy templates unchanged", () => {
     expect(ConversationalFormHelper.applyTokens("", { firstName: "X" })).toBe("");
-    expect(ConversationalFormHelper.applyTokens(null as any, {})).toBeNull();
+    expect(ConversationalFormHelper.applyTokens(null as string, {})).toBeNull();
   });
 });
 
@@ -91,15 +93,15 @@ describe("ConversationalFormHelper.answersTable", () => {
 });
 
 describe("ConversationalFormHelper.findOrCreatePerson", () => {
-  const makeRepos = (searchResult: any[]) => {
+  const makeRepos = (searchResult: { id: string; email: string }[]) => {
     const person = {
-      save: jest.fn(async (p: any) => ({ ...p, id: "newPid" })),
+      save: jest.fn(async (p: Person) => ({ ...p, id: "newPid" })),
       load: jest.fn(async (_c: string, id: string) => ({ id, email: "created@x.com" })),
       searchEmail: jest.fn(async () => searchResult),
-      convertToModel: jest.fn((_c: string, row: any) => row)
+      convertToModel: jest.fn((_c: string, row: Person) => row)
     };
-    const household = { save: jest.fn(async (h: any) => Object.assign(h, { id: "hh1" })) };
-    return { person, household } as any;
+    const household = { save: jest.fn(async (h: Household) => Object.assign(h, { id: "hh1" })) };
+    return Object.assign({} as Repos, { person, household });
   };
 
   it("returns null without an email", async () => {

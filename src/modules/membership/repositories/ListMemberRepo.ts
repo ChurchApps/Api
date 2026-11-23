@@ -7,7 +7,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 export class ListMemberRepo {
   public async loadPersonIds(churchId: string, listId: string): Promise<string[]> {
     const rows = await getDb().selectFrom("listMembers").select("personId").where("churchId", "=", churchId).where("listId", "=", listId).execute();
-    return rows.map((r: any) => r.personId);
+    return rows.map((r) => r.personId);
   }
 
   public async addPersonIds(churchId: string, listId: string, personIds: string[]) {
@@ -17,7 +17,7 @@ export class ListMemberRepo {
       churchId,
       listId,
       personId,
-      dateAdded: sql`NOW()` as any
+      dateAdded: sql<Date>`NOW()`
     }));
     await getDb().insertInto("listMembers").values(values).execute();
   }

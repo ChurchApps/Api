@@ -1,10 +1,57 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
+import { sql, type Updateable } from "kysely";
 import { getDb } from "../db/index.js";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper, PersonHelper } from "../helpers/index.js";
 import { Person } from "../models/index.js";
 import { CollectionHelper } from "../../../shared/helpers/index.js";
+
+type PeopleRow = MembershipDatabase["people"];
+
+/** people row (flat name/contact columns); photo is set when a caller has already resolved it. */
+interface PersonRow extends Omit<PeopleRow, "photoUpdated" | "dateAdded"> {
+  photo?: string;
+  photoUpdated?: Date | string;
+  dateAdded?: Date | string;
+}
+
+/** A Person after save() has flattened name/contact onto it and formatted its dates for MySQL. */
+interface PreparedPerson extends Omit<Person, "birthDate" | "anniversary" | "photoUpdated"> {
+  birthDate?: Date | string | null;
+  anniversary?: Date | string | null;
+  photoUpdated?: Date | string | null;
+  displayName?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  nickName?: string;
+  prefix?: string;
+  suffix?: string;
+  homePhone?: string;
+  mobilePhone?: string;
+  workPhone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+}
+
+interface AttendeeRow {
+  Id: string;
+  churchId: string;
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  photoUpdated: Date;
+}
+
+interface AgeGenderCountRow {
+  ageGroup: string;
+  gender: string;
+  count: number;
+}
 
 @injectable()
 export class PersonRepo {
@@ -13,30 +60,30 @@ export class PersonRepo {
     return person.id ? this.update(person) : this.create(person);
   }
 
-  private prepareDateFields(person: Person) {
-    (person as any).birthDate = DateHelper.toMysqlDateOnly(person.birthDate);
-    (person as any).anniversary = DateHelper.toMysqlDateOnly(person.anniversary);
-    (person as any).photoUpdated = DateHelper.toMysqlDate(person.photoUpdated);
+  private prepareDateFields(person: PreparedPerson) {
+    person.birthDate = DateHelper.toMysqlDateOnly(person.birthDate);
+    person.anniversary = DateHelper.toMysqlDateOnly(person.anniversary);
+    person.photoUpdated = DateHelper.toMysqlDate(person.photoUpdated);
   }
 
-  private prepareContactFields(person: Person) {
-    (person as any).homePhone = person.contactInfo?.homePhone;
-    (person as any).mobilePhone = person.contactInfo?.mobilePhone;
-    (person as any).workPhone = person.contactInfo?.workPhone;
-    (person as any).email = person.contactInfo?.email;
-    (person as any).address1 = person.contactInfo?.address1;
-    (person as any).address2 = person.contactInfo?.address2;
-    (person as any).city = person.contactInfo?.city;
-    (person as any).state = person.contactInfo?.state;
-    (person as any).zip = person.contactInfo?.zip;
+  private prepareContactFields(person: PreparedPerson) {
+    person.homePhone = person.contactInfo?.homePhone;
+    person.mobilePhone = person.contactInfo?.mobilePhone;
+    person.workPhone = person.contactInfo?.workPhone;
+    person.email = person.contactInfo?.email;
+    person.address1 = person.contactInfo?.address1;
+    person.address2 = person.contactInfo?.address2;
+    person.city = person.contactInfo?.city;
+    person.state = person.contactInfo?.state;
+    person.zip = person.contactInfo?.zip;
 
-    (person as any).displayName = person.name?.display;
-    (person as any).firstName = person.name?.first;
-    (person as any).middleName = person.name?.middle;
-    (person as any).lastName = person.name?.last;
-    (person as any).nickName = person.name?.nick;
-    (person as any).prefix = person.name?.prefix;
-    (person as any).suffix = person.name?.suffix;
+    person.displayName = person.name?.display;
+    person.firstName = person.name?.first;
+    person.middleName = person.name?.middle;
+    person.lastName = person.name?.last;
+    person.nickName = person.name?.nick;
+    person.prefix = person.name?.prefix;
+    person.suffix = person.name?.suffix;
   }
 
   private async create(person: Person): Promise<Person> {
@@ -45,7 +92,7 @@ export class PersonRepo {
     person.dateAdded = new Date();
     this.prepareDateFields(person);
     this.prepareContactFields(person);
-    const p = person as any;
+    const p: PreparedPerson = person;
     await getDb().insertInto("people").values({
       id: person.id,
       churchId: person.churchId,
@@ -56,10 +103,10 @@ export class PersonRepo {
       nickName: p.nickName,
       prefix: p.prefix,
       suffix: p.suffix,
-      birthDate: p.birthDate,
+      birthDate: p.birthDate as Date,
       gender: person.gender,
       maritalStatus: person.maritalStatus,
-      anniversary: p.anniversary,
+      anniversary: p.anniversary as Date,
       membershipStatus: person.membershipStatus,
       grade: person.grade,
       school: person.school,
@@ -72,7 +119,7 @@ export class PersonRepo {
       city: p.city,
       state: p.state,
       zip: p.zip,
-      photoUpdated: p.photoUpdated,
+      photoUpdated: p.photoUpdated as Date,
       householdId: person.householdId,
       householdRole: person.householdRole,
       campusId: person.campusId,
@@ -90,7 +137,7 @@ export class PersonRepo {
   private async update(person: Person): Promise<Person> {
     this.prepareDateFields(person);
     this.prepareContactFields(person);
-    const p = person as any;
+    const p: PreparedPerson = person;
     await getDb().updateTable("people").set({
       displayName: p.displayName,
       firstName: p.firstName,
@@ -99,10 +146,10 @@ export class PersonRepo {
       nickName: p.nickName,
       prefix: p.prefix,
       suffix: p.suffix,
-      birthDate: p.birthDate,
+      birthDate: p.birthDate as Date,
       gender: person.gender,
       maritalStatus: person.maritalStatus,
-      anniversary: p.anniversary,
+      anniversary: p.anniversary as Date,
       membershipStatus: person.membershipStatus,
       grade: person.grade,
       school: person.school,
@@ -115,7 +162,7 @@ export class PersonRepo {
       city: p.city,
       state: p.state,
       zip: p.zip,
-      photoUpdated: p.photoUpdated,
+      photoUpdated: p.photoUpdated as Date,
       householdId: person.householdId,
       householdRole: person.householdRole,
       campusId: person.campusId,
@@ -129,25 +176,25 @@ export class PersonRepo {
   }
 
   public async delete(churchId: string, id: string) {
-    await getDb().updateTable("people").set({ removed: true as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
+    await getDb().updateTable("people").set({ removed: true }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async deleteByIds(churchId: string, ids: string[]) {
     if (!ids.length) return;
-    await getDb().updateTable("people").set({ removed: true as any }).where("id", "in", ids).where("churchId", "=", churchId).execute();
+    await getDb().updateTable("people").set({ removed: true }).where("id", "in", ids).where("churchId", "=", churchId).execute();
   }
 
-  public async updateFieldsByIds(churchId: string, ids: string[], fields: Record<string, any>) {
+  public async updateFieldsByIds(churchId: string, ids: string[], fields: Updateable<MembershipDatabase["people"]>) {
     if (!ids.length || !Object.keys(fields).length) return;
     await getDb().updateTable("people").set(fields).where("id", "in", ids).where("churchId", "=", churchId).execute();
   }
 
   public async updateOptedOut(churchId: string, personId: string, optedOut: boolean) {
-    await getDb().updateTable("people").set({ optedOut: optedOut as any }).where("id", "=", personId).where("churchId", "=", churchId).execute();
+    await getDb().updateTable("people").set({ optedOut }).where("id", "=", personId).where("churchId", "=", churchId).execute();
   }
 
   public async updateSmsOptedOut(churchId: string, personId: string, smsOptedOut: boolean) {
-    await getDb().updateTable("people").set({ smsOptedOut: smsOptedOut as any }).where("id", "=", personId).where("churchId", "=", churchId).execute();
+    await getDb().updateTable("people").set({ smsOptedOut }).where("id", "=", personId).where("churchId", "=", churchId).execute();
   }
 
   public async updateHousehold(person: Person) {
@@ -159,15 +206,15 @@ export class PersonRepo {
   }
 
   public async restore(churchId: string, id: string) {
-    await getDb().updateTable("people").set({ removed: false as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
+    await getDb().updateTable("people").set({ removed: false }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async load(churchId: string, id: string) {
-    return (await getDb().selectFrom("people").selectAll().where("id", "=", id).where("churchId", "=", churchId).where("removed", "=", false as any).executeTakeFirst()) ?? null;
+    return (await getDb().selectFrom("people").selectAll().where("id", "=", id).where("churchId", "=", churchId).where("removed", "=", false).executeTakeFirst()) ?? null;
   }
 
   public async loadAll(churchId: string) {
-    return getDb().selectFrom("people").selectAll().where("churchId", "=", churchId).where("removed", "=", false as any).orderBy("lastName", "asc").orderBy("firstName", "asc").execute();
+    return getDb().selectFrom("people").selectAll().where("churchId", "=", churchId).where("removed", "=", false).orderBy("lastName", "asc").orderBy("firstName", "asc").execute();
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
@@ -183,7 +230,7 @@ export class PersonRepo {
   public async loadMembers(churchId: string) {
     return getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any)
+      .where("removed", "=", false)
       .where("membershipStatus", "in", ["Member", "Staff"])
       .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .execute();
@@ -200,9 +247,9 @@ export class PersonRepo {
     }
     return getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any)
+      .where("removed", "=", false)
       .where("membershipStatus", "in", statuses)
-      .where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]))
+      .where((eb) => eb.or([eb("optedOut", "=", false), eb("optedOut", "is", null)]))
       .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .execute();
   }
@@ -210,8 +257,8 @@ export class PersonRepo {
   public async loadRecent(churchId: string, filterOptedOut?: boolean) {
     let q = getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any);
-    if (filterOptedOut) q = q.where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]));
+      .where("removed", "=", false);
+    if (filterOptedOut) q = q.where((eb) => eb.or([eb("optedOut", "=", false), eb("optedOut", "is", null)]));
     // Ids are random shortIds, so order by dateAdded (newest first, older NULL rows last).
     return q.orderBy(sql`dateAdded IS NULL`).orderBy("dateAdded", "desc").orderBy("id", "desc").limit(25).execute();
   }
@@ -219,8 +266,8 @@ export class PersonRepo {
   public async loadAlphabetical(churchId: string, pageSize: number, filterOptedOut?: boolean) {
     let q = getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any);
-    if (filterOptedOut) q = q.where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]));
+      .where("removed", "=", false);
+    if (filterOptedOut) q = q.where((eb) => eb.or([eb("optedOut", "=", false), eb("optedOut", "is", null)]));
     q = q.orderBy("lastName", "asc").orderBy("firstName", "asc");
     if (pageSize > 0) q = q.limit(pageSize);
     return q.execute();
@@ -230,7 +277,7 @@ export class PersonRepo {
     return getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
       .where("householdId", "=", householdId)
-      .where("removed", "=", false as any)
+      .where("removed", "=", false)
       .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .execute();
   }
@@ -240,8 +287,8 @@ export class PersonRepo {
     let query = getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
       .where(sql`CONCAT(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,''), ' ', IFNULL(donorNumber,''))`, "like", searchTerm)
-      .where("removed", "=", 0 as any);
-    if (filterOptedOut) query = query.where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]));
+      .where(sql.ref<number>("removed"), "=", 0);
+    if (filterOptedOut) query = query.where((eb) => eb.or([eb("optedOut", "=", false), eb("optedOut", "is", null)]));
     return query.orderBy("lastName", "asc").orderBy("firstName", "asc").limit(100).execute();
   }
 
@@ -254,32 +301,32 @@ export class PersonRepo {
         eb(sql`REPLACE(REPLACE(WorkPhone,'-',''), ' ', '')`, "like", phoneSearch),
         eb(sql`REPLACE(REPLACE(MobilePhone,'-',''), ' ', '')`, "like", phoneSearch)
       ]))
-      .where("removed", "=", 0 as any)
+      .where(sql.ref<number>("removed"), "=", 0)
       .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .limit(100)
       .execute();
   }
 
-  public async searchEmail(churchId: string, email: string): Promise<any[]> {
+  public async searchEmail(churchId: string, email: string) {
     return getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
       .where("email", "like", "%" + email + "%")
-      .where("removed", "=", false as any)
+      .where("removed", "=", false)
       .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .limit(100)
-      .execute() as any;
+      .execute();
   }
 
   // Same as searchEmail but keeps deleted rows, so a returning user can be restored instead of duplicated.
   // Only for callers that are allowed to undelete (see PersonHelper.getPerson allowRestore); anon callers
   // must use searchEmail so a deleted person can never be resurrected from the outside.
-  public async searchEmailIncludingRemoved(churchId: string, email: string): Promise<any[]> {
+  public async searchEmailIncludingRemoved(churchId: string, email: string) {
     return getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
       .where("email", "like", "%" + email + "%")
       .orderBy("removed", "asc") // prefer a live person over a deleted duplicate
       .limit(100)
-      .execute() as any;
+      .execute();
   }
 
   // Inbound STOP lookup: any live person in the church whose mobile matches, with or without the US country code.
@@ -289,10 +336,10 @@ export class PersonRepo {
     if (!variants.length) return [];
     const rows = await getDb().selectFrom("people").select(["id"])
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any)
+      .where("removed", "=", false)
       .where(this.phoneDigitsSql("MobilePhone"), "in", variants)
       .execute();
-    return rows.map((r: any) => r.id);
+    return rows.map((r) => r.id);
   }
 
   // Digits-only compare so "(555) 123-4567" matches "555-123-4567".
@@ -310,7 +357,7 @@ export class PersonRepo {
 
     return getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any)
+      .where("removed", "=", false)
       .where((eb) => {
         const clauses = [];
         if (email) clauses.push(eb(sql`LOWER(email)`, "=", email));
@@ -320,7 +367,7 @@ export class PersonRepo {
           clauses.push(eb(this.phoneDigitsSql("MobilePhone"), "=", phoneDigits));
         }
         if (firstName && lastName && birthDate) {
-          clauses.push(eb.and([eb(sql`LOWER(FirstName)`, "=", firstName), eb(sql`LOWER(LastName)`, "=", lastName), eb("birthDate", "=", birthDate as any)]));
+          clauses.push(eb.and([eb(sql`LOWER(FirstName)`, "=", firstName), eb(sql`LOWER(LastName)`, "=", lastName), eb(sql.ref<string>("birthDate"), "=", birthDate)]));
         }
         return eb.or(clauses);
       })
@@ -378,7 +425,7 @@ export class PersonRepo {
 
     const rows = await getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)
-      .where("removed", "=", false as any)
+      .where("removed", "=", false)
       .where(sql`LOWER(TRIM(FirstName))`, "=", firstName)
       .where((eb) => {
         const clauses = [];
@@ -397,7 +444,7 @@ export class PersonRepo {
 
   public async loadAttendees(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, categoryName: string, groupId: string, startDate: Date, endDate: Date) {
     const conditions: ReturnType<typeof sql>[] = [];
-    conditions.push(sql`p.churchId = ${churchId} AND v.visitDate BETWEEN ${startDate as any} AND ${endDate as any}`);
+    conditions.push(sql`p.churchId = ${churchId} AND v.visitDate BETWEEN ${startDate} AND ${endDate}`);
 
     if (!UniqueIdHelper.isMissing(campusId)) conditions.push(sql`ser.campusId=${campusId}`);
     if (!UniqueIdHelper.isMissing(serviceId)) conditions.push(sql`ser.id=${serviceId}`);
@@ -407,7 +454,7 @@ export class PersonRepo {
 
     const whereClause = sql.join(conditions, sql` AND `);
 
-    const result = await sql`SELECT p.Id, p.churchId, p.displayName, p.firstName, p.lastName, p.photoUpdated FROM visitSessions vs INNER JOIN visits v ON v.id = vs.visitId INNER JOIN sessions s ON s.id = vs.sessionId INNER JOIN people p ON p.id = v.personId INNER JOIN \`groups\` g ON g.id = s.groupId LEFT OUTER JOIN serviceTimes st ON st.id = s.serviceTimeId LEFT OUTER JOIN services ser ON ser.id = st.serviceId WHERE ${whereClause} GROUP BY p.id, p.displayName, p.firstName, p.lastName, p.photoUpdated ORDER BY p.lastName, p.firstName`.execute(getDb());
+    const result = await sql<AttendeeRow>`SELECT p.Id, p.churchId, p.displayName, p.firstName, p.lastName, p.photoUpdated FROM visitSessions vs INNER JOIN visits v ON v.id = vs.visitId INNER JOIN sessions s ON s.id = vs.sessionId INNER JOIN people p ON p.id = v.personId INNER JOIN \`groups\` g ON g.id = s.groupId LEFT OUTER JOIN serviceTimes st ON st.id = s.serviceTimeId LEFT OUTER JOIN services ser ON ser.id = st.serviceId WHERE ${whereClause} GROUP BY p.id, p.displayName, p.firstName, p.lastName, p.photoUpdated ORDER BY p.lastName, p.firstName`.execute(getDb());
     return result.rows;
   }
 
@@ -419,7 +466,7 @@ export class PersonRepo {
       const rows = await db.selectFrom("people")
         .select((eb) => [bucket.as("name"), eb.fn.countAll<number>().as("count")])
         .where("churchId", "=", churchId)
-        .where("removed", "=", false as any)
+        .where("removed", "=", false)
         .groupBy(bucket)
         .orderBy(sql`COUNT(*)`, "desc")
         .execute();
@@ -428,7 +475,7 @@ export class PersonRepo {
 
     const [gender, membershipStatus, maritalStatus] = await Promise.all([countByColumn("gender"), countByColumn("membershipStatus"), countByColumn("maritalStatus")]);
 
-    const ageRows = await sql`SELECT
+    const ageRows = await sql<AgeGenderCountRow>`SELECT
         CASE
           WHEN age BETWEEN 0 AND 3 THEN '0-3'
           WHEN age BETWEEN 4 AND 11 THEN '4-11'
@@ -452,7 +499,7 @@ export class PersonRepo {
     ];
     const ageMap: { [group: string]: { group: string; female: number; male: number; unassigned: number } } = {};
     order.forEach((g) => (ageMap[g] = { group: g, female: 0, male: 0, unassigned: 0 }));
-    (ageRows.rows as any[]).forEach((r) => {
+    ageRows.rows.forEach((r) => {
       const bucket = ageMap[r.ageGroup];
       if (!bucket) return;
       const g = String(r.gender).toLowerCase();
@@ -467,14 +514,14 @@ export class PersonRepo {
       WHERE p.churchId = ${churchId} AND p.removed = 0
       GROUP BY p.campusId, c.name
       ORDER BY COUNT(*) DESC`.execute(db);
-    const campus = (campusRows.rows as any[]).map((r) => ({ name: String(r.name), id: (r.id as string) || "", count: Number(r.count) }));
+    const campus = campusRows.rows.map((r) => ({ name: String(r.name), id: r.id || "", count: Number(r.count) }));
 
     const total = gender.reduce((sum, r) => sum + r.count, 0);
 
     return { total, ageGroups: order.map((g) => ageMap[g]), membershipStatus, gender, maritalStatus, campus };
   }
 
-  protected rowToModel(row: any): Person {
+  protected rowToModel(row: PersonRow): Person {
     const result: Person = {
       name: {
         display: row.displayName,
@@ -522,31 +569,31 @@ export class PersonRepo {
     return result;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: PersonRow) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: PersonRow[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }
 
-  public convertToModelWithPermissions(_churchId: string, data: any, canEdit: boolean) {
+  public convertToModelWithPermissions(_churchId: string, data: PersonRow, canEdit: boolean) {
     const result = this.rowToModel(data);
     if (!canEdit) delete result.conversationId;
     return result;
   }
 
-  public convertAllToModelWithPermissions(churchId: string, data: any, canEdit: boolean) {
-    return CollectionHelper.convertAll<Person>(data, (d: any) => this.convertToModelWithPermissions(churchId, d, canEdit));
+  public convertAllToModelWithPermissions(churchId: string, data: PersonRow[], canEdit: boolean) {
+    return CollectionHelper.convertAll<Person>(data, (d: PersonRow) => this.convertToModelWithPermissions(churchId, d, canEdit));
   }
 
-  public convertAllToBasicModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Person>(data, (d: any) => this.convertToBasicModel(churchId, d));
+  public convertAllToBasicModel(churchId: string, data: PersonRow[]) {
+    return CollectionHelper.convertAll<Person>(data, (d: PersonRow) => this.convertToBasicModel(churchId, d));
   }
 
-  public convertToBasicModel(churchId: string, data: any) {
+  public convertToBasicModel(churchId: string, data: PersonRow) {
     const result: Person = {
       name: { display: data.displayName },
       contactInfo: {},
@@ -559,12 +606,12 @@ export class PersonRepo {
     return result;
   }
 
-  public convertAllToCheckinModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Person>(data, (d: any) => this.convertToCheckinModel(churchId, d));
+  public convertAllToCheckinModel(churchId: string, data: PersonRow[]) {
+    return CollectionHelper.convertAll<Person>(data, (d: PersonRow) => this.convertToCheckinModel(churchId, d));
   }
 
   // What a check-in kiosk needs to find a family, pick eligible groups and print labels. Nothing else from the record.
-  public convertToCheckinModel(churchId: string, data: any) {
+  public convertToCheckinModel(churchId: string, data: PersonRow) {
     const result: Person = {
       name: { display: data.displayName, first: data.firstName, last: data.lastName, nick: data.nickName },
       contactInfo: {},

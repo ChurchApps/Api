@@ -5,20 +5,25 @@ jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { 
 import { getDb } from "../../db/index.js";
 import { SiteRepo } from "../SiteRepo.js";
 
-function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+interface Call {
+  method: string;
+  args: unknown[];
+}
+
+function recordingDb(results: { execute?: unknown; executeTakeFirst?: unknown } = {}) {
+  const calls: Call[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => results.execute ?? [];
       if (prop === "executeTakeFirst") return async () => results.executeTakeFirst ?? null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
-const firstArg = (calls: any[], method: string) => calls.find((c) => c.method === method)?.args[0];
-const whereCalls = (calls: any[]) => calls.filter((c) => c.method === "where");
+const firstArg = (calls: Call[], method: string) => calls.find((c) => c.method === method)?.args[0];
+const whereCalls = (calls: Call[]) => calls.filter((c) => c.method === "where");
 
 describe("SiteRepo persistence", () => {
   afterEach(() => jest.restoreAllMocks());

@@ -2,14 +2,14 @@ import "reflect-metadata";
 
 // Cut the heavy value-imports so the unit under test loads without a DB/Environment/apihelper (ESM) bootstrap.
 jest.mock("../../../../shared/modules/index", () => ({
-  getAttendanceModuleGateway: () => ({ loadAttendeePersonIds: async () => [] }),
-  getGivingModuleGateway: () => ({ loadDonorPersonIds: async () => [] })
+  getAttendanceModuleGateway: () => ({ loadAttendeePersonIds: async (): Promise<string[]> => [] }),
+  getGivingModuleGateway: () => ({ loadDonorPersonIds: async (): Promise<string[]> => [] })
 }));
 jest.mock("../PersonConditionHelper", () => ({
   PersonConditionHelper: {
-    apply: (data: any[], conditions: any[]) => conditions.reduce((rows: any[], c: any) => rows.filter((r) => String(r[c.field]) === String(c.value)), data),
-    applyOne: jest.fn((data: any[]) => data),
-    usesThisMonth: (conditions: any[]) => conditions.some((c) => c.value === "thisMonth")
+    apply: (data: Record<string, unknown>[], conditions: SearchCondition[]) => conditions.reduce((rows: Record<string, unknown>[], c) => rows.filter((r) => String(r[c.field]) === String(c.value)), data),
+    applyOne: jest.fn((data: Record<string, unknown>[]) => data),
+    usesThisMonth: (conditions: SearchCondition[]) => conditions.some((c) => c.value === "thisMonth")
   }
 }));
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
@@ -18,15 +18,21 @@ jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { 
 import { ListRuleHelper } from "../ListRuleHelper";
 import { PersonConditionHelper } from "../PersonConditionHelper";
 import { PersonFieldValueRepo } from "../../repositories/PersonFieldValueRepo";
+import type { PersonField, PersonFieldValue, SearchCondition } from "../../models/index.js";
+import type { Repos } from "../../repositories/index.js";
+import type { Selectable } from "kysely";
+import type { MembershipDatabase } from "../../db/DatabaseTypes.js";
 
-function mockRepos(field: any, values: any[]) {
-  return {
+type PersonFieldValueRow = Selectable<MembershipDatabase["personFieldValues"]>;
+
+function mockRepos(field: PersonField | null, values: PersonFieldValue[]) {
+  return Object.assign({} as Repos, {
     personField: { load: jest.fn().mockResolvedValue(field) },
     personFieldValue: { loadForField: jest.fn().mockResolvedValue(values) }
-  } as any;
+  });
 }
 
-async function evalOne(field: any, values: any[], operator: string, value: string): Promise<string[]> {
+async function evalOne(field: PersonField, values: PersonFieldValue[], operator: string, value: string): Promise<string[]> {
   const repos = mockRepos(field, values);
   const rules = { match: "all" as const, conditions: [{ provider: "field" as const, entityId: "f1", operator, value }] };
   return ListRuleHelper.evaluate("ch1", rules, undefined, repos);
@@ -87,17 +93,17 @@ describe("advancedSearch personField branch (AND-intersection)", () => {
     const standardConditions = [{ field: "lastName", operator: "equals" as const, value: "Smith" }];
 
     // Mirrors PersonController.advancedSearch: field-conditions filtered first, then standard person-conditions.
-    let result = await ListRuleHelper.filterByFieldConditions("ch1", data, fieldConditions as any, repos);
-    result = PersonConditionHelper.apply(result, standardConditions as any);
+    let result = await ListRuleHelper.filterByFieldConditions("ch1", data, fieldConditions, repos);
+    result = PersonConditionHelper.apply(result, standardConditions);
 
-    expect(result.map((p: any) => p.id)).toEqual(["p1"]);
+    expect(result.map((p) => p.id)).toEqual(["p1"]);
   });
 
   it("matches nobody when the custom field is unknown", async () => {
     const data = [{ id: "p1", lastName: "Smith" }];
     const repos = mockRepos(null, []);
     const fieldConditions = [{ field: "personField_missing", operator: "equals" as const, value: "Yes" }];
-    const result = await ListRuleHelper.filterByFieldConditions("ch1", data, fieldConditions as any, repos);
+    const result = await ListRuleHelper.filterByFieldConditions("ch1", data, fieldConditions, repos);
     expect(result).toEqual([]);
   });
 });
@@ -108,8 +114,8 @@ describe("PersonFieldValueRepo.upsert (blank clears the row)", () => {
   it("creates a new row when no value exists yet", async () => {
     const repo = new PersonFieldValueRepo();
     jest.spyOn(repo, "loadForPersonField").mockResolvedValue(null);
-    const save = jest.spyOn(repo, "save").mockImplementation(async (m: any) => m);
-    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined as any);
+    const save = jest.spyOn(repo, "save").mockImplementation(async (m: PersonFieldValue) => m);
+    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined);
 
     await repo.upsert("ch1", "p1", "f1", "hello");
 
@@ -119,9 +125,9 @@ describe("PersonFieldValueRepo.upsert (blank clears the row)", () => {
 
   it("updates the existing row when a value already exists", async () => {
     const repo = new PersonFieldValueRepo();
-    jest.spyOn(repo, "loadForPersonField").mockResolvedValue({ id: "v9" } as any);
-    const save = jest.spyOn(repo, "save").mockImplementation(async (m: any) => m);
-    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined as any);
+    jest.spyOn(repo, "loadForPersonField").mockResolvedValue({ id: "v9" } as PersonFieldValueRow);
+    const save = jest.spyOn(repo, "save").mockImplementation(async (m: PersonFieldValue) => m);
+    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined);
 
     await repo.upsert("ch1", "p1", "f1", "updated");
 
@@ -131,9 +137,9 @@ describe("PersonFieldValueRepo.upsert (blank clears the row)", () => {
 
   it("deletes the existing row when the value is blank", async () => {
     const repo = new PersonFieldValueRepo();
-    jest.spyOn(repo, "loadForPersonField").mockResolvedValue({ id: "v9" } as any);
-    const save = jest.spyOn(repo, "save").mockImplementation(async (m: any) => m);
-    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined as any);
+    jest.spyOn(repo, "loadForPersonField").mockResolvedValue({ id: "v9" } as PersonFieldValueRow);
+    const save = jest.spyOn(repo, "save").mockImplementation(async (m: PersonFieldValue) => m);
+    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined);
 
     await repo.upsert("ch1", "p1", "f1", "");
 
@@ -144,8 +150,8 @@ describe("PersonFieldValueRepo.upsert (blank clears the row)", () => {
   it("does nothing when clearing a value that never existed", async () => {
     const repo = new PersonFieldValueRepo();
     jest.spyOn(repo, "loadForPersonField").mockResolvedValue(null);
-    const save = jest.spyOn(repo, "save").mockImplementation(async (m: any) => m);
-    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined as any);
+    const save = jest.spyOn(repo, "save").mockImplementation(async (m: PersonFieldValue) => m);
+    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined);
 
     await repo.upsert("ch1", "p1", "f1", "");
 
