@@ -38,7 +38,7 @@ export interface MembershipModuleGateway {
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string; discussionsEnabled?: boolean | number; announcementsEnabled?: boolean | number } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
   loadPerson(churchId: string, personId: string): Promise<{
-    id: string; householdId: string; email: string; firstName?: string; lastName?: string; displayName?: string; mobilePhone?: string; optedOut?: boolean | number; donorNumber?: string;
+    id: string; householdId: string; email: string; firstName?: string; lastName?: string; displayName?: string; mobilePhone?: string; optedOut?: boolean | number; smsOptedOut?: boolean | number; donorNumber?: string;
     membershipStatus?: string; gender?: string; maritalStatus?: string; birthDate?: Date; householdRole?: string;
   } | null>;
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
@@ -81,14 +81,14 @@ interface HouseholdAdultRow {
   id: string;
   displayName?: string;
   mobilePhone?: string;
-  optedOut?: boolean | number;
+  smsOptedOut?: boolean | number;
 }
 
 export interface HouseholdAdult {
   personId: string;
   name: string;
   mobilePhone: string;
-  optedOut: boolean;
+  smsOptedOut: boolean;
 }
 
 class MembershipModuleGatewayDb implements MembershipModuleGateway {
@@ -420,7 +420,7 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     const householdIds = [...new Set(seeds.map((p) => p.householdId).filter((id) => !!id))];
     if (householdIds.length === 0) return [];
     const rows = (await this.getDb().selectFrom("people")
-      .select(["id", "displayName", "mobilePhone", "optedOut"])
+      .select(["id", "displayName", "mobilePhone", "smsOptedOut"])
       .where("churchId", "=", churchId)
       .where("removed", "=", 0)
       .where("householdId", "in", householdIds)
@@ -430,7 +430,7 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       personId: r.id,
       name: r.displayName || "",
       mobilePhone: r.mobilePhone || "",
-      optedOut: r.optedOut === true || r.optedOut === 1
+      smsOptedOut: r.smsOptedOut === true || r.smsOptedOut === 1
     }));
   }
 

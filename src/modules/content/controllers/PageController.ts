@@ -256,7 +256,15 @@ export class PageController2 extends ContentBaseController {
           const existing = await this.repos.page.loadByUrl(au.churchId, page.url, page.siteId);
           if (existing && existing.id !== page.id) return this.json({ error: "A page with this url already exists" }, 409);
         }
-        const result = await Promise.all(req.body.map((page) => this.repos.page.save(page)));
+        let result: Page[];
+        try {
+          result = await Promise.all(req.body.map((page) => this.repos.page.save(page)));
+        } catch (e: any) {
+          // The unique key is (churchId, url) across all of the church's sites, while the check above is
+          // per site; a url used on another site, or two saves racing, lands here.
+          if (e?.errno === 1062 || e?.code === "ER_DUP_ENTRY") return this.json({ error: "A page with this url already exists" }, 409);
+          throw e;
+        }
         this.bumpSiteCache(au.churchId);
         return result;
       }

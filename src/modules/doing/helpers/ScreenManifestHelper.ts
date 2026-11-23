@@ -94,6 +94,8 @@ export class ScreenManifestHelper {
   private static cache = new Map<string, { expires: number; manifest: ScreenManifest }>();
   // A build still running at this mark logs what it is waiting on, since a Lambda timeout (30 s) never reaches the SLOW line.
   static pendingLogMs = 20000;
+  // A OneDrive link lookup that never answers held whole builds to the Lambda timeout; past this the item keeps the bearer url.
+  static linkTimeoutMs = 8000;
 
   // A slow build logs `SLOW_MANIFEST <ms>ms ...` with per-step call counts and the slowest call, keyed by step and provider id only.
   static async build(repos: Repos, churchId: string, screenGroupId: string, now = new Date()): Promise<ScreenManifest | null> {
@@ -206,7 +208,7 @@ export class ScreenManifestHelper {
     const headers = { Authorization: `Bearer ${auth.access_token}` };
     if (providerId !== "onedrive") return { url, headers };
     try {
-      const res = await this.timed(ctx, "link", providerId, () => fetch(url, { headers, redirect: "manual" }));
+      const res = await this.timed(ctx, "link", providerId, () => fetch(url, { headers, redirect: "manual", signal: AbortSignal.timeout(this.linkTimeoutMs) }));
       const location = res.headers.get("location");
       if (location) return { url: location };
     } catch (e) {
