@@ -21,7 +21,7 @@ export class GlobalStyleController extends ContentBaseController {
 
   // Anonymous access
   @httpGet("/church/:churchId")
-  public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       const result = await this.repos.globalStyle.loadForChurch(churchId, siteId);
@@ -30,7 +30,7 @@ export class GlobalStyleController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.globalStyle.load(au.churchId, id);
       return this.repos.globalStyle.convertToModel(au.churchId, data);
@@ -38,7 +38,7 @@ export class GlobalStyleController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       const result = await this.repos.globalStyle.loadForChurch(au.churchId, siteId);
@@ -47,12 +47,12 @@ export class GlobalStyleController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, GlobalStyle[] | GlobalStyle>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, GlobalStyle[] | GlobalStyle>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<GlobalStyle>[] = [];
       const items = Array.isArray(req.body) ? req.body : [req.body];
-      items.forEach((item) => { (item as any).churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.globalStyle.save(item)); });
+      items.forEach((item) => { item.churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.globalStyle.save(item)); });
       const result = await Promise.all(promises);
       this.bumpSiteCache(au.churchId);
       return this.repos.globalStyle.convertAllToModel(au.churchId, result);
@@ -60,7 +60,7 @@ export class GlobalStyleController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.globalStyle.delete(au.churchId, id);

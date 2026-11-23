@@ -8,7 +8,7 @@ import { PodcastFeedError, PodcastFeedHelper } from "../helpers/PodcastFeedHelpe
 @controller("/content/podcast")
 export class PodcastController extends ContentBaseController {
   @httpGet("/feed")
-  public async feed(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async feed(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const url = typeof req.query.url === "string" ? req.query.url.trim() : "";
       if (!url) return this.json({ error: "A feed url is required" }, 400);

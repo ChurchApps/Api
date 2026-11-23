@@ -10,7 +10,7 @@ const MAX_REDIRECTS = 200;
 @controller("/content/redirects")
 export class RedirectController extends ContentBaseController {
   @httpGet("/public/:churchId")
-  public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const path = req.query.path ? RedirectRepo.normalizePath(req.query.path.toString()) : undefined;
       return path ? await this.repos.redirect.loadByFromPath(churchId, path) : await this.repos.redirect.loadAll(churchId);
@@ -18,21 +18,21 @@ export class RedirectController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.redirect.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.redirect.loadAll(au.churchId);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Redirect[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Redirect[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
 
@@ -56,7 +56,7 @@ export class RedirectController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.redirect.delete(au.churchId, id);

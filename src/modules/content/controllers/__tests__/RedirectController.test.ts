@@ -1,29 +1,35 @@
 import "reflect-metadata";
+import express from "express";
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "gen_id" } }));
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("../../helpers/index", () => ({ Permissions: { content: { edit: "contentEdit" } } }));
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } bumpSiteCache() {} } }));
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } bumpSiteCache() {} } }));
 
 import { RedirectController } from "../RedirectController.js";
+import { Redirect } from "../../models/index.js";
+
+type JsonResult = { obj: unknown; status: number };
 
 function makeController(overrides: { checkAccess?: boolean; count?: number } = {}) {
-  const saved: any[] = [];
+  const saved: Redirect[] = [];
   const repos = {
     redirect: {
-      save: jest.fn(async (r: any) => { saved.push(r); return r; }),
+      save: jest.fn(async (r: Redirect) => { saved.push(r); return r; }),
       count: jest.fn(async () => overrides.count ?? 0)
     }
   };
   const au = { churchId: "c1", checkAccess: () => overrides.checkAccess ?? true };
   const controller = new RedirectController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, repos, saved };
 }
 
-const run = (controller: RedirectController, body: any[]) =>
-  (controller as any).save({ body }, {});
+const run = async (controller: RedirectController, body: Redirect[]) =>
+  (await controller.save({ body } as express.Request, {} as express.Response)) as JsonResult;
 
 describe("RedirectController.save guards", () => {
   it("rejects without content-edit permission", async () => {

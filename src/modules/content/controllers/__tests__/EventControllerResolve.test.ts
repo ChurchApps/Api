@@ -1,8 +1,9 @@
 import "reflect-metadata";
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+import express from "express";
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("ics", () => ({ createEvents: jest.fn() }));
 jest.mock("../../helpers/index", () => ({
-  CalendarHelper: { addExceptionDates: jest.fn(async (events: any[]) => events.forEach((e) => { e.exceptionDates = ["2026-10-25"]; })) },
+  CalendarHelper: { addExceptionDates: jest.fn(async (events: { exceptionDates?: string[] }[]) => events.forEach((e) => { e.exceptionDates = ["2026-10-25"]; })) },
   HolidayHelper: { getHolidays: jest.fn() },
   Permissions: { content: { edit: "contentEdit" }, calendars: { admin: "calendarsAdmin" } }
 }));
@@ -10,23 +11,29 @@ jest.mock("../../helpers/ApprovalHelper", () => ({ ApprovalHelper: { determineSt
 jest.mock("../../helpers/ConflictHelper", () => ({ ConflictHelper: { findConflicts: jest.fn() } }));
 jest.mock("../../helpers/IcsHelper", () => ({ IcsHelper: { parseEvents: jest.fn() } }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
-const mockGateway = { loadGroupMembersForPerson: jest.fn(async () => []), loadActiveGroupIds: jest.fn(async (_c: string, ids: string[]) => ids) };
+const mockGateway = { loadGroupMembersForPerson: jest.fn(async (): Promise<unknown[]> => []), loadActiveGroupIds: jest.fn(async (_c: string, ids: string[]) => ids) };
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => mockGateway }));
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
 
 import { NotificationService } from "../../../../shared/helpers/NotificationService";
 import { EventController } from "../EventController.js";
+import { Event } from "../../models/index.js";
 
-function makeRepos(event: any) {
-  return { event: { load: jest.fn(async () => ({ ...event })), save: jest.fn(async (e: any) => e) } };
+const req = {} as express.Request;
+const res = {} as express.Response;
+
+function makeRepos(event: Event) {
+  return { event: { load: jest.fn(async () => ({ ...event })), save: jest.fn(async (e: Event) => e) } };
 }
 
-function wire(repos: any) {
-  const controller: any = new EventController();
-  const au = { churchId: "c1", personId: "p1", checkAccess: (perm: any) => perm === "calendarsAdmin" };
-  controller.repos = repos;
-  controller.actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  controller.json = (obj: any, status: number) => ({ obj, status });
+function wire(repos: ReturnType<typeof makeRepos>) {
+  const controller = new EventController();
+  const au = { churchId: "c1", personId: "p1", checkAccess: (perm: string) => perm === "calendarsAdmin" };
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return controller;
 }
 
@@ -35,14 +42,14 @@ describe("reversing an event request decision", () => {
 
   it("rejecting an approved event takes it back off the public calendar", async () => {
     const repos = makeRepos({ id: "e1", churchId: "c1", title: "Picnic", requestedBy: "p2", approvalStatus: "approved", visibility: "public" });
-    await wire(repos).reject("e1", {}, {});
+    await wire(repos).reject("e1", req, res);
     expect(repos.event.save).toHaveBeenCalledWith(expect.objectContaining({ approvalStatus: "rejected", visibility: "private" }));
     expect(NotificationService.createNotifications).toHaveBeenCalledTimes(1);
   });
 
   it("approving a rejected event publishes it", async () => {
     const repos = makeRepos({ id: "e1", churchId: "c1", title: "Picnic", requestedBy: "p2", approvalStatus: "rejected", visibility: "private" });
-    await wire(repos).approve("e1", {}, {});
+    await wire(repos).approve("e1", req, res);
     expect(repos.event.save).toHaveBeenCalledWith(expect.objectContaining({ approvalStatus: "approved", visibility: "public" }));
     expect(NotificationService.createNotifications).toHaveBeenCalledTimes(1);
   });
@@ -52,7 +59,7 @@ describe("reversing an event request decision", () => {
 describe("recording who decided an event request", () => {
   it("approving stores the approver and the decision time", async () => {
     const repos = makeRepos({ id: "e1", churchId: "c1", title: "Picnic", requestedBy: "p2", approvalStatus: "pending" });
-    await wire(repos).approve("e1", {}, {});
+    await wire(repos).approve("e1", req, res);
     const saved = repos.event.save.mock.calls[0][0];
     expect(saved.resolvedBy).toBe("p1");
     expect(saved.resolvedDate).toBeInstanceOf(Date);
@@ -60,7 +67,7 @@ describe("recording who decided an event request", () => {
 
   it("rejecting stores the rejecter and the decision time", async () => {
     const repos = makeRepos({ id: "e1", churchId: "c1", title: "Picnic", requestedBy: "p2", approvalStatus: "pending" });
-    await wire(repos).reject("e1", {}, {});
+    await wire(repos).reject("e1", req, res);
     const saved = repos.event.save.mock.calls[0][0];
     expect(saved.resolvedBy).toBe("p1");
     expect(saved.resolvedDate).toBeInstanceOf(Date);

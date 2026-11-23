@@ -55,9 +55,10 @@ export class ByosAuth {
     let resp;
     try {
       resp = await axios.post(config.tokenUrl, params.toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
-    } catch (e: any) {
-      const detail = e?.response?.data;
-      throw new Error("Token exchange failed: " + (detail?.error_description || detail?.error || e?.message || "unknown error"));
+    } catch (e) {
+      const err = e as { message?: string; response?: { data?: { error?: string; error_description?: string } } };
+      const detail = err?.response?.data;
+      throw new Error("Token exchange failed: " + (detail?.error_description || detail?.error || err?.message || "unknown error"));
     }
     const data = resp.data;
     if (!data?.access_token) return null;
@@ -82,7 +83,7 @@ export class ByosAuth {
       inflight = (async (): Promise<string | null> => {
         // Re-read inside the critical section: another warm invocation may have already refreshed.
         const rows = await repo.loadByChurchId(row.churchId);
-        const fresh = repo.convertAllToModel(rows as any[]).find((r: StorageProvider) => r.id === row.id) || row;
+        const fresh = repo.convertAllToModel(rows).find((r: StorageProvider) => r.id === row.id) || row;
         const freshExpires = fresh.tokenExpiresAt ? new Date(fresh.tokenExpiresAt).getTime() : 0;
         if (fresh.accessToken && freshExpires - bufferMs > Date.now()) return EncryptionHelper.decrypt(fresh.accessToken);
 

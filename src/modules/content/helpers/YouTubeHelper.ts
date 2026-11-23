@@ -3,11 +3,21 @@ import { getSubtitles } from "youtube-captions-scraper";
 import { Sermon } from "../models/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
+// The fields of YouTube Data API v3 responses that this helper reads.
+interface YouTubeThumbnails { maxres?: { url?: string }; high?: { url?: string } }
+interface YouTubeVideosResponse {
+  items?: { snippet: { title: string; description: string; publishedAt: string; thumbnails?: YouTubeThumbnails }; contentDetails: { duration: string } }[];
+}
+interface YouTubeSearchResponse {
+  nextPageToken?: string;
+  items: { id: { videoId: string }; snippet: { title: string; description: string; publishedAt: string; thumbnails?: YouTubeThumbnails } }[];
+}
+
 export class YouTubeHelper {
   public static async getSermon(sermonId: string) {
     const url = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails%2C+snippet&id=${encodeURIComponent(sermonId)}&key=${Environment.youTubeApiKey}`;
     const result = { title: "", thumbnail: "", description: "", duration: 0, publishDate: new Date() };
-    const json: any = (await axios.get(url)).data;
+    const json = (await axios.get<YouTubeVideosResponse>(url)).data;
     if (json.items?.length > 0) {
       const snippet = json.items[0].snippet;
       const details = json.items[0].contentDetails;
@@ -48,7 +58,7 @@ export class YouTubeHelper {
 
   public static async getVideoPage(churchId: string, channelId: string, pageToken: string) {
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(channelId)}&maxResults=50&order=date&type=video&key=${Environment.youTubeApiKey}&pageToken=${encodeURIComponent(pageToken || "")}`;
-    const json: any = (await axios.get(url)).data;
+    const json = (await axios.get<YouTubeSearchResponse>(url)).data;
     const result = { sermons: YouTubeHelper.convertToSermons(churchId, json), nextPageToken: json.nextPageToken };
     return result;
   }
@@ -63,7 +73,7 @@ export class YouTubeHelper {
 
         // If we get subtitles, return them
         if (subtitles && subtitles.length > 0) {
-          const fullText = subtitles.map((s: any) => s.text).join(" ");
+          const fullText = subtitles.map((s: { text: string }) => s.text).join(" ");
           return fullText;
         }
 
@@ -95,7 +105,7 @@ export class YouTubeHelper {
     });
   }
 
-  private static convertToSermons(churchId: string, json: any) {
+  private static convertToSermons(churchId: string, json: YouTubeSearchResponse) {
     const sermons: Sermon[] = [];
     for (const item of json.items) {
       const sermon: Sermon = {

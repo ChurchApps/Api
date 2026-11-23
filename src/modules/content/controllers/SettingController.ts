@@ -9,7 +9,7 @@ import path from "path";
 @controller("/content/settings")
 export class ContentSettingController extends ContentBaseController {
   @httpGet("/my")
-  public async my(req: express.Request, res: express.Response): Promise<any> {
+  public async my(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({}, 401);
       return this.repos.setting.convertAllToModel(au.churchId, await this.repos.setting.loadUser(au.churchId, au.id));
@@ -17,7 +17,7 @@ export class ContentSettingController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async get(req: express.Request, res: express.Response): Promise<any> {
+  public async get(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
@@ -27,7 +27,7 @@ export class ContentSettingController extends ContentBaseController {
   }
 
   @httpPost("/my")
-  public async postMy(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<any> {
+  public async postMy(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({}, 401);
       for (const setting of req.body) {
@@ -47,7 +47,7 @@ export class ContentSettingController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async post(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<any> {
+  public async post(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       // This HTML runs as script on the church's public site, so it follows the content.edit rule for custom JS.
@@ -65,10 +65,10 @@ export class ContentSettingController extends ContentBaseController {
   }
 
   @httpGet("/public/:churchId")
-  public async publicRoute(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async publicRoute(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const settings = this.repos.setting.convertAllToModel(churchId, await this.repos.setting.loadPublicSettings(churchId));
-      const result: any = {};
+      const result: Record<string, string> = {};
       settings.forEach((s) => {
         result[s.keyName] = s.value;
       });
@@ -77,28 +77,28 @@ export class ContentSettingController extends ContentBaseController {
   }
 
   @httpGet("/imports")
-  public async getAutoImportSettings(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAutoImportSettings(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
         const playlistId = req.query?.playlistId ? req.query.playlistId.toString() : "";
         const channelId = req.query?.channelId ? req.query.channelId.toString() : "";
         const type = req.query?.type ? req.query.type.toString() : "";
-        let result = await this.repos.setting.loadByKeyNames(au.churchId, ["youtubeChannelId", "vimeoChannelId", "autoImportSermons"]);
-        result = result.filter((r: any) => r.value !== ""); // remove rows with empty value
+        let result: Setting[] = await this.repos.setting.loadByKeyNames(au.churchId, ["youtubeChannelId", "vimeoChannelId", "autoImportSermons"]);
+        result = result.filter((r) => r.value !== ""); // remove rows with empty value
         if (playlistId && channelId) {
           const filteredData = this.repos.setting.getImports(result, type, playlistId, channelId);
           if (filteredData) return this.repos.setting.convertAllImports(filteredData);
         }
-        result = this.repos.setting.getImports(result);
-        return this.repos.setting.convertAllImports(result);
+        const imports = this.repos.setting.getImports(result);
+        return this.repos.setting.convertAllImports(imports);
       }
     });
   }
 
   // authz-exempt: self-service — deleteForUser scopes to caller's own row via au.churchId + au.id
   @httpDelete("/my/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({}, 401);
       await this.repos.setting.deleteForUser(au.churchId, au.id, id);

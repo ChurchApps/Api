@@ -4,7 +4,7 @@ import path from "path";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { File } from "../models/index.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
-import { EnvironmentBase, inferContentTypeFromKey, resolveMaxUploadBytes, type IStorageProvider } from "@churchapps/apihelper";
+import { AuthenticatedUser, EnvironmentBase, inferContentTypeFromKey, resolveMaxUploadBytes, type IStorageProvider } from "@churchapps/apihelper";
 // hoisted transitive dep of @churchapps/apihelper
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { S3Client } from "@aws-sdk/client-s3";
@@ -27,6 +27,18 @@ const ARRANGEMENT_ALLOWED_MIME_TYPES = ["audio/mpeg", "audio/mp4", "audio/x-m4a"
 const ACTIVE_MIME_TYPES = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|text\/javascript|application\/(x-)?javascript|application\/ecmascript|text\/ecmascript)/i;
 const safeMemberMimeType = (mimeType: string) => (!mimeType || ACTIVE_MIME_TYPES.test(mimeType.trim()) ? "application/octet-stream" : mimeType);
 
+// Shape of an axios-style error from a storage provider (Dropbox, Google, Microsoft) as read by providerErrorDetail.
+interface ProviderHttpError {
+  response?: {
+    data?: string | {
+      error_summary?: string;
+      error?: string | { message?: string };
+      error_description?: string;
+      required_scope?: string;
+    };
+  };
+}
+
 @controller("/content/files")
 export class FileController extends ContentBaseController {
   // Minted provider links live >=1h; cache them so page loads don't hammer the provider APIs.
@@ -34,7 +46,7 @@ export class FileController extends ContentBaseController {
   private static MINT_CACHE_MS = 30 * 60 * 1000;
 
   @httpGet("/download/:id")
-  public async download(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async download(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const file = await this.repos.file.loadById(id);
       if (!file) return this.json({}, 404);
@@ -75,7 +87,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const file = await this.repos.file.load(au.churchId, id);
       if (isPrivateFile(file) && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
@@ -84,7 +96,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpGet("/:contentType/:contentId")
-  public async getByContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (isPrivateFile({ contentType }) && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       return await this.repos.file.loadForContent(au.churchId, contentType, contentId);
@@ -92,7 +104,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.file.loadForWebsite(au.churchId);
     });
@@ -100,7 +112,7 @@ export class FileController extends ContentBaseController {
 
   // Known bug - This post accepts multiple File modals but only a single file upload.  It's not a problem because the app restricts users to one upload at a time (for now).
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, File[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, File[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (Array.isArray(req.body) && req.body.some((f) => isPrivateFile(f))) return this.savePersonFiles(au, req.body);
       const isEditor = au.checkAccess(Permissions.content.edit);
@@ -151,7 +163,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpPost("/postUrl")
-  public async getUploadUrl(req: express.Request<{}, {}, { resourceId: string; fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }>, res: express.Response): Promise<any> {
+  public async getUploadUrl(req: express.Request<{}, {}, { resourceId: string; fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (isPrivateFile(req.body)) return this.personUploadUrl(au, req.body);
       const isEditor = au.checkAccess(Permissions.content.edit);
@@ -193,7 +205,7 @@ export class FileController extends ContentBaseController {
   // /{churchId}/files/group/{teamId}/{fileName} path. external=true: the church's own storage, with the url
   // and md5/modified markers to use instead (url absent until the first upload lands).
   @httpGet("/sync/:teamId/:fileName")
-  public async syncFileInfo(@requestParam("teamId") teamId: string, @requestParam("fileName") fileName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async syncFileInfo(@requestParam("teamId") teamId: string, @requestParam("fileName") fileName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const body = { contentType: "group", contentId: teamId, fileName };
       if (!this.isSyncFile(body)) return this.json({ error: "unsupported_file" }, 400);
@@ -212,7 +224,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existingFile = await this.repos.file.load(au.churchId, id);
       if (!existingFile) return this.json({}, 404);
@@ -293,7 +305,7 @@ export class FileController extends ContentBaseController {
     res.send(contents);
   }
 
-  private async canGroupMemberSave(au: any, files: File[]): Promise<boolean> {
+  private async canGroupMemberSave(au: AuthenticatedUser, files: File[]): Promise<boolean> {
     if (!Array.isArray(files) || files.length === 0) return false;
     for (const file of files) {
       if (au.groupIds.indexOf(file.contentId) === -1 || file.contentType !== "group") return false;
@@ -306,11 +318,11 @@ export class FileController extends ContentBaseController {
   }
 
   // Surfaces the provider's own error text (Dropbox error_summary, Google/Microsoft error payloads) to the admin.
-  private providerErrorDetail(e: any): string | null {
-    const data = e?.response?.data;
+  private providerErrorDetail(e: unknown): string | null {
+    const data = (e as ProviderHttpError | undefined)?.response?.data;
     if (!data) return null;
     if (typeof data === "string") return data.substring(0, 300);
-    const summary = data.error_summary || data.error?.message || data.error_description || (typeof data.error === "string" ? data.error : null);
+    const summary = data.error_summary || (data.error as { message?: string })?.message || data.error_description || (typeof data.error === "string" ? data.error : null);
     return summary && data.required_scope ? summary + " (required scope: " + data.required_scope + ")" : summary;
   }
 

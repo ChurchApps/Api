@@ -7,6 +7,7 @@ import { OneDriveStorageProvider } from "./OneDriveStorageProvider.js";
 import { S3CompatibleStorageProvider } from "./S3CompatibleStorageProvider.js";
 import { BYOS_PROVIDERS } from "./ByosAuth.js";
 import { StorageProvider, File } from "../models/index.js";
+import type { StorageProviderRepo } from "../repositories/StorageProviderRepo.js";
 
 let registered = false;
 const ensureRegistered = () => {
@@ -17,7 +18,7 @@ const ensureRegistered = () => {
 
 // BYOS providers hold per-church credentials, so they are constructed per request
 // from the church's storageProviders row rather than registered as factory singletons.
-const buildByosProvider = (row: StorageProvider, repo: any): IStorageProvider => {
+const buildByosProvider = (row: StorageProvider, repo: StorageProviderRepo): IStorageProvider => {
   switch (row.provider) {
     case "googledrive": return new GoogleDriveStorageProvider(row, repo);
     case "dropbox": return new DropboxStorageProvider(row, repo);
@@ -28,11 +29,11 @@ const buildByosProvider = (row: StorageProvider, repo: any): IStorageProvider =>
 };
 
 export class StorageResolver {
-  static async forChurch(storageProviderRepo: any, churchId: string): Promise<{ name: string; provider: IStorageProvider }> {
+  static async forChurch(storageProviderRepo: StorageProviderRepo, churchId: string): Promise<{ name: string; provider: IStorageProvider }> {
     ensureRegistered();
     const rows = await storageProviderRepo.loadByChurchId(churchId);
-    const list = storageProviderRepo.convertAllToModel(rows as any[]);
-    const p = list.find((x: any) => x.enabled);
+    const list = storageProviderRepo.convertAllToModel(rows);
+    const p = list.find((x: StorageProvider) => x.enabled);
     if (p && BYOS_PROVIDERS.includes(p.provider)) {
       return { name: p.provider, provider: buildByosProvider(p, storageProviderRepo) };
     }
@@ -44,7 +45,7 @@ export class StorageResolver {
 
   // Deletes/downloads must target the provider that holds the bytes. BYOS files carry it
   // on the row (files.provider); legacy files are derived from the stored URL.
-  static async forFile(storageProviderRepo: any, file: File): Promise<{ name: string; provider: IStorageProvider } | null> {
+  static async forFile(storageProviderRepo: StorageProviderRepo, file: File): Promise<{ name: string; provider: IStorageProvider } | null> {
     if (!file?.provider) return StorageResolver.forUrl(file?.contentPath);
     ensureRegistered();
     if (!BYOS_PROVIDERS.includes(file.provider)) {
@@ -52,7 +53,7 @@ export class StorageResolver {
       return StorageResolver.forUrl(file.contentPath);
     }
     const rows = await storageProviderRepo.loadByChurchId(file.churchId);
-    const list = storageProviderRepo.convertAllToModel(rows as any[]);
+    const list = storageProviderRepo.convertAllToModel(rows);
     const row = list.find((x: StorageProvider) => x.provider === file.provider);
     if (!row) return null;
     return { name: row.provider, provider: buildByosProvider(row, storageProviderRepo) };

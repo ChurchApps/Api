@@ -10,7 +10,7 @@ import { Environment, RecurringStreamHelper } from "../helpers/index.js";
 @controller("/content/streamingServices")
 export class StreamingServiceController extends ContentBaseController {
   @httpGet("/:id/hostChat")
-  public async getHostChatRoom(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getHostChatRoom(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       let room = "";
       if (au.checkAccess(Permissions.chat.host)) room = EncryptionHelper.encrypt(id);
@@ -19,13 +19,13 @@ export class StreamingServiceController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const services = await this.repos.streamingService.loadAll(au.churchId);
       const cutoff = RecurringStreamHelper.staleCutoff();
       const stale = services.filter((s: StreamingService) => s.serviceTime < cutoff);
       const zones = stale.some((s: StreamingService) => s.recurring) ? await RecurringStreamHelper.zoneCandidates(au.churchId) : [];
-      const promises: Promise<any>[] = [];
+      const promises: Promise<unknown>[] = [];
       const result: StreamingService[] = [];
       services.forEach((s: StreamingService) => {
         if (s.serviceTime < cutoff) {
@@ -49,7 +49,7 @@ export class StreamingServiceController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {
@@ -62,7 +62,7 @@ export class StreamingServiceController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, StreamingService[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, StreamingService[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {

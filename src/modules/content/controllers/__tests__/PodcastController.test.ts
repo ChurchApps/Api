@@ -1,5 +1,6 @@
 import "reflect-metadata";
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+import express from "express";
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/PodcastFeedHelper", () => {
   class PodcastFeedError extends Error { constructor(message: string, public status: number) { super(message); } }
   return { PodcastFeedError, PodcastFeedHelper: { load: jest.fn() } };
@@ -10,10 +11,10 @@ import { PodcastFeedError, PodcastFeedHelper } from "../../helpers/PodcastFeedHe
 
 const mockedLoad = PodcastFeedHelper.load as jest.Mock;
 
-const run = async (query: Record<string, unknown>) => {
+const run = async (query: express.Request["query"]) => {
   const controller = new PodcastController();
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  return (controller as any).feed({ query }, {});
+  Object.assign(controller, { actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action() });
+  return controller.feed({ query } as express.Request, {} as express.Response);
 };
 
 describe("PodcastController.feed", () => {

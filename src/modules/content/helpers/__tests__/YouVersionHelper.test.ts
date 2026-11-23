@@ -31,7 +31,7 @@ describe("YouVersionHelper.parseVersesFromHtml", () => {
 });
 
 describe("YouVersionHelper.getContent rate-limit breaker", () => {
-  const mockGet = (axios as any).get as jest.Mock;
+  const mockGet = axios.get as jest.Mock;
 
   beforeEach(() => {
     YouVersionHelper.blockedUntil = 0;

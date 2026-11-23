@@ -1,6 +1,6 @@
 import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { Playlist, Sermon } from "../models/index.js";
+import { Playlist, Sermon, Setting } from "../models/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { YouTubeHelper, Environment, VimeoHelper, OpenAiHelper } from "../helpers/index.js";
@@ -8,10 +8,14 @@ import { FileStorageHelper } from "@churchapps/apihelper";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
 
+interface TvFeedSermonNode { id: string; name: string; description: string; image: string; apiUrl: string }
+interface TvFeedPlaylistNode { id: string; name: string; description: string; image: string; children: TvFeedSermonNode[] }
+interface TvFeed { treeLabels: string[]; playlists: TvFeedPlaylistNode[] }
+
 @controller("/content/sermons")
 export class SermonController extends ContentBaseController {
   @httpGet("/public/freeshowSample")
-  public async getFreeShow(@requestParam("churchId") _churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getFreeShow(@requestParam("churchId") _churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {
       const result = {
         id: "freeshow",
@@ -38,7 +42,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/public/tvWrapper/:churchId")
-  public async getTvWrapper(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getTvWrapper(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {
       const result = {
         treeLabels: ["Content Type"],
@@ -73,12 +77,12 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/public/tvFeed/:churchId/:sermonId")
-  public async getSermonTvFeed(@requestParam("churchId") churchId: string, @requestParam("sermonId") sermonId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getSermonTvFeed(@requestParam("churchId") churchId: string, @requestParam("sermonId") sermonId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const sermon = await this.repos.sermon.loadById(sermonId, churchId);
       if (!sermon) return this.json({}, 404);
 
-      const result: any = {
+      const result = {
         id: sermon.id,
         name: sermon.title,
         prefetch: false,
@@ -105,18 +109,18 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/public/tvFeed/:churchId")
-  public async getTvFeed(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getTvFeed(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const playlists: Playlist[] = await this.repos.playlist.loadPublicAll(churchId);
       const sermons = await this.repos.sermon.loadPublicAll(churchId);
 
-      const result: any = {
+      const result: TvFeed = {
         treeLabels: ["Series", "Sermon"],
         playlists: []
       };
 
       playlists.forEach((playlist: Playlist) => {
-        const playlistNode: any = {
+        const playlistNode: TvFeedPlaylistNode = {
           id: playlist.id,
           name: playlist.title,
           description: playlist.description,
@@ -126,7 +130,7 @@ export class SermonController extends ContentBaseController {
 
         sermons.forEach((sermon: Sermon) => {
           if (sermon.playlistId === playlistNode.id) {
-            const sermonNode: any = {
+            const sermonNode: TvFeedSermonNode = {
               id: sermon.id,
               name: sermon.title,
               description: sermon.description,
@@ -144,7 +148,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/timeline")
-  public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const sermonIds = req.query.sermonIds ? req.query.sermonIds.toString().split(",") : [];
       return await this.repos.sermon.loadTimeline(au.churchId, sermonIds);
@@ -152,7 +156,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/lookup")
-  public async lookup(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async lookup(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const videoData = req.query.videoData?.toString() || "";
       if (!/^[A-Za-z0-9_:-]{1,64}$/.test(videoData)) return this.json({ error: "Invalid video id" }, 400);
@@ -166,7 +170,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/socialSuggestions")
-  public async socialSuggestions(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async socialSuggestions(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       const youtubeVideoId = req.query?.youtubeVideoId?.toString();
@@ -196,7 +200,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/outline")
-  public async lessonOutline(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async lessonOutline(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       const url = req.query?.url?.toString();
@@ -216,7 +220,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/youtubeImport/:channelId")
-  public async youtubeImport(@requestParam("channelId") channelId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async youtubeImport(@requestParam("channelId") channelId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       return await YouTubeHelper.getVideosFromChannel(au.churchId, channelId);
@@ -224,7 +228,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/vimeoImport/:channelId")
-  public async vimeoImport(@requestParam("channelId") channelId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async vimeoImport(@requestParam("channelId") channelId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       return await VimeoHelper.getVideosFromChannel(au.churchId, channelId);
@@ -232,34 +236,34 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.sermon.loadById(id, au.churchId);
     });
   }
 
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.sermon.loadAll(au.churchId);
     });
   }
 
   @httpGet("/public/:churchId")
-  public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repos.sermon.loadPublicAll(churchId);
     });
   }
 
   @httpGet("/rss/:churchId")
-  public async rss(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async rss(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const siteUrl = req.query.siteUrl ? req.query.siteUrl.toString().replace(/\/$/, "") : "";
       const sermons = await this.repos.sermon.loadPublicAll(churchId);
       const church = await getMembershipModuleGateway().loadChurch(churchId);
-      const settings: any[] = await this.repos.setting.loadByKeyNames(churchId, ["podcastTitle", "podcastImage"]);
-      const values: any = {};
+      const settings: Setting[] = await this.repos.setting.loadByKeyNames(churchId, ["podcastTitle", "podcastImage"]);
+      const values: Record<string, string> = {};
       settings.forEach((s) => { values[s.keyName] = s.value; });
       let image = values.podcastImage || "";
       if (!image) image = (await getMembershipModuleGateway().loadSetting(churchId, "logoLight")) || "";
@@ -336,7 +340,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {
@@ -347,7 +351,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Sermon[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Sermon[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {

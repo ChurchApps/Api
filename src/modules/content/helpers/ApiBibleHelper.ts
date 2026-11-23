@@ -2,6 +2,7 @@ import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
+import { ApiBibleBook, ApiBibleChapter, ApiBibleList, ApiBibleTranslation, ApiBibleVerse, ApiBibleVerseContent, ApiBibleVerseItem, BibleHttpError, BibleSearchResponse } from "./BibleApiTypes.js";
 
 export class ApiBibleHelper {
   static baseUrl: string = "https://api.scripture.api.bible/v1";
@@ -18,16 +19,16 @@ export class ApiBibleHelper {
     const books = await ApiBibleHelper.getBooks(translationKey);
     const verseKey = books[0].keyName + ".1.1";
     const url = this.baseUrl + "/bibles/" + translationKey + "/verses/" + verseKey + "-" + verseKey + "?content-type=json&include-titles=false&include-verse-numbers=false";
-    const data = await this.getContent(url);
+    const data = await this.getContent<ApiBibleVerseContent>(url);
     return data.data.copyright;
   }
 
   static async getTranslations() {
     const result: BibleTranslation[] = [];
     const url = this.baseUrl + "/bibles";
-    const data = await this.getContent(url);
+    const data = await this.getContent<ApiBibleList<ApiBibleTranslation>>(url);
 
-    data.data.forEach((d: any) => {
+    data.data.forEach((d) => {
       const translation: BibleTranslation = {
         attributionRequired: this.attributionRequired.indexOf(d.id) >= 0,
         attributionString: "",
@@ -42,7 +43,7 @@ export class ApiBibleHelper {
       };
       // copyright: this.translationCopyrights[d.id]
 
-      d.countries.forEach((c: any) => {
+      d.countries.forEach((c) => {
         translation.countryList.push(c.id.toLowerCase());
       });
       translation.countries = translation.countryList.join(",");
@@ -55,7 +56,7 @@ export class ApiBibleHelper {
   static async search(translationKey: string, query: string, limit?: number) {
     let url = this.baseUrl + "/bibles/" + translationKey + "/search?query=" + encodeURIComponent(query);
     if (limit) url += "&limit=" + limit;
-    const data = await this.getContent(url);
+    const data = await this.getContent<BibleSearchResponse>(url);
 
     return data;
   }
@@ -63,9 +64,9 @@ export class ApiBibleHelper {
   static async getBooks(translationKey: string) {
     const result: BibleBook[] = [];
     const url = this.baseUrl + "/bibles/" + translationKey + "/books";
-    const data = await this.getContent(url);
+    const data = await this.getContent<ApiBibleList<ApiBibleBook>>(url);
 
-    data.data.forEach((d: any, i: number) => {
+    data.data.forEach((d, i: number) => {
       result.push({
         translationKey,
         keyName: d.id,
@@ -80,9 +81,9 @@ export class ApiBibleHelper {
   static async getChapters(translationKey: string, bookKey: string) {
     const result: BibleChapter[] = [];
     const url = this.baseUrl + "/bibles/" + translationKey + "/books/" + bookKey + "/chapters";
-    const data = await this.getContent(url);
+    const data = await this.getContent<ApiBibleList<ApiBibleChapter>>(url);
 
-    data.data.forEach((d: any) => {
+    data.data.forEach((d) => {
       result.push({
         translationKey,
         bookKey,
@@ -96,9 +97,9 @@ export class ApiBibleHelper {
   static async getVerses(translationKey: string, chapterKey: string) {
     const result: BibleVerse[] = [];
     const url = this.baseUrl + "/bibles/" + translationKey + "/chapters/" + chapterKey + "/verses";
-    const data = await this.getContent(url);
+    const data = await this.getContent<ApiBibleList<ApiBibleVerse>>(url);
 
-    data.data.forEach((d: any) => {
+    data.data.forEach((d) => {
       const parts = d.id.split(".");
       result.push({
         translationKey,
@@ -112,19 +113,19 @@ export class ApiBibleHelper {
 
   static async getVerseText(translationKey: string, startVerseKey: string, endVerseKey: string) {
     const url = this.baseUrl + "/bibles/" + translationKey + "/verses/" + startVerseKey + "-" + endVerseKey + "?content-type=json&include-titles=false&include-verse-numbers=false";
-    const data = await this.getContent(url);
+    const data = await this.getContent<ApiBibleVerseContent>(url);
     const result: BibleVerseText[] = [];
     const content = data?.data?.content;
     if (!Array.isArray(content)) return result;
-    content.forEach((c: any) => {
-      (c.items || []).forEach((i: any, idx: number) => {
+    content.forEach((c) => {
+      (c.items || []).forEach((i, idx: number) => {
         this.parseVerseItem(i, c, idx, result, translationKey);
       });
     });
     return result;
   }
 
-  static parseVerseItem(item: any, parent: any, index: number, result: BibleVerseText[], translationKey: string) {
+  static parseVerseItem(item: ApiBibleVerseItem, parent: ApiBibleVerseItem, index: number, result: BibleVerseText[], translationKey: string) {
     if (item.attrs?.verseId) {
       const parts = item.attrs.verseId.split(".");
       const verse = parseInt(parts[parts.length - 1], 0) || 0;
@@ -149,7 +150,7 @@ export class ApiBibleHelper {
     }
 
     if (item.items) {
-      item.items.forEach((i: any, idx: number) => {
+      item.items.forEach((i, idx: number) => {
         this.parseVerseItem(i, item, idx, result, translationKey);
       });
     }
@@ -159,11 +160,12 @@ export class ApiBibleHelper {
   // Successful calls finish well under this, so give up sooner and answer the same 504.
   static requestTimeoutMs = 15000;
 
-  static async getContent(url: string) {
+  static async getContent<T = unknown>(url: string): Promise<T> {
     try {
-      const resp = await axios.get(url, { headers: { "api-key": Environment.apiBibleKey }, timeout: this.requestTimeoutMs });
+      const resp = await axios.get<T>(url, { headers: { "api-key": Environment.apiBibleKey }, timeout: this.requestTimeoutMs });
       return resp.data;
-    } catch (error: any) {
+    } catch (e) {
+      const error = e as BibleHttpError;
       if (error.response?.status) error.status = error.response.status;
       else if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") error.status = 504;
       throw error;

@@ -7,7 +7,7 @@ import { CalendarHelper, Permissions } from "../helpers/index.js";
 @controller("/content/curatedEvents")
 export class CuratedEventController extends ContentBaseController {
   @httpGet("/calendar/:curatedCalendarId")
-  public async getForCuratedCalendar(@requestParam("curatedCalendarId") curatedCalendarId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForCuratedCalendar(@requestParam("curatedCalendarId") curatedCalendarId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (req.query?.withoutEvents) {
         return await this.repos.curatedEvent.loadByCuratedCalendarId(au.churchId, curatedCalendarId);
@@ -24,7 +24,7 @@ export class CuratedEventController extends ContentBaseController {
     @requestParam("curatedCalendarId") curatedCalendarId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const result = await this.repos.curatedEvent.loadForEvents(curatedCalendarId, churchId);
       await CalendarHelper.addExceptionDates(result, this.repos);
@@ -33,21 +33,21 @@ export class CuratedEventController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.curatedEvent.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.curatedEvent.loadAll(au.churchId);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, PostRequestBody[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, PostRequestBody[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -84,7 +84,7 @@ export class CuratedEventController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -100,7 +100,7 @@ export class CuratedEventController extends ContentBaseController {
     @requestParam("eventId") eventId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -116,7 +116,7 @@ export class CuratedEventController extends ContentBaseController {
     @requestParam("groupId") groupId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

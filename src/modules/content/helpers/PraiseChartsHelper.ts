@@ -5,8 +5,26 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 
+// The fields of a PraiseCharts catalog/library arrangement that this helper reads.
+export interface PraiseChartsItem {
+  id?: string;
+  bpm?: string;
+  seconds?: number;
+  details?: {
+    title?: string;
+    lyrics?: string;
+    original_key?: string;
+    meter?: string;
+    keys?: string;
+    artists?: { names?: string };
+    album?: { title?: string; images?: { md?: { url?: string } } };
+    external_ids?: { spotify_id?: string; ccli_number?: string; isrc?: string; genius_id?: string };
+    external_urls?: { youtube?: string };
+  };
+}
+
 export class PraiseChartsHelper {
-  static async loadUserTokens(au: any): Promise<{ token?: string; secret?: string }> {
+  static async loadUserTokens(au: { id?: string; churchId?: string }): Promise<{ token?: string; secret?: string }> {
     if (!au?.id) return {};
     const repos = await RepoManager.getRepos<Repos>("content");
     const settings: Setting[] = await repos.setting.loadUser(au.churchId, au.id);
@@ -116,7 +134,7 @@ export class PraiseChartsHelper {
   static async loadSongFromLibrary(id: string, keys: string[], accessToken: string, accessTokenSecret: string) {
     let url = `https://api.praisecharts.com/v1.0/library/search?q=${encodeURIComponent(id)}`;
     if (keys.length > 0) url += "&keys[]=" + keys.join(",");
-    const data: any = await this.oAuthGet(url, accessToken, accessTokenSecret);
+    const data: unknown = await this.oAuthGet(url, accessToken, accessTokenSecret);
     return data;
   }
 
@@ -158,13 +176,13 @@ export class PraiseChartsHelper {
     }
   }
 
-  private static convertItemsToSongDetails(items: any[]) {
+  private static convertItemsToSongDetails(items: PraiseChartsItem[]) {
     return items.map((item) => {
       return this.convertItemToSongDetail(item);
     });
   }
 
-  private static convertItemToSongDetail(item: any) {
+  private static convertItemToSongDetail(item: PraiseChartsItem) {
     const result: SongDetail = {
       praiseChartsId: item.id,
       title: item.details?.title,
@@ -176,7 +194,7 @@ export class PraiseChartsHelper {
     return result;
   }
 
-  static appendDetails(item: any, sd: SongDetail) {
+  static appendDetails(item: PraiseChartsItem, sd: SongDetail) {
     sd.bpm = item.bpm;
     sd.keySignature = item.details?.original_key;
     sd.seconds = item.seconds;
@@ -185,7 +203,7 @@ export class PraiseChartsHelper {
     sd.tones = item.details?.keys;
   }
 
-  private static getLinks(item: any) {
+  private static getLinks(item: PraiseChartsItem) {
     const result: SongDetailLink[] = [];
     if (item.details.external_ids) {
       const externalIds = item.details.external_ids;
@@ -303,7 +321,7 @@ export class PraiseChartsHelper {
     }
   }
 
-  static getLyricsBestMatch(arrangements: any, lyrics: string) {
+  static getLyricsBestMatch(arrangements: PraiseChartsItem[], lyrics: string) {
     let bestMatch = arrangements[0];
     let bestScore = this.calculateMatchScore(lyrics, bestMatch.details?.lyrics || "");
 
@@ -320,7 +338,7 @@ export class PraiseChartsHelper {
     return this.convertItemToSongDetail(bestMatch);
   }
 
-  static getArtistBestMatch(arrangements: any, artist: string) {
+  static getArtistBestMatch(arrangements: PraiseChartsItem[], artist: string) {
     let bestMatch = arrangements[0];
     let bestScore = bestMatch.details?.artists?.names ? this.calculateMatchScore(artist, bestMatch.details?.artists?.names || "") : 0;
 

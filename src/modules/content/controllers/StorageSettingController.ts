@@ -12,24 +12,24 @@ import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
 export class StorageSettingController extends ContentBaseController {
 
   @httpGet("/providers")
-  public async getProviders(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getProviders(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const rows = await this.repos.storageProvider.loadByChurchId(au.churchId);
-      const result = this.repos.storageProvider.convertAllToModel(rows as any[]);
+      const result = this.repos.storageProvider.convertAllToModel(rows);
       return result.map((p: StorageProvider) => this.mask(p));
     });
   }
 
   @httpPost("/providers")
-  public async saveProvider(req: express.Request<{}, {}, StorageProvider[]>, res: express.Response): Promise<any> {
+  public async saveProvider(req: express.Request<{}, {}, StorageProvider[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       for (const provider of req.body) {
         const endpointError = await this.validateEndpoint(provider.settings);
         if (endpointError) return this.json({ error: endpointError }, 400);
       }
-      const existingRows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(au.churchId) as any[]);
+      const existingRows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(au.churchId));
       const saved = await Promise.all(
         req.body.map(async (provider) => {
           provider.churchId = au.churchId;
@@ -52,7 +52,7 @@ export class StorageSettingController extends ContentBaseController {
   }
 
   @httpPost("/exchange")
-  public async exchange(req: express.Request<{}, {}, { provider: string; code: string; codeVerifier: string; redirectUri: string }>, res: express.Response): Promise<any> {
+  public async exchange(req: express.Request<{}, {}, { provider: string; code: string; codeVerifier: string; redirectUri: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const { provider, code, codeVerifier, redirectUri } = req.body;
@@ -60,11 +60,11 @@ export class StorageSettingController extends ContentBaseController {
       let tokens;
       try {
         tokens = await ByosAuth.exchangeCode(provider, code, codeVerifier, redirectUri);
-      } catch (e: any) {
-        return this.json({ error: e?.message || "Token exchange failed" }, 400);
+      } catch (e) {
+        return this.json({ error: (e as { message?: string } | undefined)?.message || "Token exchange failed" }, 400);
       }
       if (!tokens) return this.json({ error: "Token exchange failed" }, 400);
-      const existingRows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(au.churchId) as any[]);
+      const existingRows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(au.churchId));
       const row: StorageProvider = existingRows.find((r: StorageProvider) => r.provider === provider) || { churchId: au.churchId, provider };
       row.accessToken = EncryptionHelper.encrypt(tokens.accessToken);
       if (tokens.refreshToken) row.refreshToken = EncryptionHelper.encrypt(tokens.refreshToken);
@@ -77,10 +77,10 @@ export class StorageSettingController extends ContentBaseController {
   }
 
   @httpDelete("/providers/:id")
-  public async deleteProvider(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteProvider(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      const rows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(au.churchId) as any[]);
+      const rows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(au.churchId));
       const row = rows.find((r: StorageProvider) => r.id === id);
       if (!row) return this.json({});
       // files still point at this provider: keep the credentials so downloads/deletes work, just stop new uploads
@@ -96,7 +96,7 @@ export class StorageSettingController extends ContentBaseController {
   }
 
   @httpGet("/status")
-  public async getStatus(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getStatus(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const storage = await StorageResolver.forChurch(this.repos.storageProvider, au.churchId);
       if (!storage.provider.getQuota) return { provider: storage.name };
@@ -129,7 +129,7 @@ export class StorageSettingController extends ContentBaseController {
   }
 
   private async disableOthers(churchId: string, keepId: string) {
-    const rows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(churchId) as any[]);
+    const rows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(churchId));
     for (const r of rows) {
       if (r.id !== keepId && r.enabled) {
         r.enabled = false;
