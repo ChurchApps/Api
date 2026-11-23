@@ -53,6 +53,34 @@ describe("EventController.subscribe ICS", () => {
   });
 });
 
+describe("EventController ICS LOCATION", () => {
+  const feedFor = async (repos: object, q: express.Request["query"]) => {
+    const controller = new EventController();
+    Object.assign(controller, { repos, actionWrapperAnon: anon });
+    const res = makeRes();
+    await controller.subscribe(feedReq(q), res as express.Response);
+    return jest.mocked(res.send).mock.calls[0][0] as string;
+  };
+  const picnic = { id: "e4", churchId: "c1", title: "Picnic", start: new Date("2026-08-23T10:00:00Z"), end: new Date("2026-08-23T11:30:00Z") };
+
+  it("writes the event location, escaped", async () => {
+    const body = await feedFor({ event: { loadPublicForGroup: jest.fn(async () => [{ ...picnic, location: "City Park, shelter 3; north lot" }]) } }, query);
+    expect(body).toContain("LOCATION:City Park\\, shelter 3\\; north lot");
+  });
+
+  it("omits LOCATION when the event has none", async () => {
+    const body = await feedFor({ event: { loadPublicForGroup: jest.fn(async () => [picnic]) } }, query);
+    expect(body).toContain("BEGIN:VEVENT");
+    expect(body).not.toContain("LOCATION");
+  });
+
+  it("hides a private event's location in a room feed", async () => {
+    const body = await feedFor({ event: { loadForRoom: jest.fn(async () => [{ ...picnic, visibility: "private", location: "Smith home" }]) } }, { roomId: "r1", churchId: "c1" });
+    expect(body).toContain("Reserved");
+    expect(body).not.toContain("Smith home");
+  });
+});
+
 describe("EventController personal calendar feed", () => {
   const makeController = () => {
     const controller = new EventController();

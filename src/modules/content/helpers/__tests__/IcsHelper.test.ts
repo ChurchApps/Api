@@ -14,6 +14,11 @@ describe("IcsHelper.parseEvents", () => {
     expect(result[0].allDay).toBeFalsy();
   });
 
+  it("reads an escaped LOCATION", () => {
+    const ics = wrap("BEGIN:VEVENT\r\nDTSTART:20260710T180000\r\nSUMMARY:Picnic\r\nLOCATION:City Park\\, shelter 3\r\nEND:VEVENT\r\n");
+    expect(IcsHelper.parseEvents(ics)[0].location).toBe("City Park, shelter 3");
+  });
+
   it("parses UTC timestamps", () => {
     const ics = wrap("BEGIN:VEVENT\r\nDTSTART:20260710T180000Z\r\nDTEND:20260710T200000Z\r\nSUMMARY:UTC Event\r\nEND:VEVENT\r\n");
     const result = IcsHelper.parseEvents(ics);
