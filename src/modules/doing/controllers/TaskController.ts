@@ -5,7 +5,7 @@ import { DoingBaseController } from "./DoingBaseController.js";
 import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
 import { StepActionHelper } from "../helpers/StepActionHelper.js";
 import { Task } from "../models/index.js";
-import { WorkflowHelper, DirectoryUpdateHelper, AccountDeletionHelper } from "../helpers/index.js";
+import { WorkflowHelper, DirectoryUpdateHelper, AccountDeletionHelper, HouseholdEditHelper } from "../helpers/index.js";
 import { Permissions, TaskAuth } from "../../../shared/helpers/index.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 import { getMembershipModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
@@ -125,8 +125,18 @@ export class TaskController extends DoingBaseController {
       const result: Task[] = [];
       const memberDirectoryUpdate = type === "directoryUpdate" && !au.checkAccess(Permissions.tasks.edit);
       if (memberDirectoryUpdate && req.body.some((task) => task.id)) return this.json({}, 401);
+      // A member's request about someone else is a household edit: checked and shaped before anything is saved.
+      const householdEdits = new Set<Task>();
+      if (memberDirectoryUpdate) {
+        for (const task of req.body) {
+          if (!task.associatedWithId || task.associatedWithId === au.personId) continue;
+          const prepared = await HouseholdEditHelper.prepareRequest(au, task);
+          if (prepared.status) return this.json(prepared.error ? { message: prepared.error } : {}, prepared.status);
+          householdEdits.add(task);
+        }
+      }
       for (const task of req.body) {
-        if (memberDirectoryUpdate) {
+        if (memberDirectoryUpdate && !householdEdits.has(task)) {
           task.status = "Open";
           task.associatedWithType = "person";
           task.associatedWithId = au.personId;

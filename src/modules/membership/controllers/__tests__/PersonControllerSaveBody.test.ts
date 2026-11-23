@@ -65,3 +65,17 @@ describe("PersonController POST / body shape", () => {
     expect(result[0].name.display).toBe("Sample Member");
   });
 });
+
+// Household edits only reach another member's record through a staff-approved directoryUpdate task.
+describe("PersonController POST / for someone else without People edit", () => {
+  it("401s a member saving a household child's record directly", async () => {
+    const { controller, repos } = setup();
+    Object.assign(controller, {
+      actionWrapper: (_req: express.Request, _res: express.Response, action: (user: unknown) => Promise<unknown>) =>
+        action({ churchId: "c1", personId: "p1", checkAccess: (perm: string) => perm === "peopleEditSelf" })
+    });
+    const result = await controller.save({ body: [{ id: "pChild", name: { first: "Child", last: "Member" } }] } as express.Request, res);
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.person.save).not.toHaveBeenCalled();
+  });
+});
