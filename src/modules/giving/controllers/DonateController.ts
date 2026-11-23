@@ -192,6 +192,7 @@ export class DonateController extends GivingBaseController {
               webhookResult.eventData?.payment_intent,
               // A PaymentIntent event must also find a gift already stored under its charge id.
               webhookResult.eventData?.latest_charge?.id ?? webhookResult.eventData?.latest_charge,
+              webhookResult.eventData?.charge,
               webhookResult.eventData?.reference_number,
               webhookResult.eventData?.transaction?.id
             ].map((v) => (v == null ? "" : String(v))).filter((v) => v !== "");

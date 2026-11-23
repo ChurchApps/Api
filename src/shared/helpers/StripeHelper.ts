@@ -297,6 +297,7 @@ export class StripeHelper {
     "charge.succeeded",  // Keep for backward compatibility during migration
     "charge.failed",     // Keep for backward compatibility during migration
     "charge.refunded",   // Refunds started from the Stripe dashboard reconcile back to the donation
+    "charge.dispute.closed",  // A lost dispute marks the donation refunded
     "customer.subscription.deleted"
   ];
 

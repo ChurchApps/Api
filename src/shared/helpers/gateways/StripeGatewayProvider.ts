@@ -64,7 +64,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
       return { action: "donation", status: eventType === "payment_intent.processing" ? "pending" : "complete" };
     }
     if (eventType === "invoice.payment_failed") return { action: "donation", status: "failed" };
-    if (eventType === "charge.refunded") return { action: "donation", status: "refunded" };
+    // A lost dispute takes the money back like a refund; verifyWebhookSignature drops won/other closes.
+    if (eventType === "charge.refunded" || eventType === "charge.dispute.closed") return { action: "donation", status: "refunded" };
     if (eventType === "customer.subscription.deleted") return { action: "cancel-subscription" };
     return { action: "ignore" };
   }
@@ -102,6 +103,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
         // This is a subscription payment - handled by invoice.paid
         shouldProcess = false;
       }
+      if (stripeEvent.type === "charge.dispute.closed" && eventData.status !== "lost") shouldProcess = false;
 
       return {
         success: true,
