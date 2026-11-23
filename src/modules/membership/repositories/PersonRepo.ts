@@ -146,6 +146,10 @@ export class PersonRepo {
     await getDb().updateTable("people").set({ optedOut: optedOut as any }).where("id", "=", personId).where("churchId", "=", churchId).execute();
   }
 
+  public async updateSmsOptedOut(churchId: string, personId: string, smsOptedOut: boolean) {
+    await getDb().updateTable("people").set({ smsOptedOut: smsOptedOut as any }).where("id", "=", personId).where("churchId", "=", churchId).execute();
+  }
+
   public async updateHousehold(person: Person) {
     await getDb().updateTable("people").set({
       householdId: person.householdId,
@@ -472,6 +476,7 @@ export class PersonRepo {
       churchId: row.churchId,
       importKey: row.importKey,
       optedOut: row.optedOut,
+      smsOptedOut: row.smsOptedOut,
       conversationId: row.conversationId
     };
     if (result.photo === undefined) result.photo = PersonHelper.getPhotoPath(row.churchId, result);
