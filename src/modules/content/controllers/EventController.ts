@@ -7,6 +7,7 @@ import { CalendarHelper, HolidayHelper, Permissions } from "../helpers/index.js"
 import { ApprovalHelper } from "../helpers/ApprovalHelper.js";
 import { ConflictHelper, ProposedBooking } from "../helpers/ConflictHelper.js";
 import { IcsHelper } from "../helpers/IcsHelper.js";
+import { CalendarFeedTokenHelper } from "../helpers/CalendarFeedTokenHelper.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { decisionMessage } from "../helpers/DecisionMessage.js";
@@ -76,6 +77,15 @@ export class EventController extends ContentBaseController {
     });
   }
 
+  // #1644: the signed-in person's own calendar feed credentials; the client builds the feed URL.
+  @httpGet("/subscribe/mine")
+  public async subscribeMine(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return this.json({ error: "personId required" }, 400);
+      return { churchId: au.churchId, personId: au.personId, token: CalendarFeedTokenHelper.create(au.churchId, au.personId) };
+    });
+  }
+
   @httpGet("/subscribe")
   public async subscribe(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -103,6 +113,21 @@ export class EventController extends ContentBaseController {
         if (curatedEvents && curatedEvents.length > 0) {
           await CalendarHelper.addExceptionDates(curatedEvents, this.repos);
           newEvents = this.populateEventsForICS(curatedEvents);
+        }
+      } else if (req.query.personId) {
+        // authz-exempt: personal ICS feed (#1644); the HMAC token from /subscribe/mine is the credential
+        const churchId = req.query.churchId.toString();
+        const personId = req.query.personId.toString();
+        if (!CalendarFeedTokenHelper.verify(churchId, personId, req.query.token)) {
+          res.status(401).send("Invalid calendar link.");
+          return;
+        }
+        const members = await getMembershipModuleGateway().loadGroupMembersForPerson(churchId, personId);
+        const groupIds = [...new Set(members.map((m) => m.groupId))];
+        const personEvents = await this.repos.event.loadTimeline(churchId, groupIds, []);
+        if (personEvents && personEvents.length > 0) {
+          await CalendarHelper.addExceptionDates(personEvents, this.repos);
+          newEvents = this.populateEventsForICS(await this.dropRemovedGroupEvents(churchId, personEvents));
         }
       }
       const { error, value } = ics.createEvents(newEvents);

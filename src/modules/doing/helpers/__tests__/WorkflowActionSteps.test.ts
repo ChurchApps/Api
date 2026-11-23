@@ -297,7 +297,7 @@ describe("WorkflowHelper sendText action", () => {
   });
 
   it("skips a person who opted out of texts", async () => {
-    loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", mobilePhone: "555-0100", optedOut: 1 });
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", mobilePhone: "555-0100", smsOptedOut: 1 });
     const repos = buildRepos(steps, { stepACT: [textAction] });
     const task = newTask();
 

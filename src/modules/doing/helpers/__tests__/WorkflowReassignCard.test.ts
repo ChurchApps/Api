@@ -15,6 +15,7 @@ jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { 
 jest.mock("../../repositories/index.js", () => ({ Repos: class {} }));
 
 import { WorkflowHelper } from "../WorkflowHelper.js";
+import { NotificationService } from "../../../../shared/helpers/NotificationService.js";
 
 // Reassigning a card leaves a line in its history so the hand-off is visible later.
 describe("WorkflowHelper.reassign", () => {
@@ -38,5 +39,19 @@ describe("WorkflowHelper.reassign", () => {
     const card: any = { id: "t1", churchId: "c1", workflowId: "w1", assignedToType: "person", assignedToId: "p1", assignedToLabel: "Donald Clark" };
     const result = await WorkflowHelper.reassign(card, { type: "person", id: "p1", label: "Donald Clark" }, buildRepos());
     expect(history(result)).toEqual([]);
+  });
+
+  it("notifies someone else who is given the card", async () => {
+    (NotificationService.createNotifications as jest.Mock).mockClear();
+    const card: any = { id: "t1", churchId: "c1", workflowId: "w1" };
+    await WorkflowHelper.reassign(card, { type: "person", id: "p2", label: "Carol Clark" }, buildRepos(), "p1");
+    expect(NotificationService.createNotifications).toHaveBeenCalledWith(["p2"], "c1", "task", "t1", expect.any(String));
+  });
+
+  it("stays quiet when people assign the card to themselves", async () => {
+    (NotificationService.createNotifications as jest.Mock).mockClear();
+    const card: any = { id: "t1", churchId: "c1", workflowId: "w1" };
+    await WorkflowHelper.reassign(card, { type: "person", id: "p2", label: "Carol Clark" }, buildRepos(), "p2");
+    expect(NotificationService.createNotifications).not.toHaveBeenCalled();
   });
 });

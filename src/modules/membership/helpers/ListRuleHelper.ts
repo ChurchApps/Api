@@ -9,6 +9,7 @@ interface EvalContext {
   peopleRows?: any[];
   visitedListIds: Set<string>;
   viewerPersonId?: string;
+  timeZone?: string | null;
 }
 
 export class ListRuleHelper {
@@ -73,7 +74,8 @@ export class ListRuleHelper {
   private static async evalPerson(c: ListRuleCondition, ctx: EvalContext): Promise<Set<string>> {
     const rows = await this.getPeopleRows(ctx);
     const condition: SearchCondition = { field: c.field, operator: c.operator as any, value: c.value ?? "" };
-    const matched = PersonConditionHelper.applyOne(rows.slice(), condition);
+    const timeZone = PersonConditionHelper.usesThisMonth([condition]) ? await this.getTimeZone(ctx) : undefined;
+    const matched = PersonConditionHelper.applyOne(rows.slice(), condition, timeZone);
     return new Set(matched.map((r: any) => r.id));
   }
 
@@ -197,6 +199,11 @@ export class ListRuleHelper {
     return ctx.peopleRows;
   }
 
+  private static async getTimeZone(ctx: EvalContext): Promise<string | undefined> {
+    if (ctx.timeZone === undefined) ctx.timeZone = (await ctx.repos.church.loadById(ctx.churchId))?.timeZone ?? null;
+    return ctx.timeZone ?? undefined;
+  }
+
   private static async getAllPeopleIds(ctx: EvalContext): Promise<Set<string>> {
     const rows = await this.getPeopleRows(ctx);
     return new Set(rows.map((r) => r.id));
@@ -212,6 +219,10 @@ export class ListRuleHelper {
     const rows = await this.getPeopleRows(ctx);
     const householdIds = new Set<string>();
     rows.forEach((r) => { if (ids.has(r.id) && r.householdId) householdIds.add(r.householdId); });
+    if (mode === "adults") {
+      const isAdult = (r: any) => r.householdRole === "Head" || r.householdRole === "Spouse";
+      return new Set(rows.filter((r) => r.householdId && householdIds.has(r.householdId) && isAdult(r)).map((r) => r.id));
+    }
     rows.forEach((r) => {
       if (!r.householdId || !householdIds.has(r.householdId)) return;
       if (mode === "household" || (mode === "children" && r.householdRole === "Child")) ids.add(r.id);

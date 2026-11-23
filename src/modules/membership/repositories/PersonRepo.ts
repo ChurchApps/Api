@@ -146,6 +146,10 @@ export class PersonRepo {
     await getDb().updateTable("people").set({ optedOut: optedOut as any }).where("id", "=", personId).where("churchId", "=", churchId).execute();
   }
 
+  public async updateSmsOptedOut(churchId: string, personId: string, smsOptedOut: boolean) {
+    await getDb().updateTable("people").set({ smsOptedOut: smsOptedOut as any }).where("id", "=", personId).where("churchId", "=", churchId).execute();
+  }
+
   public async updateHousehold(person: Person) {
     await getDb().updateTable("people").set({
       householdId: person.householdId,
@@ -325,6 +329,45 @@ export class PersonRepo {
       .execute();
   }
 
+  // Church-wide pairs using the findPossibleDuplicates keys. Email and phone also require the same
+  // first name, as findGuestMatch does, so a household sharing one number or inbox isn't listed.
+  // Keys shared by more than maxGroupSize people (an office line, a placeholder email) are skipped.
+  public async findPossibleDuplicatePairs(churchId: string, maxPairs = 100, maxGroupSize = 6) {
+    const first = sql`LOWER(TRIM(firstName))`;
+    const phoneKey = (column: string) => sql`SELECT id, 'phone' AS matchType, CONCAT(${first}, '|', ${this.phoneDigitsSql(column)}) AS matchKey FROM people
+      WHERE churchId = ${churchId} AND removed = 0 AND TRIM(IFNULL(firstName, '')) <> '' AND CHAR_LENGTH(${this.phoneDigitsSql(column)}) >= 7`;
+    const result = await sql<{ matchType: string; ids: string }>`
+      SELECT matchType, GROUP_CONCAT(DISTINCT id ORDER BY id) AS ids
+      FROM (
+        SELECT id, 'email' AS matchType, CONCAT(${first}, '|', LOWER(TRIM(email))) AS matchKey FROM people
+        WHERE churchId = ${churchId} AND removed = 0 AND TRIM(IFNULL(firstName, '')) <> '' AND email LIKE '%@%'
+        UNION ALL ${phoneKey("homePhone")}
+        UNION ALL ${phoneKey("workPhone")}
+        UNION ALL ${phoneKey("mobilePhone")}
+        UNION ALL
+        SELECT id, 'nameBirthDate' AS matchType, CONCAT(${first}, '|', LOWER(TRIM(lastName)), '|', birthDate) AS matchKey FROM people
+        WHERE churchId = ${churchId} AND removed = 0 AND TRIM(IFNULL(firstName, '')) <> '' AND TRIM(IFNULL(lastName, '')) <> '' AND birthDate IS NOT NULL
+      ) keyed
+      GROUP BY matchType, matchKey
+      HAVING COUNT(DISTINCT id) BETWEEN 2 AND ${maxGroupSize}
+      LIMIT ${maxPairs * 2}`.execute(getDb());
+
+    const pairs = new Map<string, { personId1: string; personId2: string; matchedOn: string[] }>();
+    for (const row of result.rows) {
+      const ids = row.ids.split(",");
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const key = ids[i] + "|" + ids[j];
+          const pair = pairs.get(key);
+          if (!pair) {
+            if (pairs.size < maxPairs) pairs.set(key, { personId1: ids[i], personId2: ids[j], matchedOn: [row.matchType] });
+          } else if (!pair.matchedOn.includes(row.matchType)) pair.matchedOn.push(row.matchType);
+        }
+      }
+    }
+    return Array.from(pairs.values());
+  }
+
   // QR guest sign-up: the one live person with the same first name and the same email or phone.
   // Two or more matches (or none) return null so the caller creates a new person instead of guessing.
   public async findGuestMatch(churchId: string, params: { firstName: string; email?: string; phone?: string }) {
@@ -472,6 +515,7 @@ export class PersonRepo {
       churchId: row.churchId,
       importKey: row.importKey,
       optedOut: row.optedOut,
+      smsOptedOut: row.smsOptedOut,
       conversationId: row.conversationId
     };
     if (result.photo === undefined) result.photo = PersonHelper.getPhotoPath(row.churchId, result);

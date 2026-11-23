@@ -1,7 +1,7 @@
 import "reflect-metadata";
 jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
-  PersonConditionHelper: { apply: (data: Record<string, unknown>[], conditions: { field: string; value: unknown }[]) => conditions.reduce((rows, c) => rows.filter((r) => r[c.field] === c.value), data) },
+  PersonConditionHelper: { apply: (data: Record<string, unknown>[], conditions: { field: string; value: unknown }[]) => conditions.reduce((rows, c) => rows.filter((r) => r[c.field] === c.value), data), usesThisMonth: () => false },
   ListRuleHelper: { filterByFieldConditions: jest.fn() },
   Permissions: { people: { edit: "peopleEdit", view: "peopleView" } },
   PersonHelper: {},
