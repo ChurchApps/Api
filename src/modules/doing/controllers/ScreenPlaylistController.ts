@@ -7,7 +7,7 @@ import { Permissions } from "../../../shared/helpers/index.js";
 @controller("/doing/playlists")
 export class ScreenPlaylistController extends DoingBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.playlist.load(au.churchId, id);
@@ -16,7 +16,7 @@ export class ScreenPlaylistController extends DoingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.playlist.loadAll(au.churchId);
@@ -25,7 +25,7 @@ export class ScreenPlaylistController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Playlist[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Playlist[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const promises: Promise<Playlist>[] = [];
@@ -36,7 +36,7 @@ export class ScreenPlaylistController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       await this.repos.playlist.delete(au.churchId, id);

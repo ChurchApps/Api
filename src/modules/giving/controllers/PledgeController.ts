@@ -9,7 +9,7 @@ import { CampaignHelper } from "../helpers/CampaignHelper.js";
 export class PledgeController extends GivingBaseController {
 
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const pledges = this.repos.pledge.convertAllToModel(au.churchId, await this.repos.pledge.loadByPersonId(au.churchId, au.personId));
       if (pledges.length === 0) return [];
@@ -24,7 +24,7 @@ export class PledgeController extends GivingBaseController {
   }
 
   @httpPost("/my")
-  public async saveMy(req: express.Request<{}, {}, { campaignId: string; amount: number }>, res: express.Response): Promise<any> {
+  public async saveMy(req: express.Request<{}, {}, { campaignId: string; amount: number }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const campaignId = req.body?.campaignId;
       const amount = Number(req.body?.amount);
@@ -41,7 +41,7 @@ export class PledgeController extends GivingBaseController {
   }
 
   @httpDelete("/my/:id")
-  public async deleteMy(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async deleteMy(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const pledge = this.repos.pledge.convertToModel(au.churchId, await this.repos.pledge.load(au.churchId, id));
       if (!pledge || pledge.personId !== au.personId) return this.json({}, 401);
@@ -51,7 +51,7 @@ export class PledgeController extends GivingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
       const data = await this.repos.pledge.load(au.churchId, id);
@@ -60,7 +60,7 @@ export class PledgeController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const personId = req.query?.personId?.toString() || "";
       const canView = au.checkAccess(Permissions.donations.view);
@@ -69,12 +69,12 @@ export class PledgeController extends GivingBaseController {
       if (canView && req.query.campaignId !== undefined) result = await this.repos.pledge.loadByCampaignId(au.churchId, req.query.campaignId.toString());
       else if (personId) result = await this.repos.pledge.loadByPersonId(au.churchId, personId);
       else result = await this.repos.pledge.loadAll(au.churchId);
-      return this.repos.pledge.convertAllToModel(au.churchId, result as any[]);
+      return this.repos.pledge.convertAllToModel(au.churchId, result);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Pledge[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Pledge[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       const result: Pledge[] = [];
@@ -92,7 +92,7 @@ export class PledgeController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       await this.repos.pledge.delete(au.churchId, id);

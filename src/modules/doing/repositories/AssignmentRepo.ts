@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Assignment } from "../models/index.js";
 import { getDb } from "../db/index.js";
+import { mysqlValue } from "./sqlValues.js";
 
 @injectable()
 export class AssignmentRepo {
@@ -55,7 +56,7 @@ export class AssignmentRepo {
       .execute();
   }
 
-  public async loadByPlanId(churchId: string, planId: string): Promise<any[]> {
+  public async loadByPlanId(churchId: string, planId: string) {
     return getDb().selectFrom("assignments as a")
       .innerJoin("positions as p", "p.id", "a.positionId")
       .selectAll("a")
@@ -66,7 +67,7 @@ export class AssignmentRepo {
   }
 
   // Non-declined assignments on a plan, with position label, for reminders.
-  public async loadForReminder(churchId: string, planId: string): Promise<any[]> {
+  public async loadForReminder(churchId: string, planId: string) {
     return getDb().selectFrom("assignments as a")
       .innerJoin("positions as p", (j) => j.onRef("p.id", "=", "a.positionId").onRef("p.churchId", "=", "a.churchId"))
       .innerJoin("plans as pl", (j) => j.onRef("pl.id", "=", "p.planId").onRef("pl.churchId", "=", "a.churchId"))
@@ -79,7 +80,7 @@ export class AssignmentRepo {
       ])
       .where("a.churchId", "=", churchId)
       .where("p.planId", "=", planId)
-      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false as any)]))
+      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false)]))
       .where((eb) => eb.or([eb("a.status", "=", "Accepted"), eb.and([eb("a.status", "=", "Unconfirmed"), eb("a.confirmationWorkflowId", "is", null)])]))
       .execute();
   }
@@ -113,7 +114,7 @@ export class AssignmentRepo {
       .selectAll("a")
       .where("a.churchId", "=", churchId)
       .where("a.personId", "=", personId)
-      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false as any)]))
+      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false)]))
       .execute();
   }
 
@@ -126,7 +127,7 @@ export class AssignmentRepo {
       .where("a.churchId", "=", churchId)
       .where("a.personId", "=", personId)
       .where("pl.serviceDate", ">=", sql<Date>`DATE_SUB(CURDATE(), INTERVAL 1 DAY)`)
-      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false as any)]))
+      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false)]))
       .orderBy("pl.serviceDate")
       .limit(20)
       .execute();
@@ -144,7 +145,7 @@ export class AssignmentRepo {
       .where(sql`MONTH(pl.serviceDate)`, "=", sql`MONTH(${serviceDate})`)
       .groupBy("a.personId")
       .execute();
-    return rows as any;
+    return rows;
   }
 
   public async deleteUnconfirmedByRunId(churchId: string, autofillRunId: string) {
@@ -165,10 +166,10 @@ export class AssignmentRepo {
       .select("a.personId")
       .distinct()
       .where("a.churchId", "=", churchId);
-    if (startDate) query = query.where("pl.serviceDate", ">=", startDate as any);
-    if (endDate) query = query.where("pl.serviceDate", "<=", endDate as any);
+    if (startDate) query = query.where("pl.serviceDate", ">=", startDate);
+    if (endDate) query = query.where("pl.serviceDate", "<=", endDate);
     const rows = await query.execute();
-    return rows.map((r: any) => r.personId).filter((id: string) => !!id);
+    return rows.map((r) => r.personId).filter((id: string) => !!id);
   }
 
   public async loadUnconfirmedByServiceDateRange(churchId?: string) {
@@ -186,8 +187,8 @@ export class AssignmentRepo {
         sql`pl.name`.as("planName")
       ])
       .where("a.status", "=", "Unconfirmed")
-      .where("pl.serviceDate", ">=", sql`DATE_ADD(CURDATE(), INTERVAL 2 DAY)` as any)
-      .where("pl.serviceDate", "<", sql`DATE_ADD(CURDATE(), INTERVAL 3 DAY)` as any);
+      .where("pl.serviceDate", ">=", sql<Date>`DATE_ADD(CURDATE(), INTERVAL 2 DAY)`)
+      .where("pl.serviceDate", "<", sql<Date>`DATE_ADD(CURDATE(), INTERVAL 3 DAY)`);
 
     if (churchId) {
       query = query.where("a.churchId", "=", churchId);
@@ -225,8 +226,8 @@ export class AssignmentRepo {
         "a.status"
       ])
       .where("pl.churchId", "=", churchId)
-      .where("pl.serviceDate", ">=", startDate as any)
-      .where("pl.serviceDate", "<=", endDate as any);
+      .where("pl.serviceDate", ">=", mysqlValue<Date>(startDate))
+      .where("pl.serviceDate", "<=", mysqlValue<Date>(endDate));
 
     if (ministryId) {
       query = query.where("pl.ministryId", "=", ministryId);

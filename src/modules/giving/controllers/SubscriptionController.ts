@@ -3,12 +3,14 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
-import { EncryptionHelper } from "@churchapps/apihelper";
+import { AuthenticatedUser, EncryptionHelper } from "@churchapps/apihelper";
+import { Customer, Gateway, Subscription } from "../models/index.js";
+import { SubscriptionUpdateRequest } from "./types.js";
 
 @controller("/giving/subscriptions")
 export class SubscriptionController extends GivingBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
       else return await this.repos.subscription.load(au.churchId, id);
@@ -16,7 +18,7 @@ export class SubscriptionController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
       else return await this.repos.subscription.loadAll(au.churchId);
@@ -24,12 +26,12 @@ export class SubscriptionController extends GivingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, any[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, SubscriptionUpdateRequest[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const promises: Promise<any>[] = [];
+      const promises: Promise<unknown>[] = [];
 
       for (const subscription of req.body) {
-        const existingSub = await this.repos.subscription.load(au.churchId, subscription.id) as any;
+        const existingSub = await this.repos.subscription.load(au.churchId, subscription.id) as Subscription | null;
 
         const provider = subscription.provider;
         let gateway = provider
@@ -37,7 +39,7 @@ export class SubscriptionController extends GivingBaseController {
           : null;
 
         if (!gateway && existingSub?.customerId) {
-          const customer = await this.repos.customer.load(au.churchId, existingSub.customerId) as any;
+          const customer: Customer | null = await this.repos.customer.load(au.churchId, existingSub.customerId);
           if (customer?.provider) {
             gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: customer.provider }, this.repos.gateway).catch((): null => null);
           }
@@ -67,7 +69,7 @@ export class SubscriptionController extends GivingBaseController {
 
   // authz-exempt: gated by resolveSubscriptionForAction(au, id, provider) — donations.edit or subscription owner (au.personId)
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string; reason?: string }>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string; reason?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const provider = req.query?.provider?.toString() || req.body?.provider;
       const resolved = await this.resolveSubscriptionForAction(au, id, provider);
@@ -87,7 +89,7 @@ export class SubscriptionController extends GivingBaseController {
 
   // authz-exempt: gated by resolveSubscriptionForAction(au, id, provider) — donations.edit or subscription owner (au.personId)
   @httpPost("/:id/pause")
-  public async pause(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string }>, res: express.Response): Promise<any> {
+  public async pause(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const provider = req.query?.provider?.toString() || req.body?.provider;
       const resolved = await this.resolveSubscriptionForAction(au, id, provider);
@@ -106,7 +108,7 @@ export class SubscriptionController extends GivingBaseController {
 
   // authz-exempt: gated by resolveSubscriptionForAction(au, id, provider) — donations.edit or subscription owner (au.personId)
   @httpPost("/:id/resume")
-  public async resume(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string }>, res: express.Response): Promise<any> {
+  public async resume(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const provider = req.query?.provider?.toString() || req.body?.provider;
       const resolved = await this.resolveSubscriptionForAction(au, id, provider);
@@ -124,8 +126,8 @@ export class SubscriptionController extends GivingBaseController {
   }
 
   // Shared by delete/pause/resume; verifies donations.edit or ownership (gateway-created schedules via provider).
-  private async resolveSubscriptionForAction(au: any, id: string, provider?: string): Promise<{ subscription: any; gateway: any; permission: boolean }> {
-    const subscription = await this.repos.subscription.load(au.churchId, id) as any;
+  private async resolveSubscriptionForAction(au: AuthenticatedUser, id: string, provider?: string): Promise<{ subscription: Subscription | null; gateway: Gateway | null; permission: boolean }> {
+    const subscription = await this.repos.subscription.load(au.churchId, id) as Subscription | null;
     let permission = au.checkAccess(Permissions.donations.edit) || (!!au.personId && subscription?.personId === au.personId);
 
     let gateway = provider
@@ -139,7 +141,7 @@ export class SubscriptionController extends GivingBaseController {
     if (!permission) return { subscription, gateway: null, permission: false };
 
     if (!gateway && subscription?.customerId) {
-      const customer = await this.repos.customer.load(au.churchId, subscription.customerId) as any;
+      const customer: Customer | null = await this.repos.customer.load(au.churchId, subscription.customerId);
       if (customer?.provider) {
         gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: customer.provider }, this.repos.gateway).catch((): null => null);
       }

@@ -3,7 +3,11 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { ScheduleEntry } from "../models/index.js";
 import { getDb } from "../db/index.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import type { DoingDatabase } from "../db/DatabaseTypes.js";
 import { PlaylistRepo } from "./PlaylistRepo.js";
+
+// A scheduleEntries row (exceptionDates as JSON text), or an already-saved model.
+type ScheduleEntryRow = DoingDatabase["scheduleEntries"] | ScheduleEntry;
 
 @injectable()
 export class ScheduleEntryRepo {
@@ -58,11 +62,11 @@ export class ScheduleEntryRepo {
     return getDb().selectFrom("scheduleEntries").selectAll().where("churchId", "=", churchId).where("screenGroupId", "=", screenGroupId).orderBy("start").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: ScheduleEntryRow) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: ScheduleEntryRow[]) {
     return (data || []).map(row => this.rowToModel(row));
   }
 
@@ -70,7 +74,7 @@ export class ScheduleEntryRepo {
     return DateHelper.toMysqlDate(value)?.replace(" ", "T");
   }
 
-  protected rowToModel(row: any): ScheduleEntry {
+  protected rowToModel(row: ScheduleEntryRow): ScheduleEntry {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -82,7 +86,7 @@ export class ScheduleEntryRepo {
       start: ScheduleEntryRepo.toWallClock(row.start),
       end: ScheduleEntryRepo.toWallClock(row.end),
       recurrenceRule: row.recurrenceRule,
-      exceptionDates: PlaylistRepo.parseJson(row.exceptionDates) || [],
+      exceptionDates: PlaylistRepo.parseJson<string[]>(row.exceptionDates) || [],
       endBehavior: row.endBehavior,
       enabled: !!row.enabled
     };

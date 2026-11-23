@@ -7,7 +7,7 @@ import { Permissions } from "../../../shared/helpers/index.js";
 @controller("/doing/conjunctions")
 export class ConjunctionController extends DoingBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.conjunction.load(au.churchId, id);
@@ -15,7 +15,7 @@ export class ConjunctionController extends DoingBaseController {
   }
 
   @httpGet("/trigger/:id")
-  public async getForTrigger(@requestParam("id") triggerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForTrigger(@requestParam("id") triggerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.conjunction.loadForTrigger(au.churchId, triggerId);
@@ -23,7 +23,7 @@ export class ConjunctionController extends DoingBaseController {
   }
 
   @httpGet("/stepRoute/:id")
-  public async getForStepRoute(@requestParam("id") stepRouteId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForStepRoute(@requestParam("id") stepRouteId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.conjunction.loadForStepRoute(au.churchId, stepRouteId);
@@ -31,7 +31,7 @@ export class ConjunctionController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Conjunction[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Conjunction[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       // A conjunction belongs to exactly one owner: triggerId XOR stepRouteId.
@@ -48,7 +48,7 @@ export class ConjunctionController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       await this.repos.conjunction.delete(au.churchId, id);

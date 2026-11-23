@@ -2,7 +2,7 @@ jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} 
 jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn() } }));
 import "reflect-metadata";
 
-jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/index", () => ({ PlanAuth: { canEditMinistry: jest.fn(async () => true), canEditPlan: jest.fn(async () => true) } }));
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: jest.fn() }));
 jest.mock("../../../../shared/events/InternalEventBus", () => ({ InternalEventBus: { publish: jest.fn() } }));
@@ -12,18 +12,26 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: {} }));
 
 import { PlanController } from "../PlanController.js";
 import { PlanAuth } from "../../../../shared/helpers/index";
+import express from "express";
+import type { AuthenticatedUser } from "@churchapps/apihelper";
+import { Repos } from "../../repositories/index.js";
+import { Plan } from "../../models/index.js";
 
-function makeController(repos: any) {
+type MockRepos = Record<string, Record<string, jest.Mock>>;
+const req = (r: Partial<express.Request>) => r as express.Request;
+const res = {} as express.Response;
+
+function makeController(repos: MockRepos) {
   const controller = new PlanController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", personId: "p1" });
+  controller.repos = Object.assign({} as Repos, repos);
+  controller.actionWrapper = async (_req, _res, action) => action({ churchId: "c1", personId: "p1" } as AuthenticatedUser);
   return controller;
 }
 
 describe("PlanController.copy", () => {
-  let repos: any;
+  let repos: MockRepos;
   let ids: number;
-  const withId = async (x: any) => ({ ...x, id: x.id || "new" + (++ids) });
+  const withId = async <T extends { id?: string }>(x: T) => ({ ...x, id: x.id || "new" + (++ids) });
 
   beforeEach(() => {
     ids = 0;
@@ -41,7 +49,7 @@ describe("PlanController.copy", () => {
   // there must not turn the whole copy into a 500 (the user retries and gets duplicates).
   it("returns the new plan with its service order when copying exclusions fails", async () => {
     const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", copyMode: "positions", copyServiceOrder: true };
-    const result = await (makeController(repos) as any).copy("old", { body }, {});
+    const result = await makeController(repos).copy("old", req({ body }), res);
     expect(result).toMatchObject({ id: "new1", name: "Next Sunday" });
     expect(repos.plan.save).toHaveBeenCalledTimes(1);
     expect(repos.planItem.save).toHaveBeenCalledWith(expect.objectContaining({ label: "Opening Hymn", planId: "new1" }));
@@ -50,14 +58,14 @@ describe("PlanController.copy", () => {
   it("carries the previous plan's notes and signup deadline over when the request omits them", async () => {
     repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), notes: "Bring extra chairs", signupDeadlineHours: 48 }));
     const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", copyMode: "none", copyServiceOrder: true };
-    await (makeController(repos) as any).copy("old", { body }, {});
+    await makeController(repos).copy("old", req({ body }), res);
     expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ notes: "Bring extra chairs", signupDeadlineHours: 48 }));
   });
 
   it("keeps notes and signup deadline from the request when it supplies them", async () => {
     repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), notes: "Old notes", signupDeadlineHours: 48 }));
     const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", notes: "New notes", signupDeadlineHours: 24, copyMode: "none", copyServiceOrder: true };
-    await (makeController(repos) as any).copy("old", { body }, {});
+    await makeController(repos).copy("old", req({ body }), res);
     expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ notes: "New notes", signupDeadlineHours: 24 }));
   });
 
@@ -65,7 +73,7 @@ describe("PlanController.copy", () => {
   it("keeps a cleared signup deadline cleared instead of reviving the old one", async () => {
     repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), signupDeadlineHours: 48 }));
     const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", signupDeadlineHours: null, copyMode: "none" };
-    await (makeController(repos) as any).copy("old", { body }, {});
+    await makeController(repos).copy("old", req({ body }), res);
     expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ signupDeadlineHours: null }));
   });
 
@@ -73,7 +81,7 @@ describe("PlanController.copy", () => {
   it("carries the previous plan's volunteer settings over when the request omits them", async () => {
     repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), showVolunteerNames: false, autoReplaceOnDecline: true }));
     const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", copyMode: "none" };
-    await (makeController(repos) as any).copy("old", { body }, {});
+    await makeController(repos).copy("old", req({ body }), res);
     expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ showVolunteerNames: false, autoReplaceOnDecline: true }));
   });
 
@@ -83,7 +91,7 @@ describe("PlanController.copy", () => {
       ? { id: "target", name: "This Sunday", ministryId: "m1", serviceDate: new Date("2026-09-27") }
       : { id: "old", serviceDate: new Date("2026-09-20") });
     const body = { ministryId: "m1", serviceDate: "2026-09-27", copyMode: "positions", targetPlanId: "target" };
-    const result = await (makeController(repos) as any).copy("old", { body }, {});
+    const result = await makeController(repos).copy("old", req({ body }), res);
     expect(repos.plan.save).not.toHaveBeenCalled();
     expect(repos.position.save).toHaveBeenCalledWith(expect.objectContaining({ name: "Worship Leader", planId: "target" }));
     expect(result).toMatchObject({ id: "target", name: "This Sunday" });
@@ -93,7 +101,7 @@ describe("PlanController.copy", () => {
     (PlanAuth.canEditPlan as jest.Mock).mockResolvedValueOnce(false);
     repos.plan.load = jest.fn(async (_c: string, planId: string) => ({ id: planId, ministryId: "m1", serviceDate: new Date("2026-09-27") }));
     const body = { ministryId: "m1", serviceDate: "2026-09-27", copyMode: "positions", targetPlanId: "target" };
-    const result = await (makeController(repos) as any).copy("old", { body }, {});
+    const result = await makeController(repos).copy("old", req({ body }), res);
     expect(result).toEqual({ obj: {}, status: 401 });
     expect(repos.position.save).not.toHaveBeenCalled();
   });
@@ -101,7 +109,7 @@ describe("PlanController.copy", () => {
   it("returns 404 when the target plan does not exist", async () => {
     repos.plan.load = jest.fn(async (_c: string, planId: string) => planId === "target" ? null : { id: "old", serviceDate: new Date("2026-09-20") });
     const body = { ministryId: "m1", serviceDate: "2026-09-27", copyMode: "positions", targetPlanId: "target" };
-    const result = await (makeController(repos) as any).copy("old", { body }, {});
+    const result = await makeController(repos).copy("old", req({ body }), res);
     expect(result).toEqual({ obj: {}, status: 404 });
     expect(repos.plan.save).not.toHaveBeenCalled();
   });
@@ -111,7 +119,7 @@ describe("PlanController.copy", () => {
 // signup page had no way to learn who already signed up for each position.
 describe("PlanController.getSignupVolunteers", () => {
   const { getMembershipModuleGateway } = jest.requireMock("../../../../shared/modules/index");
-  let repos: any;
+  let repos: MockRepos;
   let loadPeople: jest.Mock;
 
   beforeEach(() => {
@@ -137,21 +145,21 @@ describe("PlanController.getSignupVolunteers", () => {
   });
 
   it("returns signed-up names per self-signup position when the plan opts in", async () => {
-    const result = await (makeController(repos) as any).getSignupVolunteers("pla1", {}, {});
+    const result = await makeController(repos).getSignupVolunteers("pla1", req({}), res);
     expect(repos.plan.load).toHaveBeenCalledWith("c1", "pla1");
     expect(result).toEqual([{ positionId: "pos1", names: ["Emily Davis"] }, { positionId: "pos2", names: [] }]);
   });
 
   it("returns nothing when the plan has volunteer names turned off", async () => {
     repos.plan.load = jest.fn(async () => ({ id: "pla1", showVolunteerNames: false }));
-    const result = await (makeController(repos) as any).getSignupVolunteers("pla1", {}, {});
+    const result = await makeController(repos).getSignupVolunteers("pla1", req({}), res);
     expect(result).toEqual([]);
     expect(loadPeople).not.toHaveBeenCalled();
   });
 
   it("returns nothing for a plan outside the caller's church", async () => {
     repos.plan.load = jest.fn(async () => null);
-    const result = await (makeController(repos) as any).getSignupVolunteers("pla1", {}, {});
+    const result = await makeController(repos).getSignupVolunteers("pla1", req({}), res);
     expect(result).toEqual([]);
   });
 });
@@ -159,12 +167,12 @@ describe("PlanController.getSignupVolunteers", () => {
 // Issue #1241: a church can limit the volunteer signup list to the next week of each plan type.
 describe("PlanController.getSignupPlans", () => {
   const { getMembershipModuleGateway } = jest.requireMock("../../../../shared/modules/index");
-  let repos: any;
+  let repos: MockRepos;
   let loadSetting: jest.Mock;
 
   function makeAnonController() {
     const controller = makeController(repos);
-    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+    controller.actionWrapperAnon = async (_req, _res, action) => action();
     return controller;
   }
 
@@ -186,15 +194,15 @@ describe("PlanController.getSignupPlans", () => {
   });
 
   it("returns every upcoming plan when the setting is off", async () => {
-    const result = await (makeAnonController() as any).getSignupPlans("c1", {}, {});
-    expect(result.map((r: any) => r.plan.id)).toEqual(["a1", "b1", "a2"]);
+    const result = (await makeAnonController().getSignupPlans("c1", req({}), res)) as { plan: Plan }[];
+    expect(result.map((r) => r.plan.id)).toEqual(["a1", "b1", "a2"]);
   });
 
   it("keeps only the earliest plan of each plan type when volunteerSignupNextOnly is on", async () => {
     loadSetting.mockResolvedValue("true");
-    const result = await (makeAnonController() as any).getSignupPlans("c1", {}, {});
+    const result = (await makeAnonController().getSignupPlans("c1", req({}), res)) as { plan: Plan }[];
     expect(loadSetting).toHaveBeenCalledWith("c1", "volunteerSignupNextOnly");
-    expect(result.map((r: any) => r.plan.id)).toEqual(["a1", "b1"]);
+    expect(result.map((r) => r.plan.id)).toEqual(["a1", "b1"]);
     expect(repos.position.loadByPlanIds).toHaveBeenCalledWith("c1", ["a1", "b1"]);
   });
 });
@@ -204,7 +212,7 @@ describe("PlanController confirmation workflow authorization", () => {
   it("denies issuance before calling the workflow runtime", async () => {
     const { AssignmentWorkflowHelper } = await import("../../helpers/AssignmentWorkflowHelper.js");
     (PlanAuth.canEditPlan as jest.Mock).mockResolvedValueOnce(false);
-    const result = await (makeController({}) as any).issueRequests("otherPlan", { body: {} }, {});
+    const result = await makeController({}).issueRequests("otherPlan", req({ body: {} }), res);
     expect(result).toEqual({ obj: {}, status: 401 });
     expect(AssignmentWorkflowHelper.issuePlan).not.toHaveBeenCalled();
   });
@@ -213,7 +221,7 @@ describe("PlanController confirmation workflow authorization", () => {
     (PlanAuth.canEditPlan as jest.Mock).mockResolvedValueOnce(true);
     (AssignmentWorkflowHelper.issuePlan as jest.Mock).mockResolvedValueOnce({ issued: 1 });
     const repos = {};
-    expect(await (makeController(repos) as any).issueRequests("plan1", { body: { churchId: "forged" } }, {})).toEqual({ issued: 1 });
+    expect(await makeController(repos).issueRequests("plan1", req({ body: { churchId: "forged" } }), res)).toEqual({ issued: 1 });
     expect(AssignmentWorkflowHelper.issuePlan).toHaveBeenCalledWith("c1", "plan1", repos);
   });
 });

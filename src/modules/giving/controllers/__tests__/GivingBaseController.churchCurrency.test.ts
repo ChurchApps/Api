@@ -5,14 +5,15 @@ jest.mock("../../../../shared/helpers/ExchangeRateHelper.js", () => ({ ExchangeR
 jest.mock("../../repositories/index.js", () => ({}));
 
 import { GivingBaseController } from "../GivingBaseController.js";
+import { Gateway } from "../../models/index.js";
 
 class TestController extends GivingBaseController {
   public run(churchId: string) { return this.loadChurchRates(churchId); }
 }
 
-const makeController = (gateways: any[]) => {
+const makeController = (gateways: Gateway[]) => {
   const c = new TestController();
-  c.repos = { gateway: { loadAll: jest.fn(async () => gateways) } } as any;
+  Object.assign(c, { repos: { gateway: { loadAll: jest.fn(async () => gateways) } } });
   return c;
 };
 
