@@ -67,7 +67,7 @@ export class ConversationRepo {
       .select(["c.contentType", "c.contentId", "c.groupId", "c.id", "c.firstPostId", "c.lastPostId", "c.postCount"])
       .where("c.churchId", "=", churchId)
       .where("c.groupId", "in", groupIds)
-      .where("lp.timeSent", ">", sql`DATE_SUB(NOW(), INTERVAL 365 DAY)` as any)
+      .where("lp.timeSent", ">", sql<Date>`DATE_SUB(NOW(), INTERVAL 365 DAY)`)
       .execute();
   }
 
@@ -171,7 +171,7 @@ export class ConversationRepo {
     await getDb().deleteFrom("conversations").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(data: any): Conversation {
+  protected rowToModel(data: Conversation): Conversation {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -188,11 +188,11 @@ export class ConversationRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: Conversation) {
     return data ? this.rowToModel(data) : null;
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: Conversation[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

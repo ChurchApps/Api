@@ -18,7 +18,7 @@ export interface PayloadInterface {
   churchId: string;
   conversationId: string;
   action: PayloadAction;
-  data: any;
+  data: unknown;
 }
 export interface AttendanceInterface {
   viewers?: ViewerInterface[];

@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { Repos } from "../repositories/index.js";
 import { ReminderDefinition, ReminderOccurrence } from "../models/index.js";
-import { ReminderAdapterRegistry } from "./ReminderAdapter.js";
+import { ReminderAdapter, ReminderAdapterRegistry, ReminderEntity } from "./ReminderAdapter.js";
 import { TimezoneHelper } from "./TimezoneHelper.js";
 import { NotificationHelper, CreateNotificationOptions } from "./NotificationHelper.js";
 import { PreferenceGateHelper } from "./PreferenceGateHelper.js";
@@ -76,7 +76,7 @@ export class ReminderEngine {
   }
 
   // Entity-level keys stay stable (`${defId}:${occISO}:${offset}`); scope rows namespace by entity id so occurrences never collide.
-  private static async materialize(def: ReminderDefinition, adapter: any, entity: any, entityId: string, now: Date, horizon: Date, tz: string, scoped: boolean): Promise<number> {
+  private static async materialize(def: ReminderDefinition, adapter: ReminderAdapter, entity: ReminderEntity, entityId: string, now: Date, horizon: Date, tz: string, scoped: boolean): Promise<number> {
     const occurrences = await adapter.getOccurrences(entity, now, horizon);
     const offsets = this.parseOffsets(def.offsets);
     const sendLocalTime = def.sendLocalTime || "09:00:00";
@@ -136,13 +136,13 @@ export class ReminderEngine {
     const none: DispatchResult = { recipients: 0, textsSent: 0, textsSkipped: 0 };
     try {
       const def = await this.repos.reminderDefinition.load(occ.churchId!, occ.definitionId!);
-      if (!def || !(def as any).enabled) { await this.repos.reminderOccurrence.markCancelled(occ.id!); return none; }
+      if (!def || !def.enabled) { await this.repos.reminderOccurrence.markCancelled(occ.id!); return none; }
       const adapter = ReminderAdapterRegistry.get(occ.entityType || "");
       if (!adapter) { await this.repos.reminderOccurrence.markCancelled(occ.id!); return none; }
       const entity = await adapter.loadEntity(occ.churchId!, occ.entityId!);
       if (!entity) { await this.repos.reminderOccurrence.markCancelled(occ.id!); return none; }
 
-      const recipients = await adapter.loadRecipients(occ.churchId!, entity, occ.occLocalISO!, (def as any).recipientMode || "auto");
+      const recipients = await adapter.loadRecipients(occ.churchId!, entity, occ.occLocalISO!, def.recipientMode || "auto");
       const alreadySent = new Set(await this.repos.reminderSentLog.loadPersonIdsForOccurrence(occ.id!));
       const fresh = recipients.filter((r) => r.personId && !alreadySent.has(r.personId));
       let texts = { textsSent: 0, textsSkipped: 0 };
@@ -151,7 +151,7 @@ export class ReminderEngine {
         const message = adapter.renderMessage ? adapter.renderMessage(entity, occ.occLocalISO!, occ.message || undefined) : (occ.message || "You have a reminder");
         const link = adapter.link(entity, occ.occLocalISO!) || undefined;
         const options: CreateNotificationOptions = { category: occ.category, deliveryStartLevel: 1 };
-        const channels: string[] = ((def as any).channels || "").split(",").map((c: string) => c.trim());
+        const channels: string[] = (def.channels || "").split(",").map((c: string) => c.trim());
         if (channels.includes("email")) {
           options.emailImmediate = true;
           // Send now rows can be made at will, so their emails draw on ChurchEmailLimiter like workflow email (also on a timer retry).
@@ -246,8 +246,8 @@ export class ReminderEngine {
     const churchId = occ.churchId!;
     const membership = getMembershipModuleGateway();
     const church = await membership.loadChurch(churchId);
-    const prefs = ((await this.repos.notificationPreference.loadByPersonIds(personIds)) as any[] || []).filter((p) => p.churchId === churchId);
-    const overrides = ((await this.repos.notificationPreferenceOverride.loadByPersonIds(personIds)) as any[] || []).filter((o) => o.churchId === churchId);
+    const prefs = ((await this.repos.notificationPreference.loadByPersonIds(personIds)) || []).filter((p) => p.churchId === churchId);
+    const overrides = ((await this.repos.notificationPreferenceOverride.loadByPersonIds(personIds)) || []).filter((o) => o.churchId === churchId);
     const body = this.smsBody(church?.name || "", message);
     let noProvider = false;
     let textsSent = 0;
@@ -319,7 +319,7 @@ export class ReminderEngine {
   // occurrences in sync without waiting for midnight. event.* and plan.*/task.*
   // arrive via WebhookDispatcher.emit / InternalEventBus.publish respectively.
   // Bound at the subscription site (index.ts) so `this` resolves to the class.
-  static async handleBusEvent(churchId: string, event: string, payload: any): Promise<void> {
+  static async handleBusEvent(churchId: string, event: string, payload: { id?: string; planTypeId?: string } | null | undefined): Promise<void> {
     if (!this.repos) return;
     const id = payload?.id;
     if (!id) return;

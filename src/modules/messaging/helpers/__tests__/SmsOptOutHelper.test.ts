@@ -1,7 +1,7 @@
-const loadIdsByMobileDigits = jest.fn() as jest.MockedFunction<any>;
-const updateSmsOptedOut = jest.fn() as jest.MockedFunction<any>;
-const loadByPersonId = jest.fn() as jest.MockedFunction<any>;
-const savePref = jest.fn() as jest.MockedFunction<any>;
+const loadIdsByMobileDigits = jest.fn<Promise<string[]>, [string, string]>();
+const updateSmsOptedOut = jest.fn<Promise<unknown>, [string, string, boolean]>();
+const loadByPersonId = jest.fn<Promise<NotificationPreference | undefined>, [string, string]>();
+const savePref = jest.fn<Promise<NotificationPreference>, [NotificationPreference]>();
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { jwtSecret: "test-secret", messagingApi: "https://api.test/messaging" } }));
 jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({
   RepoManager: {
@@ -12,6 +12,7 @@ jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({
 }));
 
 import { SmsOptOutHelper } from "../SmsOptOutHelper.js";
+import type { NotificationPreference } from "../../models/index.js";
 
 describe("SmsOptOutHelper", () => {
   beforeEach(() => { updateSmsOptedOut.mockClear(); savePref.mockClear(); });

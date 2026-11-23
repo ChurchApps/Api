@@ -6,6 +6,11 @@ import { NotificationHelper } from "../helpers/NotificationHelper.js";
 import { PushAudienceHelper } from "../helpers/PushAudienceHelper.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 
+interface SendTestBody { personId: string; title?: string }
+interface CreateNotificationsBody { peopleIds: string[]; contentType: string; contentId: string; message: string; link?: string }
+interface GroupPushBody { groupId?: string; title?: string; message?: string; link?: string; imageUrl?: string }
+interface PingBody { personId: string; contentType: string; contentId: string; message: string; triggeredByPersonId?: string }
+
 @controller("/messaging/notifications")
 export class NotificationController extends MessagingBaseController {
   @httpGet("/groupPreview/:groupId")
@@ -16,7 +21,7 @@ export class NotificationController extends MessagingBaseController {
       const preview = await PushAudienceHelper.getGroupPushPreview(this.repos, au.churchId, groupId, au.personId);
       const { eligiblePersonIds: _eligiblePersonIds, ...result } = preview;
       return result;
-    }) as any;
+    });
   }
 
   // Recipient count for the "Everyone with the app" audience (scheduled push, ChurchAppsSupport#1411).
@@ -28,7 +33,7 @@ export class NotificationController extends MessagingBaseController {
       const preview = await PushAudienceHelper.getChurchPushPreview(this.repos, au.churchId, au.personId);
       const { eligiblePersonIds: _eligiblePersonIds, ...result } = preview;
       return result;
-    }) as any;
+    });
   }
 
   @httpGet("/:churchId/person/:personId")
@@ -37,86 +42,86 @@ export class NotificationController extends MessagingBaseController {
     @requestParam("personId") personId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<Notification[]> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const data = await this.repos.notification.loadByPersonId(au.churchId, personId);
-      return this.repos.notification.convertAllToModel(data as any[]);
-    }) as any;
+      return this.repos.notification.convertAllToModel(data);
+    });
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Notification> {
+  public async loadById(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.notification.loadById(au.churchId, id);
       if (!data) return this.json({}, 404);
       const model = this.repos.notification.convertToModel(data);
       if (model.personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       return model;
-    }) as any;
+    });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Notification[]>, res: express.Response): Promise<Notification[]> {
+  public async save(req: express.Request<{}, {}, Notification[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const promises: Promise<Notification>[] = [];
       req.body.forEach((notification) => {
         notification.churchId = au.churchId;
         promises.push(this.repos.notification.save(notification));
-      }) as any;
+      });
       const result = await Promise.all(promises);
-      return this.repos.notification.convertAllToModel(result as any[]);
-    }) as any;
+      return this.repos.notification.convertAllToModel(result);
+    });
   }
 
   @httpPost("/markRead/:churchId/:personId")
-  public async markRead(@requestParam("churchId") _churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async markRead(@requestParam("churchId") _churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       await this.repos.notification.markRead(au.churchId, personId);
-    }) as any;
+    });
   }
 
   @httpPost("/sendTest")
-  public async sendTestNotification(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async sendTestNotification(req: express.Request<{}, {}, SendTestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const { personId, title } = req.body;
       const method = await NotificationHelper.notifyUser(au.churchId, personId, title || "Test Notification");
       return { method, success: true };
-    }) as any;
+    });
   }
 
   @httpGet("/unreadCount")
-  public async loadMyUnread(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadMyUnread(req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existing = await this.repos.notification.loadNewCounts(au.churchId, au.personId);
       return existing || {};
-    }) as any;
+    });
   }
 
   @httpGet("/my")
-  public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existing = await this.repos.notification.loadForPerson(au.churchId, au.personId);
       await this.repos.notification.markAllRead(au.churchId, au.personId);
       return existing || {};
-    }) as any;
+    });
   }
 
   // Called from other modules (e.g. Doing: task assignment, plan publish/notify) after the
   // triggering action already passed its own permission check.
   @httpPost("/create")
-  public async create(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+  public async create(req: express.Request<{}, {}, CreateNotificationsBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       return await NotificationHelper.createNotifications(req.body.peopleIds, au.churchId, req.body.contentType, req.body.contentId, req.body.message, req.body?.link, au.personId);
-    }) as any;
+    });
   }
 
   @httpPost("/group/send")
-  public async sendGroupPush(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+  public async sendGroupPush(req: express.Request<{}, {}, GroupPushBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({ error: "Unauthorized" }, 401);
 
@@ -162,33 +167,33 @@ export class NotificationController extends MessagingBaseController {
         successCount: pushCount,
         skippedCount: preview.eligiblePersonIds.length - pushCount
       };
-    }) as any;
+    });
   }
 
   @httpPost("/ping")
-  public async ping(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+  public async ping(req: express.Request<{}, {}, PingBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       return await NotificationHelper.createNotifications([req.body.personId], au.churchId, req.body.contentType, req.body.contentId, req.body.message, undefined, req.body.triggeredByPersonId);
-    }) as any;
+    });
   }
 
   // authz-exempt: self-service — deletes only the caller's own notifications, scoped by au.churchId + au.personId from the JWT
   @httpDelete("/my")
-  public async deleteMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async deleteMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repos.notification.deleteAllForPerson(au.churchId, au.personId);
       return this.json({});
-    }) as any;
+    });
   }
 
   @httpDelete("/:churchId/:id")
-  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existing = await this.repos.notification.loadById(au.churchId, id);
       if (existing?.personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       await this.repos.notification.delete(au.churchId, id);
       return this.json({});
-    }) as any;
+    });
   }
 }

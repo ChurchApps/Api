@@ -2,7 +2,17 @@ import { sql } from "kysely";
 import { injectable } from "inversify";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
-import { PrivateMessage } from "../models/index.js";
+import { Conversation, PrivateMessage } from "../models/index.js";
+
+// A conversations row joined with its privateMessages pair (pmId) and the last post's time.
+export interface PrivateMessageRow extends Omit<Conversation, "messages"> {
+  pmId?: string;
+  fromPersonId?: string;
+  toPersonId?: string;
+  conversationId?: string;
+  notifyPersonId?: string;
+  lastMessageTime?: Date;
+}
 
 @injectable()
 export class PrivateMessageRepo {
@@ -39,7 +49,7 @@ export class PrivateMessageRepo {
   }
 
   public async loadByPersonId(churchId: string, personId: string) {
-    const result = await sql<any>`
+    const result = await sql<PrivateMessageRow>`
       SELECT c.*, pm.id as pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, m.timeSent as lastMessageTime
       FROM privateMessages pm
       INNER JOIN conversations c on c.id=pm.conversationId
@@ -47,11 +57,11 @@ export class PrivateMessageRepo {
       WHERE pm.churchId=${churchId} AND (pm.fromPersonId=${personId} OR pm.toPersonId=${personId})
       ORDER BY COALESCE(m.timeSent, c.dateCreated) DESC
     `.execute(getDb());
-    return (result.rows || []).map((d: any) => this.rowToModel(d));
+    return (result.rows || []).map((d) => this.rowToModel(d));
   }
 
   public async loadExisting(churchId: string, personA: string, personB: string) {
-    const result = await sql<any>`
+    const result = await sql<PrivateMessageRow>`
       SELECT c.*, pm.id as pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, m.timeSent as lastMessageTime
       FROM privateMessages pm
       INNER JOIN conversations c on c.id=pm.conversationId
@@ -82,7 +92,7 @@ export class PrivateMessageRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  protected rowToModel(data: any): PrivateMessage {
+  protected rowToModel(data: PrivateMessageRow): PrivateMessage {
     const result: PrivateMessage = {
       id: data.pmId || data.id,
       churchId: data.churchId,
@@ -111,11 +121,11 @@ export class PrivateMessageRepo {
     return result;
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: PrivateMessageRow) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: PrivateMessageRow[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

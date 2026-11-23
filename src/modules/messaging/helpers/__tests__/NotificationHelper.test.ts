@@ -1,6 +1,19 @@
 // Contract test for socket→push escalation when recipient offline with webpush device.
 // Mocks WebPushHelper, ExpoPushHelper, DeliveryHelper, apihelper (ESM), Environment, axios.
-const sendBulkTypedMessagesMock = jest.fn() as jest.MockedFunction<any>;
+import type { EmailHelper } from "@churchapps/apihelper";
+import type { WebPushHelper } from "../WebPushHelper.js";
+import type { DeliveryHelper } from "../DeliveryHelper.js";
+import type { Repos } from "../../repositories/index.js";
+import type { Connection, Conversation, Device, Message, Notification, NotificationEntityMute, NotificationPreference, NotificationPreferenceOverride, PrivateMessage } from "../../models/index.js";
+
+// Only the repos and methods a test touches exist; the rest of Repos is never reached. Mocks keep each
+// method's parameters but return plain fixtures, so only the parameter lists are checked.
+type MockedMethods<T> = { [M in keyof T]?: T[M] extends (...args: infer A) => unknown ? (...args: A) => unknown : T[M] };
+type RepoMocks = { [K in keyof Repos]?: MockedMethods<Repos[K]> };
+const asRepos = (mocks: RepoMocks) => mocks as Repos;
+type Row = Record<string, unknown>;
+
+const sendBulkTypedMessagesMock: jest.MockedFunction<typeof WebPushHelper.sendBulkTypedMessages> = jest.fn();
 sendBulkTypedMessagesMock.mockResolvedValue([{ token: "webpush:fake", success: true, gone: false, retryable: false }]);
 
 jest.mock("../WebPushHelper.js", () => ({
@@ -21,15 +34,15 @@ jest.mock("../WebPushHelper.js", () => ({
 jest.mock("../ExpoPushHelper.js", () => ({ ExpoPushHelper: { sendBulkTypedMessages: jest.fn().mockResolvedValue([]) } }));
 
 // DeliveryHelper mock: should NOT be called in this test (recipient is offline).
-const sendMessagesMock = jest.fn() as jest.MockedFunction<any>;
+const sendMessagesMock: jest.MockedFunction<typeof DeliveryHelper.sendMessages> = jest.fn();
 sendMessagesMock.mockResolvedValue(0);
 jest.mock("../DeliveryHelper.js", () => ({ DeliveryHelper: { sendMessages: sendMessagesMock } }));
 
 // @churchapps/apihelper: ESM-only, breaks CommonJS Jest; mock to avoid loading ArrayHelper/EmailHelper.
-const sendTemplatedEmailMock = jest.fn() as jest.MockedFunction<any>;
+const sendTemplatedEmailMock: jest.MockedFunction<typeof EmailHelper.sendTemplatedEmail> = jest.fn();
 sendTemplatedEmailMock.mockResolvedValue(undefined);
 jest.mock("@churchapps/apihelper", () => ({
-  ArrayHelper: { getIds: jest.fn(() => []), getAll: jest.fn(() => []), getOne: jest.fn(() => null) },
+  ArrayHelper: { getIds: jest.fn((): unknown[] => []), getAll: jest.fn((): unknown[] => []), getOne: jest.fn((): unknown => null) },
   EmailHelper: { sendEmail: jest.fn().mockResolvedValue(undefined), sendTemplatedEmail: sendTemplatedEmailMock }
 }));
 
@@ -37,16 +50,16 @@ jest.mock("@churchapps/apihelper", () => ({
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { getEnvironmentName: () => "test", b1AdminRoot: "https://admin.example.org/" } }));
 
 // Content gateway: event notes link through the event's group.
-const loadEventMock = jest.fn() as jest.MockedFunction<any>;
+const loadEventMock = jest.fn<Promise<unknown>, [string, string]>();
 jest.mock("../../../../shared/modules/ContentModuleGateway.js", () => ({ getContentModuleGateway: () => ({ loadEvent: loadEventMock }) }));
 
 // Membership gateway: the sender display name comes from the church record.
-const loadChurchMock = jest.fn() as jest.MockedFunction<any>;
+const loadChurchMock = jest.fn<Promise<unknown>, [string]>();
 loadChurchMock.mockResolvedValue({ id: "CHU1", name: "Grace Church" });
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch: loadChurchMock }) }));
 
 // Doing gateway: task and card note titles come from the task (#1586).
-const loadTaskMock = jest.fn() as jest.MockedFunction<any>;
+const loadTaskMock = jest.fn<Promise<unknown>, [string, string]>();
 loadTaskMock.mockResolvedValue(null);
 jest.mock("../../../../shared/modules/DoingModuleGateway.js", () => ({ getDoingModuleGateway: () => ({ loadTask: loadTaskMock }) }));
 
@@ -64,19 +77,19 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
     sendMessagesMock.mockResolvedValue(0);
   });
 
-  function buildRepos(opts: { connections?: any[]; devices?: any[]; pref?: any }) {
+  function buildRepos(opts: { connections?: Connection[]; devices?: Device[]; pref?: NotificationPreference }) {
     return {
-      connection: { loadForNotification: jest.fn(async () => opts.connections ?? []) },
+      connection: { loadForNotification: jest.fn(async (): Promise<Connection[]> => opts.connections ?? []) },
       notification: { loadNewCounts: jest.fn(async () => ({ notificationCount: 1, pmCount: 0 })) },
       notificationPreference: { loadByPersonId: jest.fn(async () => opts.pref ?? { allowPush: true, emailFrequency: "individual" }) },
-      notificationPreferenceOverride: { loadForPerson: jest.fn(async () => []) },
-      notificationEntityMute: { loadForPerson: jest.fn(async () => []) },
+      notificationPreferenceOverride: { loadForPerson: jest.fn(async (): Promise<NotificationPreferenceOverride[]> => []) },
+      notificationEntityMute: { loadForPerson: jest.fn(async (): Promise<NotificationEntityMute[]> => []) },
       device: {
-        loadForPerson: jest.fn(async () => opts.devices ?? []),
+        loadForPerson: jest.fn(async (): Promise<Device[]> => opts.devices ?? []),
         deleteByFcmToken: jest.fn(async () => {})
       },
       deliveryLog: { save: jest.fn(async () => ({})) }
-    } as any;
+    };
   }
 
   it("escalates to web push when the recipient has no live socket", async () => {
@@ -84,7 +97,7 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
       connections: [], // offline
       devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]
     });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     const result = await NotificationHelper.attemptDeliveryWithEscalation(
       "CHU00000001",
@@ -118,7 +131,7 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
       connections: [{ socketId: "abc", churchId: "CHU00000001" }],
       devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]
     });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     const result = await NotificationHelper.attemptDeliveryWithEscalation(
       "CHU00000001",
@@ -142,7 +155,7 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
       connections: [{ socketId: "abc", churchId: "CHU00000001" }],
       devices: []
     });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     const result = await NotificationHelper.attemptDeliveryWithEscalation(
       "CHU00000001",
@@ -165,7 +178,7 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
       devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }],
       pref: { allowPush: false, emailFrequency: "individual" }
     });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     const result = await NotificationHelper.attemptDeliveryWithEscalation(
       "CHU00000001",
@@ -199,7 +212,7 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
       connections: [],
       devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]
     });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     const result = await NotificationHelper.attemptDeliveryWithEscalation(
       "CHU00000001",
@@ -222,19 +235,19 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
     sendMessagesMock.mockClear();
   });
 
-  function buildPrivateMessageRepos(privateMessage: any, opts: { connections?: any[]; devices?: any[]; pref?: any; overrides?: any[]; existingDm?: any[] } = {}) {
-    const savedNotifications: any[] = [];
+  function buildPrivateMessageRepos(privateMessage: PrivateMessage, opts: { connections?: Connection[]; devices?: Device[]; pref?: NotificationPreference; overrides?: NotificationPreferenceOverride[]; existingDm?: Notification[] } = {}) {
+    const savedNotifications: Notification[] = [];
     return {
       privateMessage: {
         loadByConversationId: jest.fn(async () => ({ ...privateMessage })),
-        save: jest.fn(async (pm) => pm)
+        save: jest.fn(async (pm: PrivateMessage) => pm)
       },
-      message: { loadLatestPerPerson: jest.fn(async () => []) },
-      connection: { loadForNotification: jest.fn(async () => opts.connections ?? []) },
+      message: { loadLatestPerPerson: jest.fn(async (): Promise<Message[]> => []) },
+      connection: { loadForNotification: jest.fn(async (): Promise<Connection[]> => opts.connections ?? []) },
       notification: {
         loadNewCounts: jest.fn(async () => ({ notificationCount: 0, pmCount: 1 })),
         loadExistingUnread: jest.fn(async () => opts.existingDm ?? savedNotifications.filter((n) => n.contentType === "privateMessage" && n.isNew)),
-        save: jest.fn(async (n) => {
+        save: jest.fn(async (n: Notification) => {
           if (n.id) {
             const existing = savedNotifications.find((s) => s.id === n.id);
             if (existing) Object.assign(existing, n);
@@ -246,14 +259,14 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
         })
       },
       notificationPreference: { loadByPersonId: jest.fn(async () => opts.pref ?? { allowPush: true, emailFrequency: "individual" }) },
-      notificationPreferenceOverride: { loadForPerson: jest.fn(async () => opts.overrides ?? []) },
-      notificationEntityMute: { loadForPerson: jest.fn(async () => []) },
+      notificationPreferenceOverride: { loadForPerson: jest.fn(async (): Promise<NotificationPreferenceOverride[]> => opts.overrides ?? []) },
+      notificationEntityMute: { loadForPerson: jest.fn(async (): Promise<NotificationEntityMute[]> => []) },
       device: {
-        loadForPerson: jest.fn(async () => opts.devices ?? [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]),
+        loadForPerson: jest.fn(async (): Promise<Device[]> => opts.devices ?? [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]),
         deleteByFcmToken: jest.fn(async () => {})
       },
       deliveryLog: { save: jest.fn(async () => ({})) }
-    } as any;
+    };
   }
 
   it("notifies only the other participant when the sender is resolved", async () => {
@@ -264,11 +277,11 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
       fromPersonId: "PER_A",
       toPersonId: "PER_B"
     });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     await NotificationHelper.checkShouldNotify(
-      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as any,
-      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as any,
+      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as Conversation,
+      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as Message,
       "PER_A"
     );
 
@@ -286,11 +299,11 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
       { id: "PM1", churchId: "CHU1", conversationId: "CONV1", fromPersonId: "PER_A", toPersonId: "PER_B" },
       { connections: [{ socketId: "s1", churchId: "CHU1" }], devices: [] }
     );
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     await NotificationHelper.checkShouldNotify(
-      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as any,
-      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as any,
+      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as Conversation,
+      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as Message,
       "PER_A"
     );
 
@@ -311,15 +324,15 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
       { id: "PM1", churchId: "CHU1", conversationId: "CONV1", fromPersonId: "PER_A", toPersonId: "PER_B" },
       { connections: [{ socketId: "s1", churchId: "CHU1" }], devices: [] }
     );
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
-    const conv = { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as any;
-    await NotificationHelper.checkShouldNotify(conv, { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "One" } as any, "PER_A");
-    await NotificationHelper.checkShouldNotify(conv, { id: "MSG2", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Two" } as any, "PER_A");
+    const conv = { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as Conversation;
+    await NotificationHelper.checkShouldNotify(conv, { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "One" } as Message, "PER_A");
+    await NotificationHelper.checkShouldNotify(conv, { id: "MSG2", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Two" } as Message, "PER_A");
 
     expect(sendMessagesMock).toHaveBeenCalledTimes(2); // both pinged the socket
     // Reuse: the second message shares the conversation's existing unread row.
-    const createCalls = repos.notification.save.mock.calls.filter((c: any[]) => !c[0].id).length;
+    const createCalls = repos.notification.save.mock.calls.filter((c) => !c[0].id).length;
     expect(createCalls).toBe(1);
   });
 
@@ -331,11 +344,11 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
       fromPersonId: "PER_A",
       toPersonId: "PER_B"
     });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     await NotificationHelper.checkShouldNotify(
-      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as any,
-      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "Unknown", content: "Hello" } as any,
+      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as Conversation,
+      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "Unknown", content: "Hello" } as Message,
       "anonymous"
     );
 
@@ -349,11 +362,11 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
       { id: "PM1", churchId: "CHU1", conversationId: "CONV1", fromPersonId: "PER_A", toPersonId: "PER_B" },
       { connections: [{ socketId: "s1", churchId: "CHU1" }], pref: { allowPush: true, emailFrequency: "individual", masterMute: true } }
     );
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     await NotificationHelper.checkShouldNotify(
-      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as any,
-      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as any,
+      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as Conversation,
+      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as Message,
       "PER_A"
     );
 
@@ -374,11 +387,11 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
       { id: "PM1", churchId: "CHU1", conversationId: "CONV1", fromPersonId: "PER_A", toPersonId: "PER_B" },
       { connections: [{ socketId: "s1", churchId: "CHU1" }], devices: [] }
     );
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
 
     await NotificationHelper.checkShouldNotify(
-      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as any,
-      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as any,
+      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as Conversation,
+      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as Message,
       "PER_A"
     );
 
@@ -399,10 +412,10 @@ describe("NotificationHelper.escalateDelivery direct messages", () => {
   });
 
   it("escalates an unread DM notification row to push without touching the PM table", async () => {
-    const saved: any[] = [];
+    const saved: Notification[] = [];
     const repos = {
       notification: {
-        loadPendingEscalation: jest.fn(async () => [
+        loadPendingEscalation: jest.fn(async (): Promise<Notification[]> => [
           {
             id: "NDM1",
             churchId: "CHU1",
@@ -417,17 +430,17 @@ describe("NotificationHelper.escalateDelivery direct messages", () => {
           }
         ]),
         loadNewCounts: jest.fn(async () => ({ notificationCount: 0, pmCount: 1 })),
-        save: jest.fn(async (n) => { saved.push(n); return n; })
+        save: jest.fn(async (n: Notification) => { saved.push(n); return n; })
       },
-      connection: { loadForNotification: jest.fn(async () => []) },
+      connection: { loadForNotification: jest.fn(async (): Promise<Connection[]> => []) },
       notificationPreference: { loadByPersonId: jest.fn(async () => ({ allowPush: true, emailFrequency: "individual" })) },
-      notificationPreferenceOverride: { loadForPerson: jest.fn(async () => []) },
-      notificationEntityMute: { loadForPerson: jest.fn(async () => []) },
+      notificationPreferenceOverride: { loadForPerson: jest.fn(async (): Promise<NotificationPreferenceOverride[]> => []) },
+      notificationEntityMute: { loadForPerson: jest.fn(async (): Promise<NotificationEntityMute[]> => []) },
       device: { loadForPerson: jest.fn(async () => [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]), deleteByFcmToken: jest.fn(async () => {}) },
       deliveryLog: { save: jest.fn(async () => ({})) }
       // no privateMessage repo — escalation must not reach for it
-    } as any;
-    NotificationHelper.init(repos);
+    };
+    NotificationHelper.init(asRepos(repos));
 
     const result = await NotificationHelper.escalateDelivery();
 
@@ -437,20 +450,25 @@ describe("NotificationHelper.escalateDelivery direct messages", () => {
     expect(args[4]).toBe("PM1");
     expect(saved.at(-1)?.deliveryMethod).toBe("push");
     expect(result.notificationsEscalated).toBe(1);
-    expect((result as any).pmsEscalated).toBeUndefined();
+    expect((result as Row).pmsEscalated).toBeUndefined();
   });
 });
 
 describe("NotificationHelper.sendEmailNotifications direct messages", () => {
-  const apihelper = jest.requireMock("@churchapps/apihelper") as any;
+  type ArrayHelperMock = {
+    getIds: jest.Mock<unknown[], [Row[], string]>;
+    getAll: jest.Mock<unknown[], [Row[], string, unknown]>;
+    getOne: jest.Mock<unknown, [Row[], string, unknown]>;
+  };
+  const apihelper = jest.requireMock<{ ArrayHelper: ArrayHelperMock }>("@churchapps/apihelper");
 
   beforeEach(() => {
     sendTemplatedEmailMock.mockClear();
     sendTemplatedEmailMock.mockResolvedValue(undefined);
     loadChurchMock.mockClear();
-    apihelper.ArrayHelper.getIds.mockImplementation((arr: any[], field: string) => [...new Set((arr || []).map((a) => a[field]).filter(Boolean))]);
-    apihelper.ArrayHelper.getAll.mockImplementation((arr: any[], field: string, value: any) => (arr || []).filter((a) => a[field] === value));
-    apihelper.ArrayHelper.getOne.mockImplementation((arr: any[], field: string, value: any) => (arr || []).find((a) => a[field] === value) || null);
+    apihelper.ArrayHelper.getIds.mockImplementation((arr: Row[], field: string) => [...new Set((arr || []).map((a) => a[field]).filter(Boolean))]);
+    apihelper.ArrayHelper.getAll.mockImplementation((arr: Row[], field: string, value: unknown) => (arr || []).filter((a) => a[field] === value));
+    apihelper.ArrayHelper.getOne.mockImplementation((arr: Row[], field: string, value: unknown) => (arr || []).find((a) => a[field] === value) || null);
   });
 
   afterEach(() => {
@@ -463,10 +481,10 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
   });
 
   it("renders a DM digest email from notification rows and never loads PM rows", async () => {
-    const savedComplete: any[] = [];
+    const savedComplete: Notification[] = [];
     const repos = {
       notification: {
-        loadUndelivered: jest.fn(async () => [
+        loadUndelivered: jest.fn(async (): Promise<Notification[]> => [
           {
             id: "NDM1",
             churchId: "CHU1",
@@ -479,18 +497,18 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
             category: "direct_messages"
           }
         ]),
-        save: jest.fn(async (n) => { savedComplete.push(n); return n; })
+        save: jest.fn(async (n: Notification) => { savedComplete.push(n); return n; })
       },
       notificationPreference: { loadByPersonIds: jest.fn(async () => [{ personId: "PER_B", churchId: "CHU1", emailFrequency: "individual" }]) },
-      notificationPreferenceOverride: { loadByPersonIds: jest.fn(async () => []) },
+      notificationPreferenceOverride: { loadByPersonIds: jest.fn(async (): Promise<NotificationPreferenceOverride[]> => []) },
       deliveryLog: { save: jest.fn(async () => ({})) }
       // no privateMessage repo — the digest must not touch PM rows
-    } as any;
-    NotificationHelper.init(repos);
+    };
+    NotificationHelper.init(asRepos(repos));
     const spy = jest.spyOn(NotificationHelper, "getEmailData").mockResolvedValue([
       { id: "PER_B", email: "recipient@example.com" },
       { id: "PER_A", email: "sender@example.com" }
-    ] as any);
+    ]);
 
     const result = await NotificationHelper.sendEmailNotifications("individual");
 
@@ -502,14 +520,14 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
     expect(args[3]).toBe("https://admin.example.org"); // header link follows the install's admin root
     expect(loadChurchMock).toHaveBeenCalledWith("CHU1");
     expect(savedComplete.at(-1)?.deliveryMethod).toBe("complete");
-    expect((result as any).pmsProcessed).toBeUndefined();
+    expect((result as Row).pmsProcessed).toBeUndefined();
     spy.mockRestore();
   });
 
   it("sanitizes SES subjects and splits semicolon-separated addresses", async () => {
     const repos = {
       notification: {
-        loadUndelivered: jest.fn(async () => [
+        loadUndelivered: jest.fn(async (): Promise<Notification[]> => [
           {
             id: "N1",
             churchId: "CHU1",
@@ -520,14 +538,14 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
             category: "tasks"
           }
         ]),
-        save: jest.fn(async (n) => n)
+        save: jest.fn(async (n: Notification) => n)
       },
       notificationPreference: { loadByPersonIds: jest.fn(async () => [{ personId: "PER_B", churchId: "CHU1", emailFrequency: "individual" }]) },
-      notificationPreferenceOverride: { loadByPersonIds: jest.fn(async () => []) },
+      notificationPreferenceOverride: { loadByPersonIds: jest.fn(async (): Promise<NotificationPreferenceOverride[]> => []) },
       deliveryLog: { save: jest.fn(async () => ({})) }
-    } as any;
-    NotificationHelper.init(repos);
-    const spy = jest.spyOn(NotificationHelper, "getEmailData").mockResolvedValue([{ id: "PER_B", email: "a@example.com; b@example.com" }] as any);
+    };
+    NotificationHelper.init(asRepos(repos));
+    const spy = jest.spyOn(NotificationHelper, "getEmailData").mockResolvedValue([{ id: "PER_B", email: "a@example.com; b@example.com" }]);
 
     await NotificationHelper.sendEmailNotifications("individual");
 
@@ -545,15 +563,15 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
     loadChurchMock.mockRejectedValueOnce(new Error("db down"));
     const repos = {
       notification: {
-        loadUndelivered: jest.fn(async () => [{ id: "N2", churchId: "CHU1", personId: "PER_B", contentType: "task", contentId: "T2", message: "Hello", category: "tasks" }]),
-        save: jest.fn(async (n) => n)
+        loadUndelivered: jest.fn(async (): Promise<Notification[]> => [{ id: "N2", churchId: "CHU1", personId: "PER_B", contentType: "task", contentId: "T2", message: "Hello", category: "tasks" }]),
+        save: jest.fn(async (n: Notification) => n)
       },
       notificationPreference: { loadByPersonIds: jest.fn(async () => [{ personId: "PER_B", churchId: "CHU1", emailFrequency: "individual" }]) },
-      notificationPreferenceOverride: { loadByPersonIds: jest.fn(async () => []) },
+      notificationPreferenceOverride: { loadByPersonIds: jest.fn(async (): Promise<NotificationPreferenceOverride[]> => []) },
       deliveryLog: { save: jest.fn(async () => ({})) }
-    } as any;
-    NotificationHelper.init(repos);
-    const spy = jest.spyOn(NotificationHelper, "getEmailData").mockResolvedValue([{ id: "PER_B", email: "a@example.com" }] as any);
+    };
+    NotificationHelper.init(asRepos(repos));
+    const spy = jest.spyOn(NotificationHelper, "getEmailData").mockResolvedValue([{ id: "PER_B", email: "a@example.com" }]);
 
     await NotificationHelper.sendEmailNotifications("individual");
 
@@ -564,20 +582,20 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
 });
 
 describe("NotificationHelper.createNotifications emailImmediate", () => {
-  function buildRepos(opts: { pref?: any; existing?: any[] } = {}) {
+  function buildRepos(opts: { pref?: NotificationPreference; existing?: Notification[] } = {}) {
     return {
       notification: {
-        loadExistingUnread: jest.fn(async () => opts.existing ?? []),
+        loadExistingUnread: jest.fn(async (): Promise<Notification[]> => opts.existing ?? []),
         loadNewCounts: jest.fn(async () => ({ notificationCount: 0, pmCount: 0 })),
-        save: jest.fn(async (n: any) => ({ ...n, id: n.id || `NOTIF_${n.personId}` }))
+        save: jest.fn(async (n: Notification) => ({ ...n, id: n.id || `NOTIF_${n.personId}` }))
       },
-      connection: { loadForNotification: jest.fn(async () => []) },
+      connection: { loadForNotification: jest.fn(async (): Promise<Connection[]> => []) },
       notificationPreference: { loadByPersonId: jest.fn(async () => opts.pref ?? { allowPush: true, emailFrequency: "individual" }) },
-      notificationPreferenceOverride: { loadForPerson: jest.fn(async () => []) },
-      notificationEntityMute: { loadForPerson: jest.fn(async () => []) },
-      device: { loadForPerson: jest.fn(async () => []), deleteByFcmToken: jest.fn(async () => {}) },
+      notificationPreferenceOverride: { loadForPerson: jest.fn(async (): Promise<NotificationPreferenceOverride[]> => []) },
+      notificationEntityMute: { loadForPerson: jest.fn(async (): Promise<NotificationEntityMute[]> => []) },
+      device: { loadForPerson: jest.fn(async (): Promise<Device[]> => []), deleteByFcmToken: jest.fn(async () => {}) },
       deliveryLog: { save: jest.fn(async () => ({})) }
-    } as any;
+    };
   }
 
   let getEmailDataSpy: jest.SpyInstance;
@@ -597,23 +615,23 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
   it("keeps workflow-owned app alerts visible without an unread-email escalation", async () => {
     const repos = buildRepos();
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
     const result = await NotificationHelper.createNotifications(["PER1"], "CHU1", "assignment", "PLAN1", "Volunteer Requests: Sample service", undefined, undefined, { appOnly: true, category: "serving_schedule" });
     expect(result[0]).toMatchObject({ deliveryMethod: "complete", isNew: true, category: "serving_schedule" });
     expect(sendTemplatedEmailMock).not.toHaveBeenCalled();
   });
 
   it("gates workflow emails by church membership and member preferences", async () => {
-    NotificationHelper.init(buildRepos({ pref: { emailFrequency: "never" } }));
+    NotificationHelper.init(asRepos(buildRepos({ pref: { emailFrequency: "never" } })));
     expect(await NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toContain("skipped");
-    NotificationHelper.init(buildRepos());
+    NotificationHelper.init(asRepos(buildRepos()));
     peopleInChurchSpy.mockResolvedValue([]);
     expect(await NotificationHelper.sendWorkflowEmail("CHU1", "OTHER", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toContain("not in this church");
     expect(sendTemplatedEmailMock).not.toHaveBeenCalled();
   });
 
   it("keeps approval/rate-limited workflow emails out of the unread queue", async () => {
-    const repos = buildRepos(); NotificationHelper.init(repos);
+    const repos = buildRepos(); NotificationHelper.init(asRepos(repos));
     const reserve = jest.spyOn(ChurchEmailLimiter, "reserve").mockResolvedValue(null);
     try {
       expect(await NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toContain("blocked");
@@ -622,7 +640,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
   });
 
   it("settles a workflow email reservation after a successful or uncertain transport attempt", async () => {
-    NotificationHelper.init(buildRepos());
+    NotificationHelper.init(asRepos(buildRepos()));
     const reserve = jest.spyOn(ChurchEmailLimiter, "reserve").mockResolvedValue(["reserve1"]);
     const settle = jest.spyOn(ChurchEmailLimiter, "settle").mockResolvedValue(undefined);
     try {
@@ -638,7 +656,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
   it("drops recipients who are not in the notifying church", async () => {
     const repos = buildRepos();
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
     peopleInChurchSpy.mockResolvedValue([]);
     const result = await NotificationHelper.createNotifications(["OTHER_CHURCH_PERSON"], "CHU1", "task", "T1", "hi", undefined, undefined, { emailImmediate: true });
     expect(result).toEqual([]);
@@ -647,7 +665,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
   it("sends the per-recipient rich email, logs delivery, and marks the row complete when the gate allows", async () => {
     const repos = buildRepos();
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
     getEmailDataSpy.mockResolvedValue([{ id: "PER1", email: "per1@example.com" }]);
 
     const result = await NotificationHelper.createNotifications(
@@ -674,7 +692,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
   it("draws church-authored email from the church's allowance and skips the send when it is exhausted", async () => {
     const repos = buildRepos();
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
     getEmailDataSpy.mockResolvedValue([{ id: "PER1", email: "per1@example.com" }]);
     const reserve = jest.spyOn(ChurchEmailLimiter, "reserve").mockResolvedValueOnce(["R1"]).mockResolvedValueOnce(null);
     const settle = jest.spyOn(ChurchEmailLimiter, "settle").mockResolvedValue(undefined);
@@ -694,7 +712,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
   it("bypasses the unread-dedup guard so an unread earlier row does not swallow an explicit send", async () => {
     const repos = buildRepos({ existing: [{ personId: "PER1" }] });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
     getEmailDataSpy.mockResolvedValue([{ id: "PER1", email: "per1@example.com" }]);
 
     const result = await NotificationHelper.createNotifications(
@@ -715,7 +733,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
   it("suppresses the send when the gate denies (masterMute) but still persists the row as complete", async () => {
     const repos = buildRepos({ pref: { allowPush: true, emailFrequency: "individual", masterMute: true } });
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
     getEmailDataSpy.mockResolvedValue([{ id: "PER1", email: "per1@example.com" }]);
 
     const result = await NotificationHelper.createNotifications(
@@ -735,7 +753,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
   it("falls back to generic subject/body when emailByPerson has no entry for the recipient", async () => {
     const repos = buildRepos();
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
     getEmailDataSpy.mockResolvedValue([{ id: "PER1", email: "per1@example.com" }]);
 
     await NotificationHelper.createNotifications(
@@ -758,7 +776,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
   it("leaves the row in its normal escalation state when the recipient has no email address on file", async () => {
     const repos = buildRepos();
-    NotificationHelper.init(repos);
+    NotificationHelper.init(asRepos(repos));
     getEmailDataSpy.mockResolvedValue([]);
 
     const result = await NotificationHelper.createNotifications(
@@ -781,11 +799,11 @@ describe("NotificationHelper.sendEmailNotification volunteer requests", () => {
   beforeEach(() => {
     sendTemplatedEmailMock.mockClear();
     sendTemplatedEmailMock.mockResolvedValue(undefined);
-    NotificationHelper.init({ notification: { save: jest.fn(async (n) => n) }, deliveryLog: { save: jest.fn(async () => ({})) } } as any);
+    NotificationHelper.init(asRepos({ notification: { save: jest.fn(async (n: Notification) => n) }, deliveryLog: { save: jest.fn(async () => ({})) } }));
   });
 
   it("keeps the position's period and breaks before the confirm line", async () => {
-    const notification = { id: "N1", churchId: "CHU1", personId: "PER1", contentType: "assignment", contentId: "A1", message: "Volunteer Requests: Oct 25, 2026 - Session 1 - Teacher. Please log in and confirm." } as any;
+    const notification = { id: "N1", churchId: "CHU1", personId: "PER1", contentType: "assignment", contentId: "A1", message: "Volunteer Requests: Oct 25, 2026 - Session 1 - Teacher. Please log in and confirm." } as Notification;
 
     await NotificationHelper.sendEmailNotification("volunteer@example.com", [notification]);
 
@@ -800,15 +818,15 @@ describe("NotificationHelper.checkShouldNotify conversation message text", () =>
   let createNotificationsSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    NotificationHelper.init({
+    NotificationHelper.init(asRepos({
       message: {
         loadLatestPerPerson: jest.fn(async () => [
           { personId: "PER_A", messageType: "comment", timeSent: new Date("2026-10-30") },
           { personId: "PER_B", messageType: "comment", timeSent: new Date("2026-10-31") }
         ])
       },
-      device: { loadForPerson: jest.fn(async () => []) }
-    } as any);
+      device: { loadForPerson: jest.fn(async (): Promise<Device[]> => []) }
+    }));
     createNotificationsSpy = jest.spyOn(NotificationHelper, "createNotifications").mockResolvedValue([]);
   });
 
@@ -816,8 +834,8 @@ describe("NotificationHelper.checkShouldNotify conversation message text", () =>
     createNotificationsSpy.mockRestore();
   });
 
-  const notify = async (conversation: any) => {
-    await NotificationHelper.checkShouldNotify({ id: "CONV1", churchId: "CHU1", contentId: "C1", ...conversation }, { id: "MSG1", churchId: "CHU1", conversationId: "CONV1" } as any, "PER_A");
+  const notify = async (conversation: Conversation) => {
+    await NotificationHelper.checkShouldNotify({ id: "CONV1", churchId: "CHU1", contentId: "C1", ...conversation }, { id: "MSG1", churchId: "CHU1", conversationId: "CONV1" } as Message, "PER_A");
     return createNotificationsSpy.mock.calls[0][4];
   };
 
@@ -857,10 +875,10 @@ describe("NotificationHelper.checkShouldNotify note links (#1495)", () => {
   let createNotificationsSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    NotificationHelper.init({
+    NotificationHelper.init(asRepos({
       message: { loadLatestPerPerson: jest.fn(async () => [{ personId: "PER_B", messageType: "comment", timeSent: new Date("2026-10-31") }]) },
-      device: { loadForPerson: jest.fn(async () => []) }
-    } as any);
+      device: { loadForPerson: jest.fn(async (): Promise<Device[]> => []) }
+    }));
     createNotificationsSpy = jest.spyOn(NotificationHelper, "createNotifications").mockResolvedValue([]);
     loadEventMock.mockReset();
   });
@@ -870,7 +888,7 @@ describe("NotificationHelper.checkShouldNotify note links (#1495)", () => {
   });
 
   const linkFor = async (contentType: string) => {
-    await NotificationHelper.checkShouldNotify({ id: "CONV1", churchId: "CHU1", contentType, contentId: "C1", title: "Notes" } as any, { id: "MSG1", churchId: "CHU1", conversationId: "CONV1" } as any, "PER_A");
+    await NotificationHelper.checkShouldNotify({ id: "CONV1", churchId: "CHU1", contentType, contentId: "C1", title: "Notes" } as Conversation, { id: "MSG1", churchId: "CHU1", conversationId: "CONV1" } as Message, "PER_A");
     return createNotificationsSpy.mock.calls.at(-1)[5];
   };
 

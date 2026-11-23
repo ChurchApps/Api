@@ -15,7 +15,7 @@ export class DeviceContentController extends MessagingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, DeviceContent[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, DeviceContent[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<DeviceContent>[] = [];

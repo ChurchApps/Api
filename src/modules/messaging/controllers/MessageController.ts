@@ -1,7 +1,8 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { MessagingBaseController } from "./MessagingBaseController.js";
-import { Message } from "../models/index.js";
+import { Conversation, Message } from "../models/index.js";
 import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
 import { NotificationHelper } from "../helpers/NotificationHelper.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
@@ -12,7 +13,7 @@ const contentRoom = (contentType?: string, contentId?: string) =>
 @controller("/messaging/messages")
 export class MessageController extends MessagingBaseController {
   @httpGet("/conversation/:conversationId")
-  public async loadByConversation(@requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadByConversation(@requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, conversationId));
       if (!(await this.canReadConversation(au, conv))) return this.json([], 401);
@@ -22,7 +23,7 @@ export class MessageController extends MessagingBaseController {
   }
 
   @httpGet("/catchup/:churchId/:conversationId")
-  public async catchup(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message[]> {
+  public async catchup(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.conversation.loadById(churchId, conversationId);
       if (!data) return this.json([], 401);
@@ -30,11 +31,11 @@ export class MessageController extends MessagingBaseController {
       if (!(await this.canReadConversation(this.authUser(), conv))) return this.json([], 401);
       const messages: Message[] = await this.repos.message.loadForConversation(churchId, conversationId);
       return this.repos.message.convertAllToModel(messages);
-    }) as any;
+    });
   }
 
   @httpPost("/send")
-  public async send(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<any> {
+  public async send(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const promises: Promise<Message>[] = [];
       for (const message of req.body) {
@@ -94,14 +95,14 @@ export class MessageController extends MessagingBaseController {
             return savedMessage;
           })
         );
-      }) as any;
+      });
       const result = await Promise.all(promises);
-      return this.repos.message.convertAllToModel(result as any[]);
-    }) as any;
+      return this.repos.message.convertAllToModel(result);
+    });
   }
 
   @httpPost("/setCallout")
-  public async setCallout(req: express.Request<{}, {}, Message>, res: express.Response): Promise<Message> {
+  public async setCallout(req: express.Request<{}, {}, Message>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const message = req.body;
@@ -116,11 +117,11 @@ export class MessageController extends MessagingBaseController {
       });
 
       return message;
-    }) as any;
+    });
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message> {
+  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.message.loadById(churchId, id);
       if (!data) return this.json({}, 401);
@@ -131,13 +132,13 @@ export class MessageController extends MessagingBaseController {
       const conv = this.repos.conversation.convertToModel(convData);
       if (!(await this.canReadConversation(this.authUser(), conv))) return this.json({}, 401);
       return message;
-    }) as any;
+    });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const previous = new Map<string, any>();
+      const previous = new Map<string, Message>();
       for (const message of req.body) {
         const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
         if (this.isNote(conv?.contentType) && !(await this.canUseNotes(au, conv, "post"))) return this.json({}, 401);
@@ -210,15 +211,15 @@ export class MessageController extends MessagingBaseController {
             return savedMessage;
           })
         );
-      }) as any;
+      });
       const result = await Promise.all(promises);
-      return this.repos.message.convertAllToModel(result as any[]);
-    }) as any;
+      return this.repos.message.convertAllToModel(result);
+    });
   }
 
   // Toggle an emoji reaction on a message (delete the caller's existing one, else add).
   @httpPost("/:messageId/reactions")
-  public async toggleReaction(@requestParam("messageId") messageId: string, req: express.Request<{}, {}, { emoji: string }>, res: express.Response): Promise<any> {
+  public async toggleReaction(@requestParam("messageId") messageId: string, req: express.Request<{}, {}, { emoji: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const emoji = (req.body?.emoji || "").toString();
       if (!emoji) return this.json({ error: "emoji is required" }, 400);
@@ -248,20 +249,20 @@ export class MessageController extends MessagingBaseController {
       });
 
       return { messageId, emoji, added };
-    }) as any;
+    });
   }
 
   // Creating a message. Group feeds are stricter than participating (leader-only announcements and the
   // group's per-feed toggles); everything else is the participation rule. Reactions stay on
   // canParticipate so members can still react in a feed they cannot post to.
-  private async canPost(au: any, conv: any): Promise<boolean> {
+  private async canPost(au: AuthenticatedUser, conv: Conversation): Promise<boolean> {
     if (this.isGroupFeed(conv.contentType)) return this.canPostToGroupFeed(au, conv.contentType, conv.contentId);
     return this.canParticipate(au, conv);
   }
 
   // Group / announcement conversations gate on group membership; DMs on being a
   // participant; staff with content.edit may always act (moderation).
-  private async canParticipate(au: any, conv: any): Promise<boolean> {
+  private async canParticipate(au: AuthenticatedUser, conv: Conversation): Promise<boolean> {
     if (this.isNote(conv.contentType)) return this.canUseNotes(au, conv, "post");
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv.contentType === "group" || conv.contentType === "groupAnnouncement") {
@@ -276,7 +277,7 @@ export class MessageController extends MessagingBaseController {
 
   // Staff with content.edit moderate anywhere; group leaders moderate their own group's
   // conversations. Person notes are never leader-moderated - they run through the notes RBAC.
-  private async canModerate(au: any, conv: any): Promise<boolean> {
+  private async canModerate(au: AuthenticatedUser, conv: Conversation): Promise<boolean> {
     if (this.isNote(conv?.contentType)) return this.canUseNotes(au, conv, "post");
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv?.contentType === "group" || conv?.contentType === "groupAnnouncement") {
@@ -287,14 +288,14 @@ export class MessageController extends MessagingBaseController {
 
   // Notes share this route with chat, which the universal audit opts out of, so note edits and deletes
   // are logged here explicitly. Chat is never logged.
-  private async logNoteAudit(req: express.Request, au: any, conv: any, action: string, details: object) {
+  private async logNoteAudit(req: express.Request, au: AuthenticatedUser, conv: Conversation, action: string, details: object) {
     if (!this.isNote(conv?.contentType)) return;
     const category = this.isPersonNote(conv.contentType) ? "person" : conv.contentType === "groupNote" ? "group" : "settings";
     await this.writeAuditLog(req, au, category, action, "note", conv.contentId, details);
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const message = await this.repos.message.loadById(au.churchId, id);
       if (Object.keys(message).length === 0) {
@@ -323,9 +324,9 @@ export class MessageController extends MessagingBaseController {
         conversationId: message.conversationId,
         action: "deleteMessage",
         data: { id }
-      })) as any;
+      }));
 
       return this.json({ message: "Message deleted successfully" }, 200);
-    }) as any;
+    });
   }
 }

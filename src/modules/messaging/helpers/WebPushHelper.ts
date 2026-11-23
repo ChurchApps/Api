@@ -4,6 +4,9 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 
 export const WEB_PUSH_PREFIX = "webpush:";
 
+// What a failed webpush.sendNotification throws (web-push's WebPushError), or any other error.
+type PushSendError = { statusCode?: number; headers?: Record<string, string>; body?: string; message?: string } | null | undefined;
+
 export interface WebPushSubscriptionPayload {
   endpoint: string;
   keys: {
@@ -54,7 +57,7 @@ export class WebPushHelper {
     }
   }
 
-  private static classifyError(err: any): { gone: boolean; retryable: boolean; diagnosticCode: string } {
+  private static classifyError(err: PushSendError): { gone: boolean; retryable: boolean; diagnosticCode: string } {
     const statusCode: number | undefined = err?.statusCode;
     if (statusCode === 404 || statusCode === 410) return { gone: true, retryable: false, diagnosticCode: "subscription-gone" };
     if (statusCode === 401 || statusCode === 403) return { gone: false, retryable: false, diagnosticCode: "vapid-auth-failed" };
@@ -258,7 +261,8 @@ export class WebPushHelper {
             endpoint: endpointSummary.endpoint,
             endpointHost: endpointSummary.endpointHost
           };
-        } catch (err: any) {
+        } catch (caught) {
+          const err = caught as PushSendError;
           const statusCode: number | undefined = err?.statusCode;
           const classification = WebPushHelper.classifyError(err);
           console.error("[webpush] send failed", {

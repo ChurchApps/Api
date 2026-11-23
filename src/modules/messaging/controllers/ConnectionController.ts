@@ -19,7 +19,7 @@ export class ConnectionController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:conversationId")
-  public async load(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async load(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!(await this.canAccessConnection(churchId, conversationId))) return this.json([], 401);
       const data = await this.repos.connection.loadForConversation(churchId, conversationId);
@@ -29,7 +29,7 @@ export class ConnectionController extends MessagingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Connection[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Connection[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const au = this.authUser();
 
@@ -99,7 +99,7 @@ export class ConnectionController extends MessagingBaseController {
     @requestParam("socketId") socketId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!(await this.canAccessConnection(churchId, conversationId))) return this.json({}, 401);
       await this.repos.connection.deleteForRoom(churchId, conversationId, socketId);
@@ -109,7 +109,7 @@ export class ConnectionController extends MessagingBaseController {
   }
 
   @httpPost("/setName")
-  public async setName(req: express.Request<{}, {}, { socketId: string; name: string }>, res: express.Response): Promise<any> {
+  public async setName(req: express.Request<{}, {}, { socketId: string; name: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const connections = await this.repos.connection.loadBySocketId(req.body.socketId);
       const au = this.authUser();

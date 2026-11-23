@@ -1,5 +1,6 @@
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { TextingProviderRepo } from "../repositories/index.js";
 
 export interface LoadedTextingConfig {
   providerName: string;
@@ -12,9 +13,9 @@ export interface LoadedTextingConfig {
 
 export class TextingConfigHelper {
   // MinistryStuff is first-party: churches store no credentials; the service key + url come from our environment.
-  static async load(textingProviderRepo: any, churchId: string): Promise<LoadedTextingConfig | null> {
+  static async load(textingProviderRepo: Pick<TextingProviderRepo, "loadByChurchId" | "convertAllToModel">, churchId: string): Promise<LoadedTextingConfig | null> {
     const rows = await textingProviderRepo.loadByChurchId(churchId);
-    const list = textingProviderRepo.convertAllToModel(rows as any[]);
+    const list = textingProviderRepo.convertAllToModel(rows);
     if (!list.length) return null;
     const p = list[0];
     if (!p.enabled) return null;
