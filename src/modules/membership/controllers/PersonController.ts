@@ -492,7 +492,8 @@ export class PersonController extends MembershipBaseController {
         const fieldConditions = conditions.filter((c) => typeof c.field === "string" && c.field.startsWith("personField_"));
         const standardConditions = conditions.filter((c) => !(typeof c.field === "string" && c.field.startsWith("personField_")));
         if (fieldConditions.length) data = await ListRuleHelper.filterByFieldConditions(au.churchId, data, fieldConditions, this.repos);
-        data = PersonConditionHelper.apply(data, standardConditions);
+        const timeZone = PersonConditionHelper.usesThisMonth(standardConditions) ? (await this.repos.church.loadById(au.churchId))?.timeZone : undefined;
+        data = PersonConditionHelper.apply(data, standardConditions, timeZone);
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
         return await this.filterPeople(result, au);
       }
