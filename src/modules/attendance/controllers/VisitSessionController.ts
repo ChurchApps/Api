@@ -5,6 +5,7 @@ import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { VisitSession, Visit, Session, ServiceTime } from "../models/index.js";
 import { Permissions, Environment } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
+import { CheckedInByHelper } from "../helpers/CheckedInByHelper.js";
 
 // The fields read from membership's /groupmembers/basic/:groupId response.
 export interface GroupMemberBasic {
@@ -23,6 +24,7 @@ export interface SessionDownloadRow {
   checkinTime: Date | null;
   checkoutTime: Date | null;
   checkedOutBy: string;
+  checkedInBy: string;
   checkinType: string;
 }
 
@@ -38,6 +40,7 @@ export function toSessionDownloadRow(member: GroupMemberBasic, session: Session,
     checkinTime: visit?.checkinTime || null,
     checkoutTime: visit?.checkoutTime || null,
     checkedOutBy: visit?.checkedOutBy || "",
+    checkedInBy: visit?.checkedInBy || "",
     checkinType: visit?.checkinType || ""
   };
 }
@@ -100,6 +103,7 @@ export class VisitSessionController extends AttendanceBaseController {
         const session: Session = await this.repos.session.load(au.churchId, sessionId);
 
         if (visitSessions.length > 0 && session) {
+          await CheckedInByHelper.attachNames(au.churchId, visitSessions.map((vs) => vs.visit));
           const url = apiUrl + `/groupmembers/basic/${session.groupId}`;
           const config = { headers: { Authorization: "Bearer " + au.jwt } };
           const groupMembers = (await axios.get<GroupMemberBasic[]>(url, config)).data;
@@ -139,8 +143,11 @@ export class VisitSessionController extends AttendanceBaseController {
 
       if (!au.checkAccess(Permissions.attendance.view) && !isGroupLeader) return this.json([], 401);
       else {
-        if (sessionId !== "") return (await this.repos.visitSession.loadForSession(au.churchId, sessionId)) || [];
-        else {
+        if (sessionId !== "") {
+          const visitSessions: VisitSession[] = (await this.repos.visitSession.loadForSession(au.churchId, sessionId)) || [];
+          await CheckedInByHelper.attachNames(au.churchId, visitSessions.map((vs) => vs.visit));
+          return visitSessions;
+        } else {
           const data = await this.repos.visitSession.loadAll(au.churchId);
           return this.repos.visitSession.convertAllToModel(au.churchId, data) || [];
         }

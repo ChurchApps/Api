@@ -9,6 +9,8 @@ export class AttendanceRecord {
   public checkinTime?: Date;
   public checkoutTime?: Date;
   public checkedOutBy?: string;
+  public checkedInById?: string;
+  public checkedInBy?: string;
   public week?: number;
   public count?: number;
   // public gender?: string;*/

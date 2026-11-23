@@ -3,6 +3,7 @@ import type express from "express";
 
 jest.mock("../AttendanceBaseController", () => ({ AttendanceBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { attendance: { view: "v", viewSummary: "vs" } } }));
+jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadPeople: jest.fn(async () => []) }) }));
 
 import { AttendanceRecordController } from "../AttendanceRecordController.js";
 import type { AttendanceSessionStatusRow } from "../../repositories/AttendanceRepo.js";
