@@ -120,3 +120,22 @@ describe("PersonConditionHelper list operators", () => {
     expect(ids(PersonConditionHelper.apply(rows, [{ field: "id", operator: "notIn", value: "m1,m2" } as any]))).toEqual(["m3", "m4"]);
   });
 });
+
+describe("PersonConditionHelper this month", () => {
+  it("resolves the month in the church's time zone", () => {
+    const now = new Date("2026-12-01T03:00:00Z");
+    expect(PersonConditionHelper.resolveMonth("thisMonth", "America/Chicago", now)).toBe("11");
+    expect(PersonConditionHelper.resolveMonth("thisMonth", "Europe/London", now)).toBe("12");
+    expect(PersonConditionHelper.resolveMonth("5", "America/Chicago", now)).toBe("5");
+  });
+
+  it("matches birth and anniversary months against the current month", () => {
+    const month = parseInt(PersonConditionHelper.resolveMonth("thisMonth", "UTC"), 10);
+    const rows = [
+      { id: "now", birthDate: new Date(1990, month - 1, 15), anniversary: new Date(2010, month - 1, 15) },
+      { id: "later", birthDate: new Date(1990, month % 12, 15), anniversary: new Date(2010, month % 12, 15) }
+    ];
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "birthMonth", operator: "equals", value: "thisMonth" } as any], "UTC"))).toEqual(["now"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "anniversaryMonth", operator: "equals", value: "thisMonth" } as any], "UTC"))).toEqual(["now"]);
+  });
+});

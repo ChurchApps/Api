@@ -6,13 +6,17 @@ import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 // Person-field condition semantics shared by /people/advancedSearch and the list
 // rules engine, so derived fields (age, months, multi-column phone) match exactly.
 export class PersonConditionHelper {
-  public static apply(data: any[], conditions: SearchCondition[]) {
+  public static apply(data: any[], conditions: SearchCondition[], timeZone?: string) {
     let result = data;
-    conditions.forEach((c) => { result = this.applyOne(result, c); });
+    conditions.forEach((c) => { result = this.applyOne(result, c, timeZone); });
     return result;
   }
 
-  public static applyOne(data: any[], conditionIn: SearchCondition) {
+  public static usesThisMonth(conditions: SearchCondition[]) {
+    return conditions.some((c) => c.value === "thisMonth");
+  }
+
+  public static applyOne(data: any[], conditionIn: SearchCondition, timeZone?: string) {
     if (conditionIn.operator === "lastDays") return this.applyLastDays(data, conditionIn);
     // "notEquals" is the search screen's spelling of the helper's "notEqual".
     const c = conditionIn.operator === "notEquals" ? { ...conditionIn, operator: "notEqual" as const } : conditionIn;
@@ -27,10 +31,10 @@ export class PersonConditionHelper {
         return ArrayHelper.getAllOperator(data, "yearsMarried", c.value, c.operator, "number");
       case "birthMonth":
         data.forEach((p) => { p.birthMonth = PersonHelper.getBirthMonth(p.birthDate); });
-        return ArrayHelper.getAllOperator(data, "birthMonth", c.value, c.operator, "number");
+        return ArrayHelper.getAllOperator(data, "birthMonth", this.resolveMonth(c.value, timeZone), c.operator, "number");
       case "anniversaryMonth":
         data.forEach((p) => { p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversary); });
-        return ArrayHelper.getAllOperator(data, "anniversaryMonth", c.value, c.operator, "number");
+        return ArrayHelper.getAllOperator(data, "anniversaryMonth", this.resolveMonth(c.value, timeZone), c.operator, "number");
       case "birthDate":
       case "anniversary":
       case "dateAdded": {
@@ -54,6 +58,12 @@ export class PersonConditionHelper {
       default:
         return ArrayHelper.getAllOperator(data, c.field, c.value, c.operator);
     }
+  }
+
+  // "thisMonth" is resolved when the condition runs, in the church's time zone, so saved lists follow the calendar.
+  public static resolveMonth(value: string, timeZone?: string, now: Date = new Date()) {
+    if (value !== "thisMonth") return value;
+    return String(parseInt(DateHelper.toChurchTime(now, timeZone).substring(5, 7), 10));
   }
 
   private static applyList(data: any[], c: SearchCondition) {
