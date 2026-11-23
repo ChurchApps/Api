@@ -63,4 +63,10 @@ describe("EventRepo.save location", () => {
     const q = await run((r) => r.save({ id: "E1", churchId: "C1", title: "Picnic", location: "" }));
     expect(locationParam(q)).toBeNull();
   });
+
+  it("leaves the stored location alone when an update omits it", async () => {
+    const q = await run((r) => r.save({ id: "E1", churchId: "C1", title: "Picnic" }));
+    expect(q.sql).toMatch(/^update `events`/);
+    expect(q.sql).not.toContain("`location`");
+  });
 });

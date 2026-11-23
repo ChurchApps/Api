@@ -61,7 +61,8 @@ export class EventRepo {
       end,
       title: model.title,
       description: model.description,
-      location: model.location || null,
+      // Undefined leaves the stored location alone, so a client that does not send the field keeps it.
+      location: model.location === undefined ? undefined : model.location || null,
       visibility: model.visibility,
       recurrenceRule: model.recurrenceRule,
       registrationEnabled: model.registrationEnabled,
