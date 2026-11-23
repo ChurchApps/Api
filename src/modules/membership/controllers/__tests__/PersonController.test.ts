@@ -34,6 +34,7 @@ function personController(opts: any = {}) {
       delete: jest.fn(),
       deleteByIds: jest.fn(),
       findPossibleDuplicates: jest.fn(async () => opts.duplicates ?? []),
+      findPossibleDuplicatePairs: jest.fn(async () => opts.duplicatePairs ?? []),
       loadByIds: jest.fn(async () => opts.rowsByIds ?? []),
       convertAllToBasicModel: (_c: string, rows: any[]) => rows.map((r) => ({
         id: r.id,
@@ -618,6 +619,37 @@ describe("PersonController.duplicates", () => {
     const { controller } = personController({ access: ["peopleView"], duplicates: [] });
     const result = await (controller as any).duplicates({ body: { email: "nobody@x.org" } }, {});
     expect(result).toEqual([]);
+  });
+});
+
+describe("PersonController.getPossibleDuplicates", () => {
+  it("requires people.edit (401 for view-only)", async () => {
+    const { controller, repos } = personController({ access: ["peopleView"] });
+    const result: any = await (controller as any).getPossibleDuplicates({}, {});
+    expect(result.status).toBe(401);
+    expect(repos.person.findPossibleDuplicatePairs).not.toHaveBeenCalled();
+  });
+
+  it("returns pairs with both people, sorted by the first person's name, dropping pairs with a missing person", async () => {
+    const rows = [
+      { id: "a", name: { first: "Zed", last: "Young" } },
+      { id: "b", name: { first: "Zed", last: "Young" } },
+      { id: "c", name: { first: "Ann", last: "Adams" } },
+      { id: "d", name: { first: "Ann", last: "Adams" } }
+    ];
+    const duplicatePairs = [
+      { personId1: "a", personId2: "b", matchedOn: ["email"] },
+      { personId1: "c", personId2: "d", matchedOn: ["phone", "nameBirthDate"] },
+      { personId1: "c", personId2: "gone", matchedOn: ["email"] }
+    ];
+    const { controller, repos } = personController({ access: ["peopleEdit"], duplicatePairs, rowsByIds: rows });
+    const result: any = await (controller as any).getPossibleDuplicates({}, {});
+    expect(repos.person.findPossibleDuplicatePairs).toHaveBeenCalledWith("c1");
+    expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["a", "b", "c", "d", "gone"]);
+    expect(result).toEqual([
+      { person1: rows[2], person2: rows[3], matchedOn: ["phone", "nameBirthDate"] },
+      { person1: rows[0], person2: rows[1], matchedOn: ["email"] }
+    ]);
   });
 });
 
