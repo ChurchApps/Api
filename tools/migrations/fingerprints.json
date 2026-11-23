@@ -2556,6 +2556,17 @@
     }
    ],
    "schemaChanges": 2
+  },
+  "2026-11-23_workflowSteps_instructions": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "workflowSteps",
+     "column": "instructions",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  }
 }
