@@ -129,8 +129,11 @@ export class FormController extends MembershipBaseController {
       // JSON strings, and re-saving those would encode them a second time.
       const questions = this.repos.question.convertAllToModel(au.churchId, await this.repos.question.loadForForm(au.churchId, id));
       const savedForm = await this.repos.form.save({ ...form, id: undefined, name: form.name + " (Copy)", archived: false });
+      const newIds: Record<string, string> = {};
       for (const q of questions) {
-        await this.repos.question.save({ ...q, id: undefined, formId: savedForm.id });
+        const showIf = q.showIf?.questionId ? { ...q.showIf, questionId: newIds[q.showIf.questionId] } : null;
+        const saved = await this.repos.question.save({ ...q, id: undefined, formId: savedForm.id, showIf });
+        newIds[q.id] = saved.id;
       }
       return savedForm;
     });

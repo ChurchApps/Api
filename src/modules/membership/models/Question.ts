@@ -1,3 +1,8 @@
+export interface QuestionCondition {
+  questionId?: string;
+  value?: string;
+}
+
 export class Question {
   public id?: string;
   public churchId?: string;
@@ -10,4 +15,5 @@ export class Question {
   public sort?: string;
   public choices?: string;
   public required?: boolean;
+  public showIf?: QuestionCondition | null;
 }

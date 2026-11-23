@@ -872,6 +872,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-23_question_show_if": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "questions",
+     "column": "showIf",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {

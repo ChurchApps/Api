@@ -2,7 +2,7 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
-import { Question } from "../models/index.js";
+import { Question, QuestionCondition } from "../models/index.js";
 
 @injectable()
 export class QuestionRepo {
@@ -25,6 +25,7 @@ export class QuestionRepo {
       sort: question.sort,
       required: question.required,
       choices,
+      showIf: QuestionRepo.serializeShowIf(question.showIf),
       removed: false
     }).execute();
     return question;
@@ -41,7 +42,8 @@ export class QuestionRepo {
       placeholder: question.placeholder,
       sort: question.sort,
       required: question.required,
-      choices
+      choices,
+      showIf: QuestionRepo.serializeShowIf(question.showIf)
     }).where("id", "=", question.id).where("churchId", "=", question.churchId).execute();
     return question;
   }
@@ -130,7 +132,8 @@ export class QuestionRepo {
       required: row.required,
       sort: row.sort,
       // Question.choices is typed as a string, but clients get the parsed array.
-      choices: QuestionRepo.parseChoices(row.choices) as string
+      choices: QuestionRepo.parseChoices(row.choices) as string,
+      showIf: QuestionRepo.parseShowIf(row.showIf)
     };
     return result;
   }
@@ -141,6 +144,21 @@ export class QuestionRepo {
       try { return JSON.stringify(JSON.parse(choices)); } catch { /* plain text, encode as-is */ }
     }
     return JSON.stringify(choices);
+  }
+
+  private static serializeShowIf(showIf: QuestionCondition | null | undefined) {
+    if (!showIf?.questionId) return null;
+    return JSON.stringify({ questionId: showIf.questionId, value: showIf.value || "" });
+  }
+
+  private static parseShowIf(raw: any): QuestionCondition | null {
+    if (!raw) return null;
+    try {
+      const value = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return value?.questionId ? { questionId: value.questionId, value: value.value || "" } : null;
+    } catch {
+      return null;
+    }
   }
 
   // Forms copied before the duplicate fix (#1097) hold choices JSON-encoded twice, so one
