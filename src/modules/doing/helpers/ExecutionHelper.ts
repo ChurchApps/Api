@@ -1,5 +1,6 @@
 import { Repos } from "../repositories/index.js";
 import { AutomationExecution, Task, WorkflowTrigger } from "../models/index.js";
+import { ConditionHelper } from "./ConditionHelper.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
 import { FilterMatcher } from "./FilterMatcher.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
@@ -91,7 +92,8 @@ export class ExecutionHelper {
     if (peopleIds.length === 0) return { created: 0, skipped: 0 };
 
     let skipped = 0;
-    const existing = (await repos.task.loadByTriggerIdContent(rule.churchId, rule.id, rule.recurs || "", "person", peopleIds)) as Task[];
+    const since = ConditionHelper.periodStart(rule.recurs, await ConditionHelper.churchToday(rule.churchId));
+    const existing = (await repos.task.loadByTriggerIdContent(rule.churchId, rule.id, since, "person", peopleIds)) as Task[];
     if (existing.length > 0) {
       const seen = new Set(existing.map((t) => t.associatedWithId));
       const before = peopleIds.length;
@@ -208,7 +210,8 @@ export class ExecutionHelper {
   private static async alreadyApplied(execution: AutomationExecution, trigger: WorkflowTrigger, repos: Repos): Promise<boolean> {
     if (!execution.subjectId) return false;
     if (trigger.triggerKind === "schedule") {
-      const existing = (await repos.task.loadByTriggerIdContent(execution.churchId || "", trigger.id || "", trigger.recurs || "", execution.subjectType || "person", [execution.subjectId])) as Task[];
+      const since = ConditionHelper.periodStart(trigger.recurs, await ConditionHelper.churchToday(execution.churchId));
+      const existing = (await repos.task.loadByTriggerIdContent(execution.churchId || "", trigger.id || "", since, execution.subjectType || "person", [execution.subjectId])) as Task[];
       if (existing.length > 0) return true;
     }
     if (!FilterMatcher.toBool(trigger.oncePerSubject)) return false;

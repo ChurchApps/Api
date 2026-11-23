@@ -3,5 +3,6 @@ export class Setting {
   public churchId?: string;
   public keyName?: string;
   public value?: string;
-  public public?: string;
+  // bit(1) column: clients send 1/0 or true/false.
+  public public?: string | number | boolean;
 }

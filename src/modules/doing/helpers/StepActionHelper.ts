@@ -216,7 +216,7 @@ export class StepActionHelper {
       this.appendHistory(task, "Text skipped: no mobile phone");
       return;
     }
-    if (person.optedOut === true || person.optedOut === 1) {
+    if (person.smsOptedOut === true || person.smsOptedOut === 1) {
       this.appendHistory(task, "Text skipped: opted out");
       return;
     }

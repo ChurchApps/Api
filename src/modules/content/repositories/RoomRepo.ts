@@ -19,7 +19,8 @@ export class RoomRepo {
       description: model.description,
       capacity: model.capacity,
       approvalGroupId: model.approvalGroupId,
-      active: model.active ?? true
+      active: model.active ?? true,
+      categoryName: model.categoryName?.trim() || null
     }).execute();
     return model;
   }
@@ -30,7 +31,8 @@ export class RoomRepo {
       description: model.description,
       capacity: model.capacity,
       approvalGroupId: model.approvalGroupId ?? null,
-      active: model.active ?? true
+      active: model.active ?? true,
+      categoryName: model.categoryName?.trim() || null
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }

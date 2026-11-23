@@ -6,4 +6,5 @@ export class Resource {
   quantity?: number;
   approvalGroupId?: string;
   active?: boolean;
+  categoryName?: string;
 }
