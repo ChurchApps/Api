@@ -253,20 +253,21 @@ export class WorkflowHelper {
     return await this.closeCard(task, repos);
   }
 
-  public static async snooze(task: Task, days: number, repositories?: Repos): Promise<Task> {
+  public static async snooze(task: Task, until: number | Date, repositories?: Repos): Promise<Task> {
     const repos = await this.getRepos(repositories);
-    task.snoozedUntil = DateHelper.addDays(new Date(), Number(days));
+    task.snoozedUntil = until instanceof Date ? until : DateHelper.addDays(new Date(), Number(until));
     return await repos.task.save(task);
   }
 
-  public static async reassign(task: Task, target: AssignTarget, repositories?: Repos): Promise<Task> {
+  public static async reassign(task: Task, target: AssignTarget, repositories?: Repos, actorPersonId?: string): Promise<Task> {
     const repos = await this.getRepos(repositories);
     if (target.id !== task.assignedToId) StepActionHelper.appendHistory(task, `Reassigned from ${task.assignedToLabel || "unassigned"} to ${target.label || "unassigned"}`);
     task.assignedToType = target.type;
     task.assignedToId = target.id;
     task.assignedToLabel = target.label;
     const saved = await repos.task.save(task);
-    await this.notifyAssignee(saved, `You have been assigned a card: ${saved.title || ""}`);
+    const selfAssigned = target.type === "person" && !!actorPersonId && target.id === actorPersonId;
+    if (!selfAssigned) await this.notifyAssignee(saved, `You have been assigned a card: ${saved.title || ""}`);
     return saved;
   }
 
