@@ -81,6 +81,7 @@ export class CuratedEventRepo {
         "e.groupId",
         "e.title",
         "e.description",
+        "e.location",
         "e.start",
         "e.end",
         "e.allDay",

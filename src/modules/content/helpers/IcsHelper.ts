@@ -1,6 +1,7 @@
 interface ParsedIcsEvent {
   title?: string;
   description?: string;
+  location?: string;
   start?: Date;
   end?: Date;
   allDay?: boolean;
@@ -62,6 +63,7 @@ export class IcsHelper {
 
     if (props["SUMMARY"]) ev.title = this.unescapeText(props["SUMMARY"].value);
     if (props["DESCRIPTION"]) ev.description = this.unescapeText(props["DESCRIPTION"].value);
+    if (props["LOCATION"]) ev.location = this.unescapeText(props["LOCATION"].value).slice(0, 255);
     if (props["RRULE"]) ev.recurrenceRule = props["RRULE"].value;
     return ev;
   }

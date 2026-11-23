@@ -19,6 +19,7 @@ interface EventRequestBody {
   groupId?: string;
   title?: string;
   description?: string;
+  location?: string;
   start?: string;
   end?: string;
   allDay?: boolean;
@@ -118,7 +119,7 @@ export class EventController extends ContentBaseController {
         const roomEvents = await this.repos.event.loadForRoom(req.query.churchId.toString(), req.query.roomId.toString());
         if (roomEvents && roomEvents.length > 0) {
           await CalendarHelper.addExceptionDates(roomEvents, this.repos);
-          const masked = roomEvents.map((e: Event) => (e.visibility === "public" ? e : { ...e, title: "Reserved", description: "" }));
+          const masked = roomEvents.map((e: Event) => (e.visibility === "public" ? e : { ...e, title: "Reserved", description: "", location: "" }));
           newEvents = this.populateEventsForICS(masked);
         }
       } else if (req.query.curatedCalendarId) {
@@ -318,6 +319,7 @@ export class EventController extends ContentBaseController {
         groupId,
         title: typeof req.body.title === "string" ? req.body.title.slice(0, 255) : undefined,
         description: typeof req.body.description === "string" ? req.body.description.slice(0, 10000) : undefined,
+        location: typeof req.body.location === "string" ? req.body.location.slice(0, 255) : undefined,
         start: req.body.start ? new Date(req.body.start) : undefined,
         end: req.body.end ? new Date(req.body.end) : undefined,
         allDay: req.body.allDay,
@@ -349,6 +351,7 @@ export class EventController extends ContentBaseController {
           groupId: req.body.groupId,
           title: ev.title || "(untitled)",
           description: ev.description,
+          location: ev.location,
           start: ev.start,
           end: ev.end,
           allDay: ev.allDay,
@@ -496,6 +499,7 @@ export class EventController extends ContentBaseController {
         title: ev.title,
         description: ev.description || ""
       };
+      if (ev.location) newEv.location = ev.location;
       if (ev.recurrenceRule) newEv.recurrenceRule = ev.recurrenceRule;
       // ics writes a bare "EXDATE:" for an empty array, which strict clients reject
       const exclusionDates = (ev.exceptionDates || []).map((d) => new Date(d).getTime());

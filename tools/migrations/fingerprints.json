@@ -1695,6 +1695,17 @@
     }
    ],
    "schemaChanges": 2
+  },
+  "2026-11-23_event_location": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "location",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "giving": {

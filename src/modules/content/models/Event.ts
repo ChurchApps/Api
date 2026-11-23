@@ -7,6 +7,7 @@ export class Event {
   end?: Date;
   title?: string;
   description?: string;
+  location?: string;
   visibility?: string;
   recurrenceRule?: string;
   exceptionDates?: Date[];
