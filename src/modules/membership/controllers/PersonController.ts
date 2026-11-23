@@ -411,6 +411,21 @@ export class PersonController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/possibleDuplicates")
+  public async getPossibleDuplicates(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+      const pairs = await this.repos.person.findPossibleDuplicatePairs(au.churchId);
+      const ids = Array.from(new Set(pairs.flatMap((p) => [p.personId1, p.personId2])));
+      const people = this.repos.person.convertAllToModelWithPermissions(au.churchId, await this.repos.person.loadByIds(au.churchId, ids), true);
+      const byId = new Map(people.map((p) => [p.id, p]));
+      return pairs
+        .filter((p) => byId.has(p.personId1) && byId.has(p.personId2))
+        .map((p) => ({ person1: byId.get(p.personId1), person2: byId.get(p.personId2), matchedOn: p.matchedOn }))
+        .sort((a, b) => (a.person1!.name?.last || "").localeCompare(b.person1!.name?.last || "") || (a.person1!.name?.first || "").localeCompare(b.person1!.name?.first || ""));
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
