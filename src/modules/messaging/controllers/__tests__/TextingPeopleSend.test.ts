@@ -17,7 +17,7 @@ import { RepoManager } from "../../../../shared/infrastructure/RepoManager.js";
 const people = [
   { id: "p1", firstName: "Donald", lastName: "Clark", displayName: "Donald Clark", mobilePhone: "+15550001" },
   { id: "p2", firstName: "Carol", lastName: "Clark", displayName: "Carol Clark", mobilePhone: "+1 555-0001" },
-  { id: "p3", firstName: "Ann", lastName: "Lee", displayName: "Ann Lee", mobilePhone: "+15550003", optedOut: 1 },
+  { id: "p3", firstName: "Ann", lastName: "Lee", displayName: "Ann Lee", mobilePhone: "+15550003", smsOptedOut: 1 },
   { id: "p4", firstName: "Bob", lastName: "Ray", displayName: "Bob Ray", mobilePhone: "" }
 ];
 

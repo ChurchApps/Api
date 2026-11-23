@@ -378,7 +378,7 @@ export class TextingController extends MessagingBaseController {
       firstName: p.firstName || "",
       lastName: p.lastName || "",
       mobilePhone: p.mobilePhone || "",
-      optedOut: p.optedOut === true || p.optedOut === 1
+      optedOut: p.smsOptedOut === true || p.smsOptedOut === 1
     }));
   }
 
