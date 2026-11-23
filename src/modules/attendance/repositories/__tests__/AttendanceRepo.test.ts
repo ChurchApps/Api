@@ -16,3 +16,18 @@ describe("AttendanceRepo.rowToModel checkinTime", () => {
     expect(model.checkinTime).toBeUndefined();
   });
 });
+
+describe("AttendanceRepo.rowToModel checkout", () => {
+  it("maps checkoutTime and checkedOutBy from the row", () => {
+    const out = new Date("2026-01-04T10:15:00");
+    const model = new AttendanceRepo().convertToModel("c1", { visitDate: new Date("2026-01-04"), checkoutTime: out, checkedOutBy: "Jane Smith", groupId: "g1" });
+    expect(model.checkoutTime).toBe(out);
+    expect(model.checkedOutBy).toBe("Jane Smith");
+  });
+
+  it("leaves checkout fields undefined for a visit that was never checked out", () => {
+    const model = new AttendanceRepo().convertToModel("c1", { visitDate: new Date("2026-01-04"), groupId: "g1" });
+    expect(model.checkoutTime).toBeUndefined();
+    expect(model.checkedOutBy).toBeUndefined();
+  });
+});

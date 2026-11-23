@@ -2,11 +2,14 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
-import { VisitSession } from "../models/index.js";
+import { Visit, VisitSession } from "../models/index.js";
 import type { VisitRow } from "./VisitRepo.js";
 
-// A visitSessions row, optionally joined with the visit's personId and checkinType (loadForSession).
-export type VisitSessionRow = Omit<VisitSession, "visit" | "session"> & { personId?: string; checkinType?: string };
+// The visit columns loadForSession joins onto each visitSessions row and nests under `visit`.
+type VisitDetail = Pick<Visit, "personId" | "checkinType" | "checkinTime" | "checkoutTime" | "checkedOutBy">;
+
+// A visitSessions row, optionally joined with the visit's details (loadForSession).
+export type VisitSessionRow = Omit<VisitSession, "visit" | "session"> & VisitDetail;
 
 @injectable()
 export class VisitSessionRepo {
@@ -77,7 +80,7 @@ export class VisitSessionRepo {
   }
 
   public async loadForSession(churchId: string, sessionId: string) {
-    const rows = await sql<VisitSessionRow>`SELECT vs.*, v.personId, v.checkinType FROM visitSessions vs INNER JOIN visits v on v.id = vs.visitId WHERE vs.churchId=${churchId} AND vs.sessionId = ${sessionId}`.execute(getDb());
+    const rows = await sql<VisitSessionRow>`SELECT vs.*, v.personId, v.checkinType, v.checkinTime, v.checkoutTime, v.checkedOutBy FROM visitSessions vs INNER JOIN visits v on v.id = vs.visitId WHERE vs.churchId=${churchId} AND vs.sessionId = ${sessionId}`.execute(getDb());
     return rows.rows.map((row) => this.rowToModel(row));
   }
 
@@ -92,7 +95,14 @@ export class VisitSessionRepo {
   protected rowToModel(row: VisitSessionRow): VisitSession {
     const result: VisitSession = { id: row.id, visitId: row.visitId, sessionId: row.sessionId };
     if (row.personId !== undefined) {
-      result.visit = { id: result.visitId, personId: row.personId, checkinType: row.checkinType };
+      result.visit = {
+        id: result.visitId,
+        personId: row.personId,
+        checkinType: row.checkinType,
+        checkinTime: row.checkinTime,
+        checkoutTime: row.checkoutTime,
+        checkedOutBy: row.checkedOutBy
+      };
     }
     return result;
   }
