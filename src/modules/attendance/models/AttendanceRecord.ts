@@ -7,6 +7,8 @@ export class AttendanceRecord {
   public groupId?: string;
   public visitDate?: Date;
   public checkinTime?: Date;
+  public checkoutTime?: Date;
+  public checkedOutBy?: string;
   public week?: number;
   public count?: number;
   // public gender?: string;*/

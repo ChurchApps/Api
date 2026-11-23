@@ -7,9 +7,39 @@ import { Permissions, Environment } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 // The fields read from membership's /groupmembers/basic/:groupId response.
-interface GroupMemberBasic {
+export interface GroupMemberBasic {
   personId: string;
   displayName: string;
+}
+
+// One row of the session CSV download: every group member, present or absent.
+export interface SessionDownloadRow {
+  id: string;
+  personId: string;
+  visitId: string;
+  sessionDate: Date;
+  personName: string;
+  status: "present" | "absent";
+  checkinTime: Date | null;
+  checkoutTime: Date | null;
+  checkedOutBy: string;
+  checkinType: string;
+}
+
+export function toSessionDownloadRow(member: GroupMemberBasic, session: Session, visitSession?: VisitSession): SessionDownloadRow {
+  const visit = visitSession?.visit;
+  return {
+    id: visitSession?.id || "",
+    personId: member.personId,
+    visitId: visitSession?.visitId || "",
+    sessionDate: session.sessionDate,
+    personName: member.displayName,
+    status: visitSession ? "present" : "absent",
+    checkinTime: visit?.checkinTime || null,
+    checkoutTime: visit?.checkoutTime || null,
+    checkedOutBy: visit?.checkedOutBy || "",
+    checkinType: visit?.checkinType || ""
+  };
 }
 
 @controller("/attendance/visitsessions")
@@ -64,14 +94,7 @@ export class VisitSessionController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json([], 401);
       else {
-        const result: {
-          id: string;
-          personId: string;
-          visitId: string;
-          sessionDate: Date;
-          personName: string;
-          status: "present" | "absent";
-        }[] = [];
+        const result: SessionDownloadRow[] = [];
         const apiUrl = Environment.membershipApi;
         const visitSessions: VisitSession[] = ((await this.repos.visitSession.loadForSession(au.churchId, sessionId)) as VisitSession[]) || [];
         const session: Session = await this.repos.session.load(au.churchId, sessionId);
@@ -81,18 +104,9 @@ export class VisitSessionController extends AttendanceBaseController {
           const config = { headers: { Authorization: "Bearer " + au.jwt } };
           const groupMembers = (await axios.get<GroupMemberBasic[]>(url, config)).data;
 
-          const visitSessionPersonIds = new Set(visitSessions.map((session) => session.visit?.personId));
           groupMembers?.forEach((member) => {
-            const status = visitSessionPersonIds.has(member.personId) ? "present" : "absent";
-            const visitSession = visitSessions.find((session) => session.visit?.personId === member.personId);
-            result.push({
-              id: visitSession ? visitSession.id : "",
-              personId: member.personId,
-              visitId: visitSession ? visitSession.visitId : "",
-              sessionDate: session.sessionDate,
-              personName: member.displayName,
-              status
-            });
+            const visitSession = visitSessions.find((vs) => vs.visit?.personId === member.personId);
+            result.push(toSessionDownloadRow(member, session, visitSession));
           });
         }
         return result;
