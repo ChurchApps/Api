@@ -188,6 +188,17 @@ export class ReminderController extends MessagingBaseController {
     });
   }
 
+  // The caller's own per-entity mutes (e.g. muted groups), never anyone else's; ?entityType=group narrows the list.
+  @httpGet("/mute")
+  public async myMutes(req: express.Request, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return [];
+      const mutes = (await this.repos.notificationEntityMute.loadForPerson(au.churchId, au.personId)) as NotificationEntityMute[];
+      const entityType = typeof req.query.entityType === "string" ? req.query.entityType : "";
+      return entityType ? mutes.filter((m) => m.entityType === entityType) : mutes;
+    });
+  }
+
   @httpPost("/mute")
   public async mute(req: express.Request<{}, {}, EntityMuteBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
