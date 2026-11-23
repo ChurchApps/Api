@@ -328,6 +328,16 @@ export class GatewayService {
     await repos.gatewayPaymentMethod.deleteByExternalId(gateway.churchId, gateway.id, paymentMethodId);
   }
 
+  // null = this provider can't tell which method a recurring gift uses.
+  static async activeSubscriptionIdsUsingMethod(gateway: Gateway, paymentMethodId: string, customerId: string): Promise<string[] | null> {
+    const provider = this.getProviderFromGateway(gateway);
+    const config = this.getGatewayConfig(gateway);
+    if (provider.activeSubscriptionIdsUsingMethod) return await provider.activeSubscriptionIdsUsingMethod(config, paymentMethodId, customerId);
+    if (!provider.listNormalizedSubscriptions) return null;
+    const subs = await provider.listNormalizedSubscriptions(config, customerId);
+    return subs.filter((s) => String(s.default_payment_method) === String(paymentMethodId)).map((s) => String(s.id));
+  }
+
   static async verifySubscriptionOwnership(gateway: Gateway, subscriptionId: string, personId: string, repos: Repos): Promise<boolean> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.verifySubscriptionOwnership) {

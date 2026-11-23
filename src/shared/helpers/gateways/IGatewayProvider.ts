@@ -396,6 +396,8 @@ export interface IGatewayProvider {
   verifyMethodOwnership?(config: GatewayConfig, paymentMethodId: string, customerId: string, repos: Repos): Promise<boolean>;
   // Full provider-side delete (may cascade schedules); default is detachPaymentMethod.
   deletePaymentMethod?(config: GatewayConfig, paymentMethodId: string, customerId: string, repos: Repos): Promise<void>;
+  // Ids of the customer's live recurring gifts charged to this method; providers without it fall back to listNormalizedSubscriptions.
+  activeSubscriptionIdsUsingMethod?(config: GatewayConfig, paymentMethodId: string, customerId: string): Promise<string[]>;
   // Verifies a gateway-created subscription belongs to the person (no local row exists).
   verifySubscriptionOwnership?(config: GatewayConfig, subscriptionId: string, personId: string, repos: Repos): Promise<boolean>;
   // Maps a provider SDK error to an HTTP response; null falls through to generic handling.
