@@ -558,23 +558,13 @@ export class DonateController extends GivingBaseController {
           id: subscriptionResult.subscriptionId,
           churchId,
           personId: person.id,
-          customerId: providerCustomerId || subscriptionData.customerId
+          customerId: providerCustomerId || subscriptionData.customerId,
+          amount,
+          interval
         };
 
-        await this.repos.subscription.save(subscription);
-
-        const promises: Promise<SubscriptionFund>[] = [];
-        funds.forEach((fund: FundDonation) => {
-          const subscriptionFund: SubscriptionFund = {
-            churchId,
-            subscriptionId: subscription.id,
-            fundId: fund.id,
-            amount: fund.amount
-          };
-          promises.push(this.repos.subscriptionFunds.save(subscriptionFund));
-        });
-
-        await Promise.all(promises);
+        const subscriptionFunds: SubscriptionFund[] = funds.map((fund: FundDonation) => ({ fundId: fund.id, amount: fund.amount }));
+        await this.repos.subscription.save(subscription, subscriptionFunds);
 
         try {
           const receipt = await this.receiptContext(churchId, funds);

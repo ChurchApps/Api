@@ -12,8 +12,8 @@ interface Subject {
   label?: string;
 }
 
-// The record published with a triggerable event (person, donation, group member, form
-// submission, visit, registration or list member); each event fills only its own fields.
+// The record published with a triggerable event (person, donation, recurring gift, group member,
+// form submission, visit, registration or list member); each event fills only its own fields.
 interface TriggerEventPayload {
   id?: string;
   personId?: string;
@@ -38,6 +38,8 @@ interface TriggerEventPayload {
   eventId?: string;
   listId?: string;
   listName?: string;
+  interval?: { interval_count?: number | string; interval?: string };
+  subscriptionFunds?: { fundId?: string }[];
 }
 
 type TriggerFacts = Record<string, unknown>;
@@ -51,6 +53,15 @@ const MEMBERSHIP_STATUS_OPTIONS = [
   { value: "Staff", label: "Staff" },
   { value: "Inactive", label: "Inactive" },
   { value: "Deceased", label: "Deceased" }
+];
+
+// Recurring gift frequencies, keyed the way the giving form names them (DonationHelper.getInterval).
+const FREQUENCY_OPTIONS = [
+  { value: "one_week", label: "Weekly" },
+  { value: "two_week", label: "Every 2 Weeks" },
+  { value: "one_month", label: "Monthly" },
+  { value: "three_month", label: "Quarterly" },
+  { value: "one_year", label: "Annually" }
 ];
 
 interface TriggerFieldDef {
@@ -94,6 +105,16 @@ const EVENT_DEFS: TriggerEventDef[] = [
       { key: "donation.isFirstTime", label: "First-Time Donor", type: "select", options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] },
       { key: "person.membershipStatus", label: "Donor Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS },
       { key: "fundDonation.fundId", label: "Fund", type: "select", optionsSource: "funds" }
+    ]
+  },
+  {
+    eventType: "subscription.created",
+    label: "Recurring gift · Created",
+    recordType: "subscription",
+    fields: [
+      { key: "subscription.amount", label: "Amount", type: "number" },
+      { key: "subscriptionFund.fundId", label: "Fund", type: "select", optionsSource: "funds" },
+      { key: "subscription.frequency", label: "Frequency", type: "select", options: FREQUENCY_OPTIONS }
     ]
   },
   { eventType: "group.member.added", label: "Group · Member Joined", recordType: "group", fields: GROUP_FIELDS },
@@ -246,6 +267,19 @@ export class EventTriggerHelper {
         ];
       }
 
+      case "subscription.created":
+        if (!payload.personId) return []; // a recurring gift with no donor has no subject
+        return [
+          {
+            subject: { type: "person", id: payload.personId },
+            facts: {
+              "subscription.amount": payload.amount,
+              "subscriptionFund.fundId": (payload.subscriptionFunds || []).map((f) => f.fundId),
+              "subscription.frequency": EventTriggerHelper.frequencyKey(payload.interval)
+            }
+          }
+        ];
+
       case "group.member.added":
       case "group.member.removed":
       case "group.member.requested": {
@@ -328,6 +362,14 @@ export class EventTriggerHelper {
       default:
         return [];
     }
+  }
+
+  // { interval_count: 2, interval: "week" } -> "two_week", matching FREQUENCY_OPTIONS.
+  static frequencyKey(interval?: { interval_count?: number | string; interval?: string }): string | undefined {
+    if (!interval?.interval) return undefined;
+    const count = Math.floor(Number(interval.interval_count) || 1);
+    const word = ({ 1: "one", 2: "two", 3: "three" } as Record<number, string>)[count] || String(count);
+    return word + "_" + interval.interval;
   }
 
   // Not private so tests can spy on it; treat as internal.
