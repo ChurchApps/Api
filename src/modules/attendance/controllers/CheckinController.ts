@@ -14,8 +14,12 @@ export class CheckinController extends AttendanceBaseController {
   public async getSettings(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.checkin) && !au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
-      const gradePromotionDate = await getMembershipModuleGateway().loadSetting(au.churchId, "gradePromotionDate");
-      return { gradePromotionDate };
+      const gateway = getMembershipModuleGateway();
+      const [gradePromotionDate, checkinAnnouncement] = await Promise.all([
+        gateway.loadSetting(au.churchId, "gradePromotionDate"),
+        gateway.loadSetting(au.churchId, "checkinAnnouncement")
+      ]);
+      return { gradePromotionDate, checkinAnnouncement: checkinAnnouncement || "" };
     });
   }
 
