@@ -1,4 +1,4 @@
-// Adds the failed-payment, cancellation and refund events to every church's existing Stripe webhook endpoint (Stripe never adds events on its own).
+// Adds the failed-payment, cancellation, refund and dispute events to every church's existing Stripe webhook endpoint (Stripe never adds events on its own).
 // Usage: ENVIRONMENT=prod npx tsx tools/manual/stripe-webhook-events.ts [--apply]   (dry run without --apply)
 import "reflect-metadata";
 import Stripe from "stripe";
@@ -11,7 +11,7 @@ const apply = process.argv.includes("--apply");
 await Environment.init(process.env.ENVIRONMENT || "dev");
 
 // Not payment_intent.*: an old endpoint already gets charge.succeeded, and a gift seen as both ch_ and pi_ can be recorded twice.
-const wanted = ["invoice.payment_failed", "customer.subscription.deleted", "charge.refunded"];
+const wanted = ["invoice.payment_failed", "customer.subscription.deleted", "charge.refunded", "charge.dispute.closed"];
 const counts = { updated: 0, current: 0, noEndpoint: 0, failed: 0 };
 
 for (const gateway of await new GatewayRepo().loadByProvider("stripe")) {

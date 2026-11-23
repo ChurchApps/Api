@@ -22,6 +22,10 @@ describe("StripeGatewayProvider refunds", () => {
       expect(provider.classifyWebhookEvent("charge.refunded")).toEqual({ action: "donation", status: "refunded" });
     });
 
+    it("classifies charge.dispute.closed as a refunded donation", () => {
+      expect(provider.classifyWebhookEvent("charge.dispute.closed")).toEqual({ action: "donation", status: "refunded" });
+    });
+
     it("still classifies charge.succeeded as complete", () => {
       expect(provider.classifyWebhookEvent("charge.succeeded")).toEqual({ action: "donation", status: "complete" });
     });

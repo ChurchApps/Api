@@ -30,6 +30,8 @@ export interface ExpandableRef {
 export interface GatewayWebhookData extends GatewayObject {
   payment_intent?: string;
   latest_charge?: ExpandableRef;
+  // A Stripe dispute names its charge here.
+  charge?: string;
   reference_number?: string;
   transaction?: { id?: string };
   cancellation_details?: { reason?: string | null };
