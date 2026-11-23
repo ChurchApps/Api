@@ -10,7 +10,7 @@ jest.mock("../../helpers/index", () => ({
   CheckinTimeZoneHelper: jest.requireActual("../../helpers/CheckinTimeZoneHelper").CheckinTimeZoneHelper
 }));
 
-const gateway = { loadGroupsForCheckin: jest.fn(), loadSetting: jest.fn(), loadHouseholdPeople: jest.fn(), loadChurch: jest.fn(), loadCampusTimeZones: jest.fn(async () => ({})), loadCampusTimeZone: jest.fn(async (): Promise<string | null> => null) };
+const gateway = { loadPeople: jest.fn(async (_c: string, ids: string[]) => ids.filter((id) => id !== "outsider").map((id) => ({ id, displayName: id }))), loadGroupsForCheckin: jest.fn(), loadSetting: jest.fn(), loadHouseholdPeople: jest.fn(), loadChurch: jest.fn(), loadCampusTimeZones: jest.fn(async () => ({})), loadCampusTimeZone: jest.fn(async (): Promise<string | null> => null) };
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => gateway }));
 
 import { VisitController } from "../VisitController.js";
@@ -294,6 +294,24 @@ describe("self check-in household scoping", () => {
     const saved = repos.visit.save.mock.calls[0][0];
     expect(saved.checkinType).toBeUndefined();
     expect(saved.checkedInById).toBe("p1");
+  });
+
+  it("keeps the kiosk's checked-in-by adult when they are a person in the church", async () => {
+    const { controller, repos } = makeController({ groups: [], counts: [] });
+    const body = memberVisit();
+    body[0].checkedInById = "mom";
+    await controller.postCheckin(req(body), res);
+    expect(gateway.loadPeople).toHaveBeenCalledWith("c1", ["mom"]);
+    expect(repos.visit.save.mock.calls[0][0].checkedInById).toBe("mom");
+  });
+
+  it("drops a kiosk checked-in-by id that is not a person in the church", async () => {
+    const { controller, repos } = makeController({ groups: [], counts: [] });
+    const body = memberVisit();
+    body[0].checkedInById = "outsider";
+    await controller.postCheckin(req(body), res);
+    expect(repos.visit.save).toHaveBeenCalled();
+    expect(repos.visit.save.mock.calls[0][0].checkedInById).toBeUndefined();
   });
 
   it("allows getCheckin for the member's own household", async () => {

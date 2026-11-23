@@ -31,3 +31,10 @@ describe("AttendanceRepo.rowToModel checkout", () => {
     expect(model.checkedOutBy).toBeUndefined();
   });
 });
+
+describe("AttendanceRepo.rowToModel checked in by", () => {
+  it("maps checkedInById from the row", () => {
+    const model = new AttendanceRepo().convertToModel("c1", { visitDate: new Date("2026-01-04"), checkedInById: "mom", groupId: "g1" });
+    expect(model.checkedInById).toBe("mom");
+  });
+});

@@ -3,6 +3,7 @@ import type express from "express";
 
 jest.mock("../AttendanceBaseController", () => ({ AttendanceBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { attendance: { edit: "e" } }, Environment: {} }));
+jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadPeople: jest.fn(async () => []) }) }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("axios", () => ({ post: jest.fn() }));
 

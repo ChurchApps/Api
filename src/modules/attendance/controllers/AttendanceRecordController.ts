@@ -3,6 +3,7 @@ import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import type { AttendanceRecordRow } from "../repositories/AttendanceRepo.js";
+import { CheckedInByHelper } from "../helpers/CheckedInByHelper.js";
 
 @controller("/attendance/attendancerecords")
 export class AttendanceRecordController extends AttendanceBaseController {
@@ -125,7 +126,9 @@ export class AttendanceRecordController extends AttendanceBaseController {
           result = await this.repos.attendance.loadForPerson(au.churchId, personId);
         }
       }
-      return this.repos.attendance.convertAllToModel(au.churchId, result);
+      const records = this.repos.attendance.convertAllToModel(au.churchId, result);
+      if (records) await CheckedInByHelper.attachNames(au.churchId, records);
+      return records;
     });
   }
 }

@@ -8,6 +8,7 @@ import { SecurityCodeHelper, CheckinGateHelper, CheckinTimeZoneHelper } from "..
 import type { GateGroup, GateCount, GateIncoming, GateResult, GateServiceTime } from "../helpers/CheckinGateHelper.js";
 import type { VisitRow } from "../repositories/VisitRepo.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { CheckedInByHelper } from "../helpers/CheckedInByHelper.js";
 
 // 409 body returned when check-in gates reject a batch.
 interface GateRejection {
@@ -109,6 +110,8 @@ export class VisitController extends AttendanceBaseController {
         if (!isStaff && !(await this.inOwnHousehold(au, submittedPersonIds))) return this.json({}, 403);
         // Self check-in can't claim volunteer/guest status (it skews ratio gates) or attribute the check-in to someone else.
         if (!isStaff) req.body.forEach((v) => { if (v.checkinType !== "member") v.checkinType = undefined; v.checkedInById = au.personId; });
+        // Kiosks record the adult who looked the household up; it must be a person in this church.
+        else await CheckedInByHelper.keepChurchPeopleOnly(au.churchId, req.body);
 
         const checkDuplicates = req.query.checkDuplicates === "true";
 
@@ -263,6 +266,7 @@ export class VisitController extends AttendanceBaseController {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
         const promises: Promise<Visit>[] = [];
+        await CheckedInByHelper.keepChurchPeopleOnly(au.churchId, req.body);
         req.body.forEach((visit) => {
           visit.churchId = au.churchId;
           promises.push(
