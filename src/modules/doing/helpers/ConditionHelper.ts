@@ -44,24 +44,59 @@ export class ConditionHelper {
   }
 
   // Calendar parts of "now" in the church's time zone; the scheduler runs in UTC.
-  private static async churchToday(churchId?: string): Promise<ChurchToday> {
+  public static async churchToday(churchId?: string): Promise<ChurchToday> {
     let timeZone: string | undefined;
     try {
       if (churchId) timeZone = (await getMembershipModuleGateway().loadChurch(churchId))?.timeZone || undefined;
     } catch { /* fall back to server time */ }
     let parts: Intl.DateTimeFormatPart[];
     try {
-      parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).formatToParts(new Date());
+      parts = this.zonedParts(new Date(), timeZone);
     } catch {
-      parts = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).formatToParts(new Date());
+      timeZone = undefined;
+      parts = this.zonedParts(new Date(), undefined);
     }
     const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
     return {
       iso: `${get("year")}-${get("month")}-${get("day")}`,
       dayOfMonth: parseInt(get("day"), 10),
       dayOfWeek: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday")) + 1,
-      month: parseInt(get("month"), 10)
+      month: parseInt(get("month"), 10),
+      hour: parseInt(get("hour"), 10) % 24,
+      timeZone
     };
+  }
+
+  // Start of the current repeat period in church-local days, so the dedupe compares days rather than seconds:
+  // daily = today, weekly = the last 7 days, monthly/yearly = since the day after the same date last month/year.
+  public static periodStart(recurs: string | undefined, today: ChurchToday): Date | null {
+    const [y, m, d] = today.iso.split("-").map((v) => parseInt(v, 10));
+    let start: Date;
+    switch (recurs) {
+      case "daily": start = new Date(Date.UTC(y, m - 1, d)); break;
+      case "weekly": start = new Date(Date.UTC(y, m - 1, d - 6)); break;
+      case "monthly": start = new Date(Date.UTC(y, m - 2, d + 1)); break;
+      case "yearly": start = new Date(Date.UTC(y - 1, m - 1, d + 1)); break;
+      default: return null; // no repeat: any prior card dedups
+    }
+    return this.zonedMidnight(start, today.timeZone);
+  }
+
+  // The UTC instant of local midnight on the given calendar date (read from its UTC fields).
+  private static zonedMidnight(date: Date, timeZone?: string): Date {
+    const offsetAt = (instant: number) => {
+      const parts = this.zonedParts(new Date(instant), timeZone);
+      const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value || "0", 10);
+      return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second")) - instant;
+    };
+    const target = date.getTime();
+    let result = target - offsetAt(target);
+    result = target - offsetAt(result);
+    return new Date(result);
+  }
+
+  private static zonedParts(date: Date, timeZone?: string) {
+    return new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(date);
   }
 
   public static evalSimpleCondition(condition: Condition, today: ChurchToday) {
@@ -117,4 +152,4 @@ export class ConditionHelper {
   }
 }
 
-interface ChurchToday { iso: string; dayOfMonth: number; dayOfWeek: number; month: number }
+export interface ChurchToday { iso: string; dayOfMonth: number; dayOfWeek: number; month: number; hour: number; timeZone?: string }

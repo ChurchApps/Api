@@ -2,7 +2,7 @@ import { RepoManager } from "../infrastructure/RepoManager.js";
 import { civilDate, civilISO, CivilOccurrence } from "../helpers/CivilDate.js";
 import type { Repos as ContentRepos } from "../../modules/content/repositories/index.js";
 import type { ContentDatabase } from "../../modules/content/db/DatabaseTypes.js";
-import type { Event, EventBooking, EventRsvp, Registration, RegistrationMember } from "../../modules/content/models/index.js";
+import type { Event, EventBooking, EventRsvp, File, Link, Registration, RegistrationMember } from "../../modules/content/models/index.js";
 
 // The fields the recurrence engine reads from an event.
 interface RecurringEventSource {
@@ -18,6 +18,8 @@ export interface ContentModuleGateway {
   loadRegistrationMembersByPerson(churchId: string, personId: string): Promise<RegistrationMember[]>;
   loadEventRsvpsByPerson(churchId: string, personId: string): Promise<EventRsvp[]>;
   loadEventBookingsByPerson(churchId: string, personId: string): Promise<EventBooking[]>;
+  // Documents and links kept on the person's record (files.contentType "person", links.category "personLink").
+  loadPersonDocuments(churchId: string, personId: string): Promise<{ files: File[]; links: Link[] }>;
   loadEvent(churchId: string, eventId: string): Promise<Event | null>;
   // Events of a group that collect registration answers through a form.
   loadEventsForGroup(churchId: string, groupId: string): Promise<{ id: string; title: string; start: Date; groupId: string; formId: string }[]>;
@@ -62,6 +64,15 @@ class ContentModuleGatewayDb implements ContentModuleGateway {
       .where("churchId", "=", churchId)
       .where("requestedBy", "=", personId)
       .execute();
+  }
+
+  public async loadPersonDocuments(churchId: string, personId: string) {
+    const db = await this.db();
+    const [files, links] = await Promise.all([
+      db.selectFrom("files").select(["id", "fileName", "fileType", "size", "dateModified"]).where("churchId", "=", churchId).where("contentType", "=", "person").where("contentId", "=", personId).execute(),
+      db.selectFrom("links").select(["id", "text", "url"]).where("churchId", "=", churchId).where("category", "=", "personLink").where("linkData", "=", personId).execute()
+    ]);
+    return { files: files as File[], links: links as Link[] };
   }
 
   public async loadEvent(churchId: string, eventId: string) {

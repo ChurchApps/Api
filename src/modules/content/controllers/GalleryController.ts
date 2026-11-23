@@ -71,6 +71,7 @@ export class GalleryController extends ContentBaseController {
       if (error) return this.json({ error }, 400);
       const contents = req.body.fileContents || "";
       const buffer = Buffer.from(contents.includes(",") ? contents.split(",")[1] : contents, "base64");
+      if (buffer.length > 26214400) return this.json({ error: "file_too_large" }, 400);
       await FileStorageHelper.store(key, req.body.contentType, buffer);
       return { key };
     });

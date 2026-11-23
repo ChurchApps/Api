@@ -703,6 +703,8 @@ export class UserController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const { email, personName, contextName } = req.body;
       if (!email || !contextName) return res.status(400).json({ errors: ["email and contextName are required"] });
+      // SES rejects these with a 500-shaped exception; the fix is the person's stored address.
+      if (/[\s\p{Cc}]/u.test(email)) return res.status(400).json({ errors: ["That email address has a space or hidden character in it. Correct it on the person's record."] });
 
       // Only invite people already in this church; otherwise this is an open relay from our SES identity.
       const matches = await this.repos.person.searchEmail(au.churchId, email);
