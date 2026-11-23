@@ -218,7 +218,7 @@ export class FormSubmissionController extends MembershipBaseController {
 
             if (wantsFollowUp && contact?.email) {
               try {
-                await this.sendFollowUp(churchId, contact.email, followUpFirstName, form.followUpSubject, form.followUpBody);
+                await this.sendFollowUp(churchId, contact.email, followUpFirstName, form.followUpSubject, form.followUpBody, ConversationalFormHelper.answersTable(questions, formSubmission.answers));
               } catch (err) {
                 console.error("Form follow-up email failed (non-fatal):", err);
               }
@@ -310,13 +310,13 @@ export class FormSubmissionController extends MembershipBaseController {
     }
   }
 
-  private async sendFollowUp(churchId: string, email: string, firstName: string, subject: string, body: string) {
+  private async sendFollowUp(churchId: string, email: string, firstName: string, subject: string, body: string, answersHtml: string) {
     const reserved = await ChurchEmailLimiter.reserve(churchId, "formFollowUp", [{ address: email }]);
     if (!reserved) return;
     const church: Church = await this.repos.church.loadById(churchId);
     const tokens = { firstName: this.escapeHtml(firstName), churchName: this.escapeHtml(church?.name) };
     const resolvedSubject = ConversationalFormHelper.applyTokens(subject, tokens);
-    const resolvedBody = ConversationalFormHelper.applyTokens(body, tokens);
+    const resolvedBody = ConversationalFormHelper.applyTokens(body, { ...tokens, answers: answersHtml });
     try {
       await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church?.name), email, church?.name, Environment.b1AdminRoot, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
       await ChurchEmailLimiter.settle(churchId, reserved[0], true);

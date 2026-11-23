@@ -9,6 +9,11 @@ export interface FormContact {
   phone?: string;
 }
 
+const escapeHtml = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+};
+
 export class ConversationalFormHelper {
   static extractContact(questions: Question[], answers: Answer[]): FormContact {
     const contact: FormContact = {};
@@ -31,9 +36,29 @@ export class ConversationalFormHelper {
     return contact;
   }
 
-  static applyTokens(template: string, tokens: { firstName?: string; churchName?: string }): string {
+  static applyTokens(template: string, tokens: { firstName?: string; churchName?: string; answers?: string }): string {
     if (!template) return template;
-    return template.replace(/\{firstName\}/g, tokens.firstName || "").replace(/\{churchName\}/g, tokens.churchName || "");
+    return template.replace(/\{firstName\}/g, tokens.firstName || "").replace(/\{churchName\}/g, tokens.churchName || "").replace(/\{answers\}/g, tokens.answers || "");
+  }
+
+  static answersTable(questions: Question[], answers: Answer[]): string {
+    const rows: string[] = [];
+    (questions || []).forEach((q) => {
+      if (q.fieldType === "Heading") return;
+      const value = (answers || []).find((a) => a.questionId === q.id)?.value?.trim();
+      if (!value) return;
+      rows.push("<tr><th style=\"font-size: 16px\" width=\"30%\">" + escapeHtml(q.title) + "</th><td style=\"font-size: 15px\">" + escapeHtml(this.displayValue(q, value)) + "</td></tr>");
+    });
+    if (rows.length === 0) return "";
+    return "<table role=\"presentation\" style=\"text-align: left;\" cellspacing=\"8\" width=\"80%\"><tbody>" + rows.join("") + "</tbody></table>";
+  }
+
+  private static displayValue(q: Question, value: string): string {
+    if (q.fieldType === "Yes/No") return value === "True" ? "Yes" : value === "False" ? "No" : value;
+    const choices: { text?: string; value?: string }[] = Array.isArray(q.choices) ? q.choices : [];
+    if (q.fieldType === "Multiple Choice") return choices.find((c) => c.value === value)?.text || value;
+    if (q.fieldType === "Checkbox") return value.split(",").map((v) => choices.find((c) => c.value === v)?.text || v).join(", ");
+    return value;
   }
 
   static async findOrCreatePerson(repos: Repos, churchId: string, contact: FormContact): Promise<Person | null> {
