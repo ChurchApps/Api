@@ -259,10 +259,11 @@ export class PageController2 extends ContentBaseController {
         let result: Page[];
         try {
           result = await Promise.all(req.body.map((page) => this.repos.page.save(page)));
-        } catch (e: any) {
+        } catch (e: unknown) {
           // The unique key is (churchId, url) across all of the church's sites, while the check above is
           // per site; a url used on another site, or two saves racing, lands here.
-          if (e?.errno === 1062 || e?.code === "ER_DUP_ENTRY") return this.json({ error: "A page with this url already exists" }, 409);
+          const dbError = e as { errno?: number; code?: string } | undefined;
+          if (dbError?.errno === 1062 || dbError?.code === "ER_DUP_ENTRY") return this.json({ error: "A page with this url already exists" }, 409);
           throw e;
         }
         this.bumpSiteCache(au.churchId);

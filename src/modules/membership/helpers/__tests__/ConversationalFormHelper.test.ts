@@ -1,5 +1,5 @@
 import { ConversationalFormHelper } from "../ConversationalFormHelper.js";
-import type { Household, Person } from "../../models/index.js";
+import type { Household, Person, Question } from "../../models/index.js";
 import type { Repos } from "../../repositories/index.js";
 
 const q = (id: string, fieldType: string, title: string) => ({ id, fieldType, title });
@@ -64,12 +64,12 @@ describe("ConversationalFormHelper.applyTokens", () => {
 
 describe("ConversationalFormHelper.answersTable", () => {
   it("lists each answered question with readable, escaped values", () => {
-    const questions: any[] = [
+    const questions: Question[] = [
       q("h1", "Heading", "About you"),
       q("q1", "Textbox", "Name"),
       q("q2", "Yes/No", "First visit?"),
-      { id: "q3", fieldType: "Multiple Choice", title: "Service", choices: [{ text: "9:00 AM", value: "early" }, { text: "11:00 AM", value: "late" }] },
-      { id: "q4", fieldType: "Checkbox", title: "Interests", choices: [{ text: "Kids", value: "k" }, { text: "Music", value: "m" }] },
+      Object.assign({} as Question, { id: "q3", fieldType: "Multiple Choice", title: "Service", choices: [{ text: "9:00 AM", value: "early" }, { text: "11:00 AM", value: "late" }] }),
+      Object.assign({} as Question, { id: "q4", fieldType: "Checkbox", title: "Interests", choices: [{ text: "Kids", value: "k" }, { text: "Music", value: "m" }] }),
       q("q5", "Textbox", "Notes")
     ];
     const answers = [a("q1", "<b>Sam</b>"), a("q2", "True"), a("q3", "late"), a("q4", "k,m"), a("q5", "  ")];
@@ -83,7 +83,7 @@ describe("ConversationalFormHelper.answersTable", () => {
   });
 
   it("is empty when nothing was answered", () => {
-    expect(ConversationalFormHelper.answersTable([q("q1", "Textbox", "Name")] as any, [])).toBe("");
+    expect(ConversationalFormHelper.answersTable([q("q1", "Textbox", "Name")], [])).toBe("");
   });
 
   it("fills {answers} in a template", () => {

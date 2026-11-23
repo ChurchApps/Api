@@ -1,4 +1,4 @@
-import { MusicHelper } from "../helpers/MusicHelper";
+import { MusicHelper } from "../helpers/MusicHelper.js";
 
 // Minimal format-0 SMF: one track, one note-on/note-off pair per pitch.
 function midi(pitches: number[]): Buffer {

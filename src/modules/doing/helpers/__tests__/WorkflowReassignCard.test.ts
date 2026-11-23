@@ -54,14 +54,14 @@ describe("WorkflowHelper.reassign", () => {
 
   it("notifies someone else who is given the card", async () => {
     (NotificationService.createNotifications as jest.Mock).mockClear();
-    const card: any = { id: "t1", churchId: "c1", workflowId: "w1" };
+    const card: Task = { id: "t1", churchId: "c1", workflowId: "w1" };
     await WorkflowHelper.reassign(card, { type: "person", id: "p2", label: "Carol Clark" }, buildRepos(), "p1");
     expect(NotificationService.createNotifications).toHaveBeenCalledWith(["p2"], "c1", "task", "t1", expect.any(String));
   });
 
   it("stays quiet when people assign the card to themselves", async () => {
     (NotificationService.createNotifications as jest.Mock).mockClear();
-    const card: any = { id: "t1", churchId: "c1", workflowId: "w1" };
+    const card: Task = { id: "t1", churchId: "c1", workflowId: "w1" };
     await WorkflowHelper.reassign(card, { type: "person", id: "p2", label: "Carol Clark" }, buildRepos(), "p2");
     expect(NotificationService.createNotifications).not.toHaveBeenCalled();
   });

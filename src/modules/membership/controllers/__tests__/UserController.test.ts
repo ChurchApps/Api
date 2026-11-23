@@ -76,8 +76,8 @@ function userController(initial: User | null) {
       clearVerification: jest.fn()
     },
     userChurch: { loadByUserId: jest.fn(), save: jest.fn() },
-    person: { searchEmail: jest.fn(async () => []) },
-    role: { loadAll: jest.fn(async () => []) },
+    person: { searchEmail: jest.fn(async (): Promise<unknown[]> => []) },
+    role: { loadAll: jest.fn(async (): Promise<unknown[]> => []) },
     roleMember: { save: jest.fn() },
     userMfa: { isEnabled: jest.fn(async () => false) }
   };
@@ -489,8 +489,8 @@ describe("UserController.sendInviteEmail", () => {
     const { controller, repos } = userController(null);
     repos.person.searchEmail.mockResolvedValue([{ email: "new@b .c" }]);
     repos.church = { loadById: jest.fn(async () => ({ name: "Grace" })) };
-    const res: any = { status: jest.fn(function (this: any, code: number) { this.code = code; return this; }), json: jest.fn(function (this: any) { return this; }) };
-    await (controller as any).sendInviteEmail({ body: { email: "new@b .c", personName: "New", contextName: "Staff" }, headers: {} }, res);
+    const res = Object.assign({} as express.Response, { status: jest.fn(function (this: Record<string, unknown>, code: number) { this.code = code; return this; }), json: jest.fn(function (this: Record<string, unknown>) { return this; }) });
+    await controller.sendInviteEmail(req({ body: { email: "new@b .c", personName: "New", contextName: "Staff" }, headers: {} }), res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(send).not.toHaveBeenCalled();
   });

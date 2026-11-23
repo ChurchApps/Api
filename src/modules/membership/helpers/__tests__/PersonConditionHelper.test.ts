@@ -99,27 +99,27 @@ describe("PersonConditionHelper list operators", () => {
     { id: "m1", membershipStatus: "Member", campusId: "c1" },
     { id: "m2", membershipStatus: "Regular Attendee", campusId: "c2" },
     { id: "m3", membershipStatus: "Visitor", campusId: "c1" },
-    { id: "m4", membershipStatus: null as any, campusId: "c1" }
+    { id: "m4", membershipStatus: null as string | null, campusId: "c1" }
   ];
 
   it("matches any of several membership statuses", () => {
-    expect(ids(PersonConditionHelper.apply(rows, [{ field: "membershipStatus", operator: "in", value: "Member,Regular Attendee" } as any]))).toEqual(["m1", "m2"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "membershipStatus", operator: "in", value: "Member,Regular Attendee" } as SearchCondition]))).toEqual(["m1", "m2"]);
   });
 
   it("leaves out every listed status, keeping people with no status", () => {
-    expect(ids(PersonConditionHelper.apply(rows, [{ field: "membershipStatus", operator: "notIn", value: "Visitor" } as any]))).toEqual(["m1", "m2", "m4"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "membershipStatus", operator: "notIn", value: "Visitor" } as SearchCondition]))).toEqual(["m1", "m2", "m4"]);
   });
 
   it("ignores case and spaces around list values", () => {
-    expect(ids(PersonConditionHelper.apply(rows, [{ field: "membershipStatus", operator: "in", value: "member, regular attendee" } as any]))).toEqual(["m1", "m2"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "membershipStatus", operator: "in", value: "member, regular attendee" } as SearchCondition]))).toEqual(["m1", "m2"]);
   });
 
   it("treats the UI's notEquals as not equal", () => {
-    expect(ids(PersonConditionHelper.apply(rows, [{ field: "campusId", operator: "notEquals", value: "c1" } as any]))).toEqual(["m2"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "campusId", operator: "notEquals", value: "c1" } as SearchCondition]))).toEqual(["m2"]);
   });
 
   it("excludes the whole id list for notIn", () => {
-    expect(ids(PersonConditionHelper.apply(rows, [{ field: "id", operator: "notIn", value: "m1,m2" } as any]))).toEqual(["m3", "m4"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "id", operator: "notIn", value: "m1,m2" } as SearchCondition]))).toEqual(["m3", "m4"]);
   });
 });
 
@@ -137,7 +137,7 @@ describe("PersonConditionHelper this month", () => {
       { id: "now", birthDate: new Date(1990, month - 1, 15), anniversary: new Date(2010, month - 1, 15) },
       { id: "later", birthDate: new Date(1990, month % 12, 15), anniversary: new Date(2010, month % 12, 15) }
     ];
-    expect(ids(PersonConditionHelper.apply(rows, [{ field: "birthMonth", operator: "equals", value: "thisMonth" } as any], "UTC"))).toEqual(["now"]);
-    expect(ids(PersonConditionHelper.apply(rows, [{ field: "anniversaryMonth", operator: "equals", value: "thisMonth" } as any], "UTC"))).toEqual(["now"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "birthMonth", operator: "equals", value: "thisMonth" } as SearchCondition], "UTC"))).toEqual(["now"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "anniversaryMonth", operator: "equals", value: "thisMonth" } as SearchCondition], "UTC"))).toEqual(["now"]);
   });
 });

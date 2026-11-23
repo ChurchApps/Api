@@ -52,6 +52,7 @@ interface SettingRow { keyName: string; value: string; public?: number }
 interface ControllerOpts {
   person?: PersonRow;
   duplicates?: PersonRow[];
+  duplicatePairs?: { personId1: string; personId2: string; matchedOn: string[] }[];
   rowsByIds?: PersonRow[];
   isPublicGroupLeader?: boolean;
   church?: { id: string; archivedDate?: Date };
@@ -704,7 +705,7 @@ describe("PersonController.duplicates", () => {
 describe("PersonController.getPossibleDuplicates", () => {
   it("requires people.edit (401 for view-only)", async () => {
     const { controller, repos } = personController({ access: ["peopleView"] });
-    const result: any = await (controller as any).getPossibleDuplicates({}, {});
+    const result = (await controller.getPossibleDuplicates(req, res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.findPossibleDuplicatePairs).not.toHaveBeenCalled();
   });
@@ -722,7 +723,7 @@ describe("PersonController.getPossibleDuplicates", () => {
       { personId1: "c", personId2: "gone", matchedOn: ["email"] }
     ];
     const { controller, repos } = personController({ access: ["peopleEdit"], duplicatePairs, rowsByIds: rows });
-    const result: any = await (controller as any).getPossibleDuplicates({}, {});
+    const result = await controller.getPossibleDuplicates(req, res);
     expect(repos.person.findPossibleDuplicatePairs).toHaveBeenCalledWith("c1");
     expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["a", "b", "c", "d", "gone"]);
     expect(result).toEqual([
@@ -1016,26 +1017,26 @@ describe("PersonController opted-out people in staff lists", () => {
 
   it("GET /list includes an opted-out person for a View People caller who is not a server admin", async () => {
     const { controller } = listController(["peopleView"]);
-    const result: any[] = await (controller as any).getList({ query: {} }, {});
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as Person[];
     expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
   });
 
   it("GET /recent includes an opted-out person for a View People caller who is not a server admin", async () => {
     const { controller } = listController(["peopleView"]);
-    const result: any[] = await (controller as any).getRecent({ query: {} }, {});
+    const result = (await controller.getRecent(makeReq({ query: {} }), res)) as Person[];
     expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
   });
 
   it("GET /search includes an opted-out person for a View People caller who is not a server admin", async () => {
     const { controller } = listController(["peopleView"]);
-    const result: any[] = await (controller as any).search({ query: { term: "Clark" } }, {});
+    const result = (await controller.search(makeReq({ query: { term: "Clark" } }), res)) as Person[];
     expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
   });
 
   it("still hides an opted-out person from a member browsing the directory", async () => {
     const { controller } = listController([], "Member");
-    const list: any[] = await (controller as any).getList({ query: {} }, {});
-    const recent: any[] = await (controller as any).getRecent({ query: {} }, {});
+    const list = (await controller.getList(makeReq({ query: {} }), res)) as Person[];
+    const recent = (await controller.getRecent(makeReq({ query: {} }), res)) as Person[];
     expect(list.map((p) => p.id)).toEqual(["p2"]);
     expect(recent.map((p) => p.id)).toEqual(["p2"]);
   });

@@ -11,9 +11,10 @@ jest.mock("../index", () => ({
 }));
 
 import { ListRefreshHelper } from "../ListRefreshHelper";
+import type { Repos } from "../../repositories/index.js";
 
 describe("ListRefreshHelper.getNamesHtml", () => {
-  const repos = (people: any[]) => ({ person: { loadByIds: jest.fn().mockResolvedValue(people) } }) as any;
+  const repos = (people: Record<string, unknown>[]) => Object.assign({} as Repos, { person: { loadByIds: jest.fn().mockResolvedValue(people) } });
 
   it("lists escaped display names under a heading", async () => {
     const html = await ListRefreshHelper.getNamesHtml(repos([{ displayName: "Ann <Lee>" }, { firstName: "Bo", lastName: "Kim" }]), "ch1", "Added", ["a", "b"]);

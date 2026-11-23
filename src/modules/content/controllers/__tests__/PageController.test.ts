@@ -275,14 +275,14 @@ describe("PageController2.save duplicate url", () => {
   it("returns 409 instead of 500 when the database rejects a url used on another site", async () => {
     const { controller, repos } = makeSaveController(null);
     repos.page.save.mockRejectedValueOnce(Object.assign(new Error("Duplicate entry 'c1-/' for key 'pages.uq_churchId_url'"), { code: "ER_DUP_ENTRY", errno: 1062 }));
-    const result: any = await (controller as any).save({ body: [{ url: "/", title: "Home", siteId: "site2" }] }, {});
+    const result = await controller.save({ body: [{ url: "/", title: "Home", siteId: "site2" }] } as express.Request, {} as express.Response);
     expect(result).toEqual({ obj: { error: "A page with this url already exists" }, status: 409 });
   });
 
   it("still throws other save errors", async () => {
     const { controller, repos } = makeSaveController(null);
     repos.page.save.mockRejectedValueOnce(new Error("connection lost"));
-    await expect((controller as any).save({ body: [{ url: "/x", title: "X" }] }, {})).rejects.toThrow("connection lost");
+    await expect(controller.save({ body: [{ url: "/x", title: "X" }] } as express.Request, {} as express.Response)).rejects.toThrow("connection lost");
   });
 
   it("saves a page with a new url", async () => {

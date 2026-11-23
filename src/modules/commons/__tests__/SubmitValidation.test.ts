@@ -1,8 +1,9 @@
 import "reflect-metadata";
+import type { SubmissionPayload } from "../models/index.js";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 
-import { ASSET_TYPES } from "../__mocks__/churchappsHelpers";
-import { isUploadableName, licensesFor, normalizeTags, resultingFileNames, validateSubmission } from "../helpers/SubmitValidation";
+import { ASSET_TYPES } from "../__mocks__/churchappsHelpers.js";
+import { isUploadableName, licensesFor, normalizeTags, resultingFileNames, validateSubmission } from "../helpers/SubmitValidation.js";
 
 const song = ASSET_TYPES.song;
 const freeshow = ASSET_TYPES["freeshow/template"];
@@ -87,8 +88,8 @@ describe("registry-driven submission validation", () => {
   });
 });
 
-import { changedKeys, lintChordProBrackets, NO_MELODY_MESSAGE, notAcceptedMessage, submissionType } from "../helpers/SubmitValidation";
-import { ASSET_TYPES as LOCAL_TYPES } from "../helpers/AssetTypes";
+import { changedKeys, lintChordProBrackets, NO_MELODY_MESSAGE, notAcceptedMessage, submissionType } from "../helpers/SubmitValidation.js";
+import { ASSET_TYPES as LOCAL_TYPES } from "../helpers/AssetTypes.js";
 
 const localSong = LOCAL_TYPES.song;
 
@@ -246,14 +247,14 @@ describe("new song file roles", () => {
 
   it("keeps the base registry's other types untouched and inserts the roles before the generated files", () => {
     expect(LOCAL_TYPES["freeshow/template"]).toBe(ASSET_TYPES["freeshow/template"]);
-    const roles = localSong.files.map((f: any) => f.role);
+    const roles = localSong.files.map((f) => f.role);
     expect(roles.indexOf("lyrics")).toBeLessThan(roles.indexOf("song"));
     expect(roles).toEqual(expect.arrayContaining(["demoAudio", "sheetPdf", "score", "scoreImage", "lyrics", "manifest"]));
   });
 });
 
 describe("new songs must say how the tune goes", () => {
-  const bare = { ...goodSong, detail: { ...goodSong.detail, videoUrl: undefined } };
+  const bare: SubmissionPayload = { ...goodSong, detail: { ...goodSong.detail, videoUrl: undefined } };
   it("refuses chords and words alone, accepts any melody file or a video link", () => {
     expect(validateSubmission(song, bare, [], [])).toContain(NO_MELODY_MESSAGE);
     expect(validateSubmission(song, bare, [file("art.jpg")], [])).toContain(NO_MELODY_MESSAGE);

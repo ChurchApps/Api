@@ -418,7 +418,7 @@ export class PersonController extends MembershipBaseController {
   }
 
   @httpGet("/possibleDuplicates")
-  public async getPossibleDuplicates(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPossibleDuplicates(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const pairs = await this.repos.person.findPossibleDuplicatePairs(au.churchId);

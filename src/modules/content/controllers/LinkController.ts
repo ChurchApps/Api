@@ -130,7 +130,7 @@ export class LinkController extends ContentBaseController {
 
   // Person links need Edit People (and nothing else in the batch); every other link needs content edit.
   // An existing row keeps the rule of its stored category, so an id can't be used to cross between them.
-  private async canSave(au: any, links: Link[]): Promise<boolean> {
+  private async canSave(au: AuthenticatedUser, links: Link[]): Promise<boolean> {
     if (!Array.isArray(links) || links.length === 0) return au.checkAccess(Permissions.content.edit);
     const personLinks = links.filter((l) => isPersonLink(l));
     if (personLinks.length > 0 && personLinks.length !== links.length) return false;

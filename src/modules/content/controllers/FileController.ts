@@ -76,7 +76,7 @@ export class FileController extends ContentBaseController {
 
   // Private files are never served from the raw route; staff with access get a short-lived signed link instead.
   @httpGet("/download/:id/link")
-  public async downloadLink(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async downloadLink(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const file = await this.repos.file.load(au.churchId, id);
       if (!file) return this.json({}, 404);
@@ -248,7 +248,7 @@ export class FileController extends ContentBaseController {
   }
 
   // Person documents: Edit People only, always new rows, private bytes on the default store.
-  private async savePersonFiles(au: any, files: File[]): Promise<any> {
+  private async savePersonFiles(au: AuthenticatedUser, files: File[]): Promise<unknown> {
     if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
     if (!files.every((f) => f.contentType === PERSON_CONTENT_TYPE && PersonFileStorage.isValidPersonId(f.contentId) && f.fileName)) return this.json({ error: "invalid_file" }, 400);
     const results: File[] = [];
@@ -276,7 +276,7 @@ export class FileController extends ContentBaseController {
     return results;
   }
 
-  private async personUploadUrl(au: any, body: { fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }): Promise<any> {
+  private async personUploadUrl(au: AuthenticatedUser, body: { fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }): Promise<unknown> {
     if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
     if (!PersonFileStorage.isValidPersonId(body.contentId) || !body.fileName) return this.json({ error: "invalid_file" }, 400);
     const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, body.contentType, body.contentId);
@@ -288,8 +288,8 @@ export class FileController extends ContentBaseController {
   }
 
   // Signed link only: the browser opens it directly, so it carries no JWT.
-  private async downloadPrivate(file: File, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    const query: any = req.query || {};
+  private async downloadPrivate(file: File, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    const query: express.Request["query"] = req.query || {};
     if (!PersonFileStorage.verifyLink(file.id, query.exp?.toString(), query.sig?.toString())) return this.json({}, 401);
     res.set("Cache-Control", "private, no-store");
     const key = file.externalId || this.buildKey(file.churchId, file.contentType, file.contentId, file.fileName);

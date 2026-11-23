@@ -149,7 +149,7 @@ describe("GalleryController.upload", () => {
     mockEnvironment.fileStore = "disk";
     const { controller } = makeController({ access: ["contentEdit"] });
     const big = "data:image/png;base64," + Buffer.alloc(26 * 1024 * 1024).toString("base64");
-    const result: any = await controller.upload({ body: { folder: "1.78", fileName: "1.png", contentType: "image/png", fileContents: big } } as any, {} as any);
+    const result = (await controller.upload({ body: { folder: "1.78", fileName: "1.png", contentType: "image/png", fileContents: big } } as express.Request, {} as express.Response)) as GalleryResult;
     expect(result.status).toBe(400);
     expect(FileStorageHelper.store).not.toHaveBeenCalled();
   });

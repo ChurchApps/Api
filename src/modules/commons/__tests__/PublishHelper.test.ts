@@ -2,21 +2,21 @@ import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 jest.mock("../helpers/ContentLibraryHelper", () => {
   const L = jest.requireActual("../helpers/PackageLayout");
-  const liveKey = (a: any, n: string) => (L.isPackageKey(n) ? `commons/${n}` : `commons/assets/${a.assetType}/${a.id}/${n}`);
+  const liveKey = (a: Asset, n: string) => (L.isPackageKey(n) ? `commons/${n}` : `commons/assets/${a.assetType}/${a.id}/${n}`);
   return {
     ContentLibraryHelper: {
-      livePrefix: (a: any) => `commons/assets/${a.assetType}/${a.id}`,
+      livePrefix: (a: Asset) => `commons/assets/${a.assetType}/${a.id}`,
       liveKey,
       packagePrefix: (dir: string) => `commons/${dir}`,
-      fileKey: (a: any, files: any[], n: string) => liveKey(a, L.findByBase(files, a.assetType, n)?.name || L.packageKey(L.packageDirFrom(files), a.assetType, n)),
+      fileKey: (a: Asset, files: AssetFile[], n: string) => liveKey(a, L.findByBase(files, a.assetType, n)?.name || L.packageKey(L.packageDirFrom(files), a.assetType, n)),
       pendingPrefix: (id: string) => `commons/pending/${id}`,
       pendingKey: (id: string, n: string) => `commons/pending/${id}/${n}`,
       promote: jest.fn(async () => true),
       store: jest.fn(async () => {}),
       removeKey: jest.fn(async () => {}),
       removePrefix: jest.fn(async () => {}),
-      readKey: jest.fn(async () => null),
-      listLiveKeys: jest.fn(async () => []),
+      readKey: jest.fn(async (): Promise<null> => null),
+      listLiveKeys: jest.fn(async (): Promise<string[]> => []),
       sha256: () => "hash",
       role: (n: string) => n.replace(/\.[^.]+$/, ""),
       songJson: () => ({}),
@@ -27,30 +27,61 @@ jest.mock("../helpers/ContentLibraryHelper", () => {
 jest.mock("../helpers/NamesHelper", () => ({ userNames: jest.fn(async () => ({ owner000001: "Owner", stranger0001: "Stranger Sam" })) }));
 jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyApproved: jest.fn(async () => {}), notifyRejected: jest.fn(async () => {}), notifyChangesRequested: jest.fn(async () => {}) } }));
 
-import { PublishHelper } from "../helpers/PublishHelper";
-import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
-import { CommonsMailHelper } from "../helpers/CommonsMailHelper";
+import { PublishHelper } from "../helpers/PublishHelper.js";
+import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
+import { CommonsMailHelper } from "../helpers/CommonsMailHelper.js";
+import type { SourceRow } from "../helpers/publishHooks/index.js";
+import type { Asset, AssetFile, Contributor, Song, Submission } from "../models/index.js";
+import type { Repos } from "../repositories/Repos.js";
+import type { AssetRepo } from "../repositories/AssetRepo.js";
+import type { AssetFileRepo } from "../repositories/AssetFileRepo.js";
+import type { AuthorRepo } from "../repositories/AuthorRepo.js";
+import type { SongRepo } from "../repositories/SongRepo.js";
+import type { SubmissionRepo } from "../repositories/SubmissionRepo.js";
 
-const asset = (): any => ({ id: "asset000001", assetType: "song", name: "Old", language: "English", status: "published", publisherUserId: "owner000001", publishedAt: new Date("2026-01-01"), publishedSubmissionId: "sub00000000" });
+const asset = (): Asset => ({ id: "asset000001", assetType: "song", name: "Old", language: "English", status: "published", publisherUserId: "owner000001", publishedAt: new Date("2026-01-01"), publishedSubmissionId: "sub00000000" });
 // the package a legacy or brand-new song lands in: the title and language at the time of the approve (the payload renames it)
 const PKG = "songs/en/new-name-asset000001";
 // a song already in the layout keeps its frozen folder whatever its title becomes
 const FROZEN = "songs/en/public-domain/old-asset000001";
 const LEGACY = "commons/assets/song/asset000001";
 const qualityDetail = { heuristic: 30, parts: ["demo", "key"], llm: 0, notes: "completeness heuristic only — not an AI judgment" };
-const submission = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "stranger0001", status: "pending", triageScore: 30, payload: { name: "New Name", tags: " grace , praise ", license: "WC", qualityDetail, detail: { writer: "Fanny Crosby", chordPro: "Verse 1\r\n[G]Sing", bpm: 80 } } });
+const submission = (): Submission => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "stranger0001", status: "pending", triageScore: 30, payload: { name: "New Name", tags: " grace , praise ", license: "WC", qualityDetail, detail: { writer: "Fanny Crosby", chordPro: "Verse 1\r\n[G]Sing", bpm: 80 } } });
 
-function repos(files: any[] = [], liveFiles: any[] = []) {
+type RepoFns = {
+  asset: Pick<AssetRepo, "update" | "delete" | "loadById">;
+  submission: Pick<SubmissionRepo, "update" | "countApproved" | "loadByAsset" | "delete" | "loadById">;
+  assetFile: Pick<AssetFileRepo, "loadBySubmission" | "loadOne" | "loadLive" | "update" | "delete" | "upsert" | "deleteBySubmission" | "deleteByAsset">;
+  song: Pick<SongRepo, "loadSatellite" | "upsert" | "loadById">;
+  author: Pick<AuthorRepo, "loadIdByName" | "findOrCreate" | "loadById" | "update">;
+};
+type RepoMocks = { [K in keyof RepoFns]: jest.Mocked<RepoFns[K]> };
+type SyncFns = {
+  assetFile?: Partial<Pick<AssetFileRepo, "loadLive" | "create" | "delete">>;
+  submission?: Partial<Pick<SubmissionRepo, "loadHistory">>;
+  song?: Partial<Pick<SongRepo, "loadSatellite" | "update">>;
+};
+type SyncMocks = { [K in keyof SyncFns]-?: jest.Mocked<Required<SyncFns[K]>> };
+// every function passed in is a jest.fn; syncOutput only touches these repos
+const syncRepos = (parts: SyncFns) => parts as SyncMocks & Repos;
+
+function repos(files: AssetFile[] = [], liveFiles: AssetFile[] = []) {
   const live = [...liveFiles];
-  const r: any = {
+  const r: RepoFns = {
     asset: { update: jest.fn(async () => {}), delete: jest.fn(async () => {}), loadById: jest.fn(async () => asset()) },
-    submission: { update: jest.fn(async () => {}), countApproved: jest.fn(async () => 1), loadByAsset: jest.fn(async () => []), delete: jest.fn(async () => {}), loadById: jest.fn(async () => undefined) },
+    submission: {
+      update: jest.fn(async () => {}),
+      countApproved: jest.fn(async () => 1),
+      loadByAsset: jest.fn(async (): Promise<Submission[]> => []),
+      delete: jest.fn(async () => {}),
+      loadById: jest.fn(async (): Promise<Submission | undefined> => undefined)
+    },
     assetFile: {
       loadBySubmission: jest.fn(async () => files),
       loadOne: jest.fn(async (_a: string, name: string) => live.find((f) => f.name === name)),
       loadLive: jest.fn(async () => live),
       // mirrors the DB: clearing submissionId makes a proposed row live; delete drops a live row
-      update: jest.fn(async (id: string, fields: any) => {
+      update: jest.fn(async (id: string, fields: Partial<AssetFile>) => {
         const promoted = fields.submissionId === null && files.find((f) => f.id === id);
         if (promoted) live.push({ ...promoted, ...fields });
       }),
@@ -58,14 +89,15 @@ function repos(files: any[] = [], liveFiles: any[] = []) {
         const i = live.findIndex((f) => f.id === id);
         if (i >= 0) live.splice(i, 1);
       }),
-      upsert: jest.fn(async (f: any) => { live.push(f); return f; }),
+      upsert: jest.fn(async (f: AssetFile) => { live.push(f); return f; }),
       deleteBySubmission: jest.fn(async () => {}),
       deleteByAsset: jest.fn(async () => {})
     },
-    song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", hymnalCount: 3, contributors: null })), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "New Name" })) },
-    author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001", name: "Fanny Crosby" })), update: jest.fn(async () => {}) }
+    song: { loadSatellite: jest.fn(async (): Promise<Song | undefined> => ({ assetId: "asset000001", hymnalCount: 3, contributors: null })), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "New Name" })) },
+    author: { loadIdByName: jest.fn(async (): Promise<string | undefined> => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001", name: "Fanny Crosby" })), update: jest.fn(async () => {}) }
   };
-  return r;
+  // every repo function above is a jest.fn; PublishHelper only touches these five repos
+  return r as RepoMocks & Repos;
 }
 
 describe("PublishHelper.approve", () => {
@@ -141,7 +173,7 @@ describe("PublishHelper.approve", () => {
 
   it("leaves a non-song asset's files flat", async () => {
     const r = repos([{ id: "pf1", name: "thumb.png", action: "add" }], [{ id: "lf1", name: "content.fstemplate" }]);
-    const a = { id: "asset000002", assetType: "freeshow/template", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" } as any;
+    const a: Asset = { id: "asset000002", assetType: "freeshow/template", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" };
     await PublishHelper.approve(r, { ...submission(), payload: { name: "Wide", license: "CC0" } }, a, "admin000001");
     expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/thumb.png", "commons/assets/freeshow/template/asset000002/thumb.png");
     expect(r.assetFile.update).toHaveBeenCalledWith("pf1", { submissionId: null, action: "add", name: "thumb.png" });
@@ -179,7 +211,7 @@ describe("PublishHelper.approve", () => {
 
   it("stamps publishedAt on a first approval and skips the satellite for hook-less types", async () => {
     const r = repos([{ id: "pf1", name: "content.fstemplate", action: "add" }]);
-    const a = { id: "asset000002", assetType: "freeshow/template", status: "pending", publisherUserId: "owner000001" } as any;
+    const a: Asset = { id: "asset000002", assetType: "freeshow/template", status: "pending", publisherUserId: "owner000001" };
     await PublishHelper.approve(r, { ...submission(), payload: { name: "Wide", license: "CC0", detail: { appMinVersion: "1.4" } } }, a, "admin000001");
     expect(r.song.upsert).not.toHaveBeenCalled();
     expect(r.asset.update).toHaveBeenLastCalledWith("asset000002", expect.objectContaining({ status: "published", publishedAt: expect.any(Date) }));
@@ -192,7 +224,7 @@ describe("PublishHelper.approve", () => {
     r.author.findOrCreate.mockImplementation(async (name: string) => name === "Ada" ? "authorAda001" : "authorBbb001");
     const sub = { ...submission(), payload: { ...submission().payload, detail: { writer: "Ada & Bea", chordPro: "[C]x" } } };
     await PublishHelper.approve(r, sub, asset(), "admin000001");
-    expect(r.author.findOrCreate.mock.calls.map((c: any) => c[0])).toEqual(["Ada", "Bea"]);
+    expect(r.author.findOrCreate.mock.calls.map((c) => c[0])).toEqual(["Ada", "Bea"]);
     expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ authorId: "authorAda001" }));
   });
 
@@ -202,7 +234,7 @@ describe("PublishHelper.approve", () => {
     r.author.findOrCreate.mockImplementation(async (name: string) => ids[name]);
     const sub = { ...submission(), payload: { ...submission().payload, detail: { writer: "Ada, Bea and Cy", chordPro: "[C]x" } } };
     await PublishHelper.approve(r, sub, asset(), "admin000001");
-    expect(r.author.findOrCreate.mock.calls.map((c: any) => c[0])).toEqual(["Ada", "Bea", "Cy"]);
+    expect(r.author.findOrCreate.mock.calls.map((c) => c[0])).toEqual(["Ada", "Bea", "Cy"]);
     expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ authorId: "a1" }));
   });
 
@@ -223,7 +255,7 @@ describe("PublishHelper.approve", () => {
     const sub = { ...submission(), payload: { ...submission().payload, publisherChurchId: "CHUother0001" } };
     await PublishHelper.approve(r, sub, { ...asset(), status: "unpublished" }, "admin000001");
     expect(r.asset.update).toHaveBeenLastCalledWith("asset000001", { publishedSubmissionId: "sub00000001" });
-    expect(r.asset.update.mock.calls.some((c: any[]) => "publisherChurchId" in c[1] || c[1].status === "published")).toBe(false);
+    expect(r.asset.update.mock.calls.some((c) => "publisherChurchId" in c[1] || c[1].status === "published")).toBe(false);
   });
 
   it("leaves an already claimed author row alone", async () => {
@@ -324,8 +356,8 @@ describe("PublishHelper.diffFields", () => {
   });
 });
 
-const manifestWritten = () => JSON.parse((ContentLibraryHelper.store as jest.Mock).mock.calls.find((c) => c[0].endsWith("/sources/manifest.json"))[2].toString());
-const contributorsUpserted = (r: any) => JSON.parse(r.song.upsert.mock.calls[0][0].contributors);
+const manifestWritten = (): { files: SourceRow[] } => JSON.parse((ContentLibraryHelper.store as jest.Mock).mock.calls.find((c) => c[0].endsWith("/sources/manifest.json"))[2].toString());
+const contributorsUpserted = (r: RepoMocks): Contributor[] => JSON.parse(r.song.upsert.mock.calls[0][0].contributors);
 
 describe("PublishHelper.approve — sources manifest", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -375,11 +407,11 @@ describe("PublishHelper.approve — sources manifest", () => {
   });
 
   it("keeps the frozen package folder, preserves harvested and earlier rows, replaces a re-uploaded file's row, and backfills an upload with no row", async () => {
-    const previous = { file: "demoAudio.mp3", url: null, acquired: "2026-01-02", sha256: "oldhash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: "sub00000000", note: "first demo" };
-    const harvested = { file: "hymnary.json", url: null, acquired: null, sha256: "h", licenseBasis: "hymnary", original: false, submittedBy: null, note: "Harvested hymnal counts" };
+    const previous: SourceRow = { file: "demoAudio.mp3", url: null, acquired: "2026-01-02", sha256: "oldhash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: "sub00000000", note: "first demo" };
+    const harvested: SourceRow = { file: "hymnary.json", url: null, acquired: null, sha256: "h", licenseBasis: "hymnary", original: false, submittedBy: null, note: "Harvested hymnal counts" };
     const seeded = { files: [previous, { ...previous, file: "sheetPdf.pdf", sha256: "stale" }, harvested] };
     (ContentLibraryHelper.readKey as jest.Mock).mockImplementation(async (key: string) => (key === `commons/${FROZEN}/sources/manifest.json` ? { buffer: Buffer.from(JSON.stringify(seeded)), contentType: "application/json" } : null));
-    const live = [
+    const live: AssetFile[] = [
       { id: "lf1", name: `${FROZEN}/sources/demoAudio.mp3`, contentHash: "oldhash", uploadedBy: "owner000001", createdAt: new Date("2026-01-02") },
       { id: "lf2", name: `${FROZEN}/sources/sheetPdf.pdf`, contentHash: "pdfhash", uploadedBy: "owner000001", createdAt: new Date("2026-02-03") },
       { id: "lf3", name: `${FROZEN}/masters/art.png`, contentHash: "arthash", uploadedBy: "owner000001", createdAt: new Date("2026-03-04T12:00:00Z") },
@@ -393,16 +425,16 @@ describe("PublishHelper.approve — sources manifest", () => {
     expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/sheetPdf.pdf", `commons/${FROZEN}/sources/sheetPdf.pdf`);
     expect((ContentLibraryHelper.store as jest.Mock).mock.calls.map((c) => c[0]).sort()).toEqual([`commons/${FROZEN}/masters/lyrics.chordpro`, `commons/${FROZEN}/masters/song.json`, `commons/${FROZEN}/sources/manifest.json`]);
     const rows = manifestWritten().files;
-    expect(rows.find((s: any) => s.file === "demoAudio.mp3")).toEqual(previous);
-    expect(rows.find((s: any) => s.file === "hymnary.json")).toEqual(harvested);
-    expect(rows.find((s: any) => s.file === "sheetPdf.pdf")).toMatchObject({ sha256: "pdfhash", submission: "sub00000001", submittedBy: "stranger0001", note: "cleaner scan" });
-    expect(rows.find((s: any) => s.file === "masters/art.png")).toEqual({ file: "masters/art.png", url: null, acquired: "2026-03-04", sha256: "arthash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: null, note: null });
-    expect(rows.some((s: any) => s.file.endsWith("song.json") || s.file.endsWith("tune.mid"))).toBe(false);
+    expect(rows.find((s) => s.file === "demoAudio.mp3")).toEqual(previous);
+    expect(rows.find((s) => s.file === "hymnary.json")).toEqual(harvested);
+    expect(rows.find((s) => s.file === "sheetPdf.pdf")).toMatchObject({ sha256: "pdfhash", submission: "sub00000001", submittedBy: "stranger0001", note: "cleaner scan" });
+    expect(rows.find((s) => s.file === "masters/art.png")).toEqual({ file: "masters/art.png", url: null, acquired: "2026-03-04", sha256: "arthash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: null, note: null });
+    expect(rows.some((s) => s.file.endsWith("song.json") || s.file.endsWith("tune.mid"))).toBe(false);
     (ContentLibraryHelper.readKey as jest.Mock).mockReset().mockResolvedValue(null);
   });
 
   it("reads a pre-cut-over song's root manifest.json from the legacy folder and carries its rows into sources/manifest.json", async () => {
-    const legacyRow = { file: "sources/demoAudio.mp3", url: null, acquired: "2026-01-02", sha256: "oldhash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: "sub00000000", note: "first demo" };
+    const legacyRow: SourceRow = { file: "sources/demoAudio.mp3", url: null, acquired: "2026-01-02", sha256: "oldhash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: "sub00000000", note: "first demo" };
     (ContentLibraryHelper.readKey as jest.Mock).mockImplementation(async (key: string) => (key === `${LEGACY}/manifest.json` ? { buffer: Buffer.from(JSON.stringify({ id: "asset000001", files: [{ name: "sources/demoAudio.mp3", role: "demoAudio" }], sources: [legacyRow] })), contentType: "application/json" } : null));
     const live = [{ id: "lf1", name: "sources/demoAudio.mp3", contentHash: "oldhash", uploadedBy: "owner000001", createdAt: new Date("2026-01-02") }];
     const r = repos([], live);
@@ -433,7 +465,7 @@ describe("PublishHelper.approve — contributors", () => {
     const sub = { ...submission(), type: "translation", payload: { ...submission().payload, detail: { writer: "Anon", chordPro: "[C]x", translator: "Ana Lopez", parentSongId: "asset000009" } } };
     await PublishHelper.approve(r, sub, asset(), "admin000001");
     const rows = contributorsUpserted(r);
-    expect(rows.map((c: any) => [c.name, c.what])).toEqual([["Stranger Sam", "translation"], ["Ana Lopez", "translator"]]);
+    expect(rows.map((c) => [c.name, c.what])).toEqual([["Stranger Sam", "translation"], ["Ana Lopez", "translator"]]);
   });
 
   it("labels the other types and survives an unreadable contributors column", async () => {
@@ -492,13 +524,13 @@ describe("PublishHelper.syncOutput", () => {
       `commons/${DIR}/output/composition.zip`
     ]);
     (ContentLibraryHelper.readKey as jest.Mock).mockResolvedValueOnce({ buffer: Buffer.from('{"seconds": 133.6}'), contentType: "application/json" });
-    const r: any = {
-      assetFile: { loadLive: jest.fn(async () => live), create: jest.fn(async (f: any) => f), delete: jest.fn(async () => {}) },
+    const r = syncRepos({
+      assetFile: { loadLive: jest.fn(async () => live), create: jest.fn(async (f: AssetFile) => f), delete: jest.fn(async () => {}) },
       song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", confidence: "chart-only", hasChords: true })), update: jest.fn(async () => {}) }
-    };
+    });
     expect(await PublishHelper.syncOutput(r, "asset000001")).toEqual({ added: 4, removed: 1 });
     expect(ContentLibraryHelper.listLiveKeys).toHaveBeenCalledWith(`commons/${DIR}/output`);
-    expect(r.assetFile.create.mock.calls.map((c: any[]) => c[0].name)).toEqual([`${DIR}/output/composition/slides.json`, `${DIR}/output/composition/score.musicxml`, `${DIR}/output/composition/duration.json`, `${DIR}/output/composition.zip`]);
+    expect(r.assetFile.create.mock.calls.map((c) => c[0].name)).toEqual([`${DIR}/output/composition/slides.json`, `${DIR}/output/composition/score.musicxml`, `${DIR}/output/composition/duration.json`, `${DIR}/output/composition.zip`]);
     expect(r.assetFile.delete).toHaveBeenCalledWith("lf2");
     expect(r.assetFile.delete).toHaveBeenCalledTimes(1);
     // no sources/tune.abc: the score was transcribed from the recording
@@ -516,17 +548,17 @@ describe("PublishHelper.syncOutput", () => {
     const DIR5 = "songs/en/new-song-asset000001";
     (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR5}/output/composition/slides.json`]);
     const approved = { id: "sub00000001", filesChanged: [{ name: "sheetPdf.pdf", action: "declined", reason: "blurry" }] };
-    const r: any = {
-      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR5}/song.json` }]), create: jest.fn(async (f: any) => f), delete: jest.fn() },
+    const r = syncRepos({
+      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR5}/song.json` }]), create: jest.fn(async (f: AssetFile) => f), delete: jest.fn() },
       submission: { loadHistory: jest.fn(async () => [{ id: "sub00000000" }, approved]) },
-      song: { loadSatellite: jest.fn(async () => undefined) }
-    };
+      song: { loadSatellite: jest.fn(async (): Promise<Song | undefined> => undefined) }
+    });
     await PublishHelper.syncOutput(r, "asset000001");
     expect(CommonsMailHelper.notifyApproved).toHaveBeenCalledWith(approved, "asset000001", [{ name: "sheetPdf.pdf", reason: "blurry" }]);
     // a later sync of the same build sends nothing
     (CommonsMailHelper.notifyApproved as jest.Mock).mockClear();
     (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR5}/output/composition/slides.json`]);
-    r.assetFile.loadLive = jest.fn(async () => [{ id: "lf1", name: `${DIR5}/song.json` }, { id: "lf2", name: `${DIR5}/output/composition/slides.json` }]);
+    Object.assign(r.assetFile, { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR5}/song.json` }, { id: "lf2", name: `${DIR5}/output/composition/slides.json` }]) });
     await PublishHelper.syncOutput(r, "asset000001");
     expect(CommonsMailHelper.notifyApproved).not.toHaveBeenCalled();
   });
@@ -536,11 +568,11 @@ describe("PublishHelper.syncOutput", () => {
     (ContentLibraryHelper.listLiveKeys as jest.Mock)
       .mockResolvedValueOnce([`commons/${DIR4}/output/composition/slides.json`])
       .mockResolvedValueOnce([`commons/${DIR4}/sources/timing.json`]);
-    const r: any = {
-      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR4}/song.json` }]), create: jest.fn(async (f: any) => f), delete: jest.fn() },
-      submission: { loadHistory: jest.fn(async () => []) },
-      song: { loadSatellite: jest.fn(async () => undefined) }
-    };
+    const r = syncRepos({
+      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR4}/song.json` }]), create: jest.fn(async (f: AssetFile) => f), delete: jest.fn() },
+      submission: { loadHistory: jest.fn(async (): Promise<Submission[]> => []) },
+      song: { loadSatellite: jest.fn(async (): Promise<Song | undefined> => undefined) }
+    });
     expect(await PublishHelper.syncOutput(r, "asset000001")).toEqual({ added: 2, removed: 0 });
     expect(ContentLibraryHelper.listLiveKeys).toHaveBeenCalledWith(`commons/${DIR4}/sources/timing.json`);
     expect(r.assetFile.create).toHaveBeenCalledWith({ assetId: "asset000001", name: `${DIR4}/sources/timing.json`, action: "add" });
@@ -551,10 +583,10 @@ describe("PublishHelper.syncOutput", () => {
     const run = async (duration: object, singTimeSeconds: number) => {
       (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR6}/output/composition/duration.json`]);
       (ContentLibraryHelper.readKey as jest.Mock).mockResolvedValueOnce({ buffer: Buffer.from(JSON.stringify(duration)), contentType: "application/json" });
-      const r: any = {
+      const r = syncRepos({
         assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR6}/song.json` }, { id: "lf2", name: `${DIR6}/output/composition/duration.json` }]), create: jest.fn(), delete: jest.fn() },
         song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", scoreSource: "abc", singTimeSeconds })), update: jest.fn(async () => {}) }
-      };
+      });
       await PublishHelper.syncOutput(r, "asset000001");
       return r.song.update;
     };
@@ -568,10 +600,10 @@ describe("PublishHelper.syncOutput", () => {
       (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR7}/output/composition/slides.json`]);
       // only read when the row has a blank to fill
       if (bpm === null) (ContentLibraryHelper.readKey as jest.Mock).mockResolvedValueOnce({ buffer: Buffer.from(JSON.stringify({ bpm: 129, key: "E" })), contentType: "application/json" });
-      const r: any = {
+      const r = syncRepos({
         assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR7}/song.json` }, { id: "lf2", name: `${DIR7}/output/composition/slides.json` }]), create: jest.fn(), delete: jest.fn() },
         song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", scoreSource: "abc", singTimeSeconds: 300, bpm, songKey: "E" })), update: jest.fn(async () => {}) }
-      };
+      });
       await PublishHelper.syncOutput(r, "asset000001");
       return r.song.update;
     };
@@ -582,29 +614,29 @@ describe("PublishHelper.syncOutput", () => {
   it("calls a score built beside a tune.abc an abc score", async () => {
     const DIR3 = "songs/en/new-song-asset000001";
     (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR3}/output/composition/score.musicxml`]);
-    const r: any = {
-      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR3}/song.json` }, { id: "lf2", name: `${DIR3}/sources/tune.abc` }]), create: jest.fn(async (f: any) => f), delete: jest.fn() },
-      submission: { loadHistory: jest.fn(async () => []) },
+    const r = syncRepos({
+      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR3}/song.json` }, { id: "lf2", name: `${DIR3}/sources/tune.abc` }]), create: jest.fn(async (f: AssetFile) => f), delete: jest.fn() },
+      submission: { loadHistory: jest.fn(async (): Promise<Submission[]> => []) },
       song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", confidence: "chart-only", hasChords: true, singTimeSeconds: 90 })), update: jest.fn(async () => {}) }
-    };
+    });
     await PublishHelper.syncOutput(r, "asset000001");
     expect(r.song.update).toHaveBeenCalledWith("asset000001", { scoreSource: "abc", confidence: "score" });
   });
 
   it("drops no rows when the package's output/ lists empty (a takedown, not a retired build)", async () => {
     const DIR2 = "songs/ru/x-asset000001";
-    const r: any = {
+    const r = syncRepos({
       assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR2}/song.json` }, { id: "lf2", name: `${DIR2}/output/composition.zip` }]), create: jest.fn(), delete: jest.fn() },
-      song: { loadSatellite: jest.fn(async () => undefined) }
-    };
+      song: { loadSatellite: jest.fn(async (): Promise<Song | undefined> => undefined) }
+    });
     expect(await PublishHelper.syncOutput(r, "asset000001")).toEqual({ added: 0, removed: 0 });
     expect(r.assetFile.delete).not.toHaveBeenCalled();
   });
 
   it("skips a song with no package of its own or a pre-2026-09 one", async () => {
-    const r: any = { assetFile: { loadLive: jest.fn(async () => [{ name: "songs/en/parent-parent00001/song.json" }]) } };
+    const r = syncRepos({ assetFile: { loadLive: jest.fn(async () => [{ name: "songs/en/parent-parent00001/song.json" }]) } });
     expect(await PublishHelper.syncOutput(r, "asset000001")).toBeNull();
-    r.assetFile.loadLive = jest.fn(async () => [{ name: "songs/en/wc-license/old-asset000001/masters/song.json" }]);
+    Object.assign(r.assetFile, { loadLive: jest.fn(async () => [{ name: "songs/en/wc-license/old-asset000001/masters/song.json" }]) });
     expect(await PublishHelper.syncOutput(r, "asset000001")).toBeNull();
     expect(ContentLibraryHelper.listLiveKeys).not.toHaveBeenCalled();
   });
@@ -613,7 +645,7 @@ describe("PublishHelper.syncOutput", () => {
 describe("PublishHelper — a reviewer's correction to a catalog import", () => {
   beforeEach(() => jest.clearAllMocks());
   // seeded from the content repo: no publisher, published on its "Imported" record, under a writer's grant
-  const imported = (): any => ({ id: "asset000001", assetType: "song", name: "God Cares For You", tags: "Praise", language: "English", license: "larry-holder", status: "published", publishedAt: new Date("2026-09-15"), publishedSubmissionId: "subimport01" });
+  const imported = (): Asset => ({ id: "asset000001", assetType: "song", name: "God Cares For You", tags: "Praise", language: "English", license: "larry-holder", status: "published", publishedAt: new Date("2026-09-15"), publishedSubmissionId: "subimport01" });
   const importRecord = { id: "subimport01", note: "Imported", status: "approved", submittedBy: "seed", payload: { name: "God Cares For You", tags: "Praise", license: "larry-holder", detail: { writer: "Larry Holder", chordPro: "GodÂ’s care (stale import)" } } };
   const row = { id: "asset000001", title: "God Cares For You", writer: "Larry Holder", licenseVersion: "permissions", chordPro: "Verse 1\nA Musical For Young Voices", scripture: "Matthew 6:25-34", bpm: 80, timeSignature: "4/4", year: 1997, proAnswer: "no" };
 

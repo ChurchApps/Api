@@ -93,7 +93,7 @@ describe("advancedSearch personField branch (AND-intersection)", () => {
     const standardConditions = [{ field: "lastName", operator: "equals" as const, value: "Smith" }];
 
     // Mirrors PersonController.advancedSearch: field-conditions filtered first, then standard person-conditions.
-    let result = await ListRuleHelper.filterByFieldConditions("ch1", data, fieldConditions, repos);
+    let result: { id: string; lastName: string }[] = await ListRuleHelper.filterByFieldConditions("ch1", data, fieldConditions, repos);
     result = PersonConditionHelper.apply(result, standardConditions);
 
     expect(result.map((p) => p.id)).toEqual(["p1"]);
@@ -169,10 +169,10 @@ describe("household inclusion", () => {
     { id: "neighbor", householdId: "h2", householdRole: "Head" }
   ];
   const groupRules = { match: "all" as const, conditions: [{ provider: "group" as const, entityId: "g1" }] };
-  const repos = {
+  const repos = Object.assign({} as Repos, {
     person: { loadAll: jest.fn().mockResolvedValue(people) },
     groupMember: { loadForGroup: jest.fn().mockResolvedValue([{ personId: "kid" }]) }
-  } as any;
+  });
 
   it("replaces matches with the adults of their households", async () => {
     expect((await ListRuleHelper.evaluate("ch1", groupRules, "adults", repos)).sort()).toEqual(["dad", "mom"]);
@@ -186,10 +186,10 @@ describe("household inclusion", () => {
 
 describe("this month person conditions", () => {
   it("evaluates with the church's time zone", async () => {
-    const repos = {
+    const repos = Object.assign({} as Repos, {
       person: { loadAll: jest.fn().mockResolvedValue([{ id: "p1" }]) },
       church: { loadById: jest.fn().mockResolvedValue({ timeZone: "America/Chicago" }) }
-    } as any;
+    });
     const rules = { match: "all" as const, conditions: [{ provider: "person" as const, field: "birthMonth", operator: "equals", value: "thisMonth" }] };
     await ListRuleHelper.evaluate("ch1", rules, undefined, repos);
     expect(PersonConditionHelper.applyOne).toHaveBeenLastCalledWith(expect.any(Array), expect.objectContaining({ value: "thisMonth" }), "America/Chicago");

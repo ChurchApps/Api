@@ -25,14 +25,14 @@ export class DeliveryLogController extends MessagingBaseController {
     @requestParam("personId") personId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<{ bounced: boolean; address?: string; date?: Date }> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const allowed = personId === au.personId || au.checkAccess(Permissions.people.view) || au.checkAccess(Permissions.people.edit) || au.checkAccess(Permissions.messaging.admin);
       if (!allowed) return this.json({}, 401);
       const latest = await this.repos.deliveryLog.loadLatestEmailEvent(au.churchId, personId);
       if (latest?.deliveryMethod !== "sesBounce") return { bounced: false };
       return { bounced: true, address: latest.deliveryAddress, date: latest.attemptTime };
-    }) as any;
+    });
   }
 
   @httpGet("/person/:personId")

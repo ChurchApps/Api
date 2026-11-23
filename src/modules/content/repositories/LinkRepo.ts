@@ -68,7 +68,7 @@ export class LinkRepo {
       .where("churchId", "=", churchId)
       .where("category", "=", category)
       .where("linkData", "=", linkData)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   public async loadByCategory(churchId: string, category: string, siteId = ""): Promise<Link[]> {

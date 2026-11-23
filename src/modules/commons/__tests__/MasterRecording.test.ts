@@ -3,17 +3,17 @@ jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers")
 jest.mock("../../../shared/helpers/index", () => ({ Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } }, Environment: { commonsMusicEditors: "" } }));
 jest.mock("../helpers/ContentLibraryHelper", () => ({ ContentLibraryHelper: { songJson: jest.fn(), renderChordpro: () => "" } }));
 
-import { ASSET_TYPES } from "../helpers/AssetTypes";
-import { ReviewerHelper } from "../helpers/ReviewerHelper";
-import { isUploadableName, validateSubmission } from "../helpers/SubmitValidation";
-import { packageFields } from "../helpers/publishHooks/song";
+import { ASSET_TYPES } from "../helpers/AssetTypes.js";
+import { ReviewerHelper } from "../helpers/ReviewerHelper.js";
+import { isUploadableName, validateSubmission } from "../helpers/SubmitValidation.js";
+import { packageFields } from "../helpers/publishHooks/song.js";
 
 const song = ASSET_TYPES.song;
 const goodSong = { name: "Hymn", license: "WC", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true, videoUrl: "https://youtu.be/demo" } };
 const withMaster = (masterLicense?: string) => ({ ...goodSong, detail: { ...goodSong.detail, recordingOwned: true, masterLicense } });
 const file = (name: string, sizeBytes = 1000, action = "add") => ({ name, sizeBytes, action });
 const published = { isNewAsset: false, note: "the studio master, mixed in the original key" };
-const parse = (v: any) => (typeof v === "string" ? JSON.parse(v) : v);
+const parse = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
 
 describe("master recording: a second rights layer with its own license", () => {
   it("master.<audio ext> is an uploadable song file", () => {

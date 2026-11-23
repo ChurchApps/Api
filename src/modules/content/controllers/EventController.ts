@@ -93,7 +93,7 @@ export class EventController extends ContentBaseController {
 
   // #1644: the signed-in person's own calendar feed credentials; the client builds the feed URL.
   @httpGet("/subscribe/mine")
-  public async subscribeMine(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async subscribeMine(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.personId) return this.json({ error: "personId required" }, 400);
       return { churchId: au.churchId, personId: au.personId, token: CalendarFeedTokenHelper.create(au.churchId, au.personId) };

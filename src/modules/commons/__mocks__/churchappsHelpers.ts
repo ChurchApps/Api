@@ -1,8 +1,10 @@
 // Jest cannot load the ESM-only @churchapps/helpers build, so tests mock it with a fixture
 // registry that mirrors the shape of the real ASSET_TYPES entries used here.
+import type { AssetFileRole, AssetTypeDefinition } from "@churchapps/helpers";
+
 const MB = 1048576;
 export const COMMONS_PRODUCT_LABELS = { worshipcommons: "WorshipCommons", freeshow: "FreeShow", lessons: "Lessons", b1: "B1" };
-export const ASSET_TYPES: Record<string, any> = {
+export const ASSET_TYPES: Record<string, AssetTypeDefinition> = {
   song: {
     key: "song",
     label: "Song",
@@ -47,8 +49,8 @@ export const ASSET_TYPES: Record<string, any> = {
 };
 export const FILE_ROLE_ALIASES: Record<string, string> = { "tune.mid": "midi", "tune.abc": "abc", "timing.json": "timing", "art-thumb.webp": "thumb", "lyrics.chordpro": "chart", "song.mp3": "demoAudio", "song.wav": "demoAudio", "song.m4a": "demoAudio", "song.ogg": "demoAudio", "song.flac": "demoAudio" };
 export const fileRole = (name: string): string => FILE_ROLE_ALIASES[name] ?? name.replace(/\.[^.]+$/, "");
-export function conventionalFileName(def: any, role: string, originalName: string): string | null {
-  const spec = def.files.find((f: any) => f.role === role);
+export function conventionalFileName(def: AssetTypeDefinition, role: string, originalName: string): string | null {
+  const spec = def.files.find((f: AssetFileRole) => f.role === role);
   if (!spec || spec.generated) return null;
   const ext = (originalName.includes(".") ? originalName.split(".").pop() || "" : "").toLowerCase();
   if (!spec.extensions.includes(ext)) return null;

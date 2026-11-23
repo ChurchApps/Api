@@ -2,15 +2,16 @@ import "reflect-metadata";
 
 const sendTransactional = jest.fn(async () => {});
 jest.mock("../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional } }));
-const loadByIds = jest.fn(async () => [{ id: "user0000001", email: "writer@example.com" }]);
+const loadByIds = jest.fn(async (_ids: string[]): Promise<{ id: string; email?: string }[]> => [{ id: "user0000001", email: "writer@example.com" }]);
 jest.mock("../../../shared/infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ user: { loadByIds } })) } }));
 jest.mock("../../../shared/helpers/Environment.js", () => ({ Environment: { supportEmail: "support@churchapps.org", worshipCommonsRoot: "https://worshipcommons.org", b1AdminRoot: "https://admin.b1.church" } }));
 
 import { CommonsMailHelper } from "../helpers/CommonsMailHelper.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
+import type { Report, Submission } from "../models/index.js";
 
-const sub = (): any => ({ id: "sub00000001", submittedBy: "user0000001", payload: { name: "New Hymn" } });
+const sub = (): Submission => ({ id: "sub00000001", submittedBy: "user0000001", payload: { name: "New Hymn" } });
 
 describe("CommonsMailHelper writer emails", () => {
   beforeEach(() => {
@@ -85,8 +86,8 @@ describe("CommonsMailHelper writer emails", () => {
     expect((TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5]).toContain("https://worshipcommons.org/songs/asset000001/edit?draft=sub00000001");
   });
 
-  it.each(["notifyReceived", "notifyApproved", "notifyChangesRequested", "notifyRejected"])("%s shares the my-songs link and support footer", async (method) => {
-    await (CommonsMailHelper as any)[method](sub(), method === "notifyApproved" ? "asset000001" : method === "notifyRejected" ? "quality" : "a note");
+  it.each(["notifyReceived", "notifyApproved", "notifyChangesRequested", "notifyRejected"] as const)("%s shares the my-songs link and support footer", async (method) => {
+    await CommonsMailHelper[method](sub(), method === "notifyApproved" ? "asset000001" : method === "notifyRejected" ? "quality" : "a note");
     const body = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5];
     expect(body).toContain('<a href="https://worshipcommons.org/my-songs">');
     expect(body).toContain("Questions? Email support@churchapps.org.");
@@ -188,7 +189,7 @@ describe("CommonsMailHelper.notifyReviewerDigest", () => {
 });
 
 describe("CommonsMailHelper report emails", () => {
-  const report = (over: any = {}): any => ({ id: "rep00000001", contentText: "Old Hymn", reason: "copyright", email: "reporter@example.com", ...over });
+  const report = (over: Report = {}): Report => ({ id: "rep00000001", contentText: "Old Hymn", reason: "copyright", email: "reporter@example.com", ...over });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -235,8 +236,8 @@ describe("CommonsMailHelper report emails", () => {
     expect(body).not.toContain("<p>   </p>");
   });
 
-  it.each(["notifyReportReceived", "notifyReportResolved"])("skips %s when the report has no email", async (method) => {
-    await (CommonsMailHelper as any)[method](report({ email: undefined }), "upheld");
+  it.each(["notifyReportReceived", "notifyReportResolved"] as const)("skips %s when the report has no email", async (method) => {
+    await CommonsMailHelper[method](report({ email: undefined }), "upheld");
     expect(TransactionalEmailHelper.sendTransactional).not.toHaveBeenCalled();
   });
 
@@ -275,8 +276,8 @@ describe("CommonsMailHelper proposal-type wording", () => {
     jest.clearAllMocks();
     loadByIds.mockResolvedValue([{ id: "user0000001", email: "writer@example.com" }]);
   });
-  const typed = (type: string): any => ({ ...sub(), type });
-  const last = () => (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls.at(-1) as any[];
+  const typed = (type: string): Submission => ({ ...sub(), type });
+  const last = () => (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls.at(-1) as unknown[];
 
   it("names the proposal in the received, approved and rejected mails", async () => {
     await CommonsMailHelper.notifyReceived(typed("correction"));

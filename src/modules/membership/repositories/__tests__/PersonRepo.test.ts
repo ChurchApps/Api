@@ -268,11 +268,11 @@ describe("PersonRepo.loadRecent ordering", () => {
 });
 
 describe("PersonRepo.findPossibleDuplicatePairs", () => {
-  function rawDb(rows: any[]) {
-    const queries: any[] = [];
+  function rawDb(rows: Record<string, unknown>[]) {
+    const queries: unknown[] = [];
     const executor = {
-      transformQuery: (node: any) => node,
-      compileQuery: (node: any) => { queries.push(node); return { sql: "", parameters: [], query: node }; },
+      transformQuery: (node: unknown) => node,
+      compileQuery: (node: unknown) => { queries.push(node); return { sql: "", parameters: [] as unknown[], query: node }; },
       executeQuery: async () => ({ rows })
     };
     return { db: { getExecutor: () => executor }, queries };
