@@ -50,7 +50,7 @@ export class SubscriptionRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  private rowToModel(row: any): Subscription {
+  private rowToModel(row: Subscription): Subscription {
     return { id: row.id, churchId: row.churchId, personId: row.personId, customerId: row.customerId, currency: row.currency };
   }
 }

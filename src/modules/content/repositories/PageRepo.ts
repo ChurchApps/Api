@@ -21,7 +21,7 @@ export class PageRepo {
       visibility: model.visibility,
       groupIds: model.groupIds,
       metaDescription: model.metaDescription
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -34,7 +34,7 @@ export class PageRepo {
       visibility: model.visibility,
       groupIds: model.groupIds,
       metaDescription: model.metaDescription
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -52,7 +52,7 @@ export class PageRepo {
   }
 
   public async loadAll(churchId: string, siteId = ""): Promise<Page[]> {
-    return getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("churchId", "=", churchId).where("siteId", "=", siteId).execute() as any;
+    return getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("churchId", "=", churchId).where("siteId", "=", siteId).execute();
   }
 
   public async loadByUrl(churchId: string, url: string, siteId = "") {
@@ -60,7 +60,7 @@ export class PageRepo {
   }
 
   public async loadPublished(churchId: string, id: string): Promise<Page | undefined> {
-    return (await getDb().selectFrom("pages").select(["id", "publishedJSON", "publishedAt"]).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) as any ?? null;
+    return (await getDb().selectFrom("pages").select(["id", "publishedJSON", "publishedAt"]).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
   public async savePublished(churchId: string, id: string, publishedJSON: string | null): Promise<Date | null> {
@@ -69,10 +69,10 @@ export class PageRepo {
     return publishedAt;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Page; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Page[]; }
+  public convertToModel(_churchId: string, data: Page) { return data; }
+  public convertAllToModel(_churchId: string, data: Page[]) { return data || []; }
 
-  protected rowToModel(row: any): Page {
+  protected rowToModel(row: Page): Page {
     return {
       id: row.id,
       churchId: row.churchId,

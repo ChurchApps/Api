@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
 import { getDb } from "../db/index.js";
+import type { GatewayPaymentMethodRow } from "./types.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GatewayPaymentMethod } from "../models/index.js";
 
@@ -22,7 +23,7 @@ export class GatewayPaymentMethodRepo {
       methodType: model.methodType,
       displayName: model.displayName,
       metadata
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -35,7 +36,7 @@ export class GatewayPaymentMethodRepo {
       methodType: model.methodType,
       displayName: model.displayName,
       metadata
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -84,7 +85,7 @@ export class GatewayPaymentMethodRepo {
     return rows.map(r => this.rowToModel(r));
   }
 
-  private rowToModel(row: any): GatewayPaymentMethod {
+  private rowToModel(row: GatewayPaymentMethodRow): GatewayPaymentMethod {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -99,12 +100,12 @@ export class GatewayPaymentMethodRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: GatewayPaymentMethodRow) {
     return data ? this.rowToModel(data) : null;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
-    return data.map((r: any) => this.rowToModel(r));
+  public convertAllToModel(_churchId: string, data: GatewayPaymentMethodRow[]) {
+    return data.map((r) => this.rowToModel(r));
   }
 
   private parseJson(value: unknown) {

@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
 import { getDb } from "../db/index.js";
+import type { CustomerRow } from "./types.js";
 import { Customer } from "../models/index.js";
 
 @injectable()
@@ -42,7 +43,7 @@ export class CustomerRepo {
       personId: model.personId,
       provider,
       metadata
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -53,7 +54,7 @@ export class CustomerRepo {
       personId: model.personId,
       provider,
       metadata
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -83,20 +84,20 @@ export class CustomerRepo {
       .execute());
   }
 
-  private pickPrimary(rows: any[]): Customer | null {
+  private pickPrimary(rows: CustomerRow[]): Customer | null {
     const models = rows.map(r => this.rowToModel(r));
     return models.find(m => !m.metadata?.guest) ?? models[0] ?? null;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: CustomerRow) {
     return data ? this.rowToModel(data) : null;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(_churchId: string, data: CustomerRow[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 
-  private rowToModel(row: any): Customer {
+  private rowToModel(row: CustomerRow): Customer {
     return {
       id: row.id,
       churchId: row.churchId,

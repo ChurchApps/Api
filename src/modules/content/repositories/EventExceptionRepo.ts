@@ -17,7 +17,7 @@ export class EventExceptionRepo {
       churchId: model.churchId,
       eventId: model.eventId,
       exceptionDate
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -26,7 +26,7 @@ export class EventExceptionRepo {
     await getDb().updateTable("eventExceptions").set({
       eventId: model.eventId,
       exceptionDate
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -39,20 +39,20 @@ export class EventExceptionRepo {
   }
 
   public async loadAll(churchId: string): Promise<EventException[]> {
-    return getDb().selectFrom("eventExceptions").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("eventExceptions").selectAll().where("churchId", "=", churchId).execute();
   }
 
   public async loadForEvents(churchId: string, eventIds: string[]) {
     if (!eventIds || eventIds.length === 0) return [];
     return getDb().selectFrom("eventExceptions").selectAll()
       .where("churchId", "=", churchId)
-      .where("eventId", "in", eventIds).execute() as any;
+      .where("eventId", "in", eventIds).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as EventException; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as EventException[]; }
+  public convertToModel(_churchId: string, data: EventException) { return data; }
+  public convertAllToModel(_churchId: string, data: EventException[]) { return data || []; }
 
-  protected rowToModel(row: any): EventException {
+  protected rowToModel(row: EventException): EventException {
     return {
       id: row.id,
       churchId: row.churchId,

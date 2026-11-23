@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
+import type { SubscriptionFundWithName } from "./types.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { SubscriptionFund } from "../models/index.js";
 import { FundRepo } from "./FundRepo.js";
@@ -25,7 +26,7 @@ export class SubscriptionFundsRepo {
       subscriptionId: model.subscriptionId,
       fundId: model.fundId,
       amount: model.amount
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -34,7 +35,7 @@ export class SubscriptionFundsRepo {
       subscriptionId: model.subscriptionId,
       fundId: model.fundId,
       amount: model.amount
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -57,8 +58,8 @@ export class SubscriptionFundsRepo {
       .execute();
   }
 
-  public async loadBySubscriptionId(churchId: string, subscriptionId: string) {
-    const result = await sql<any>`
+  public async loadBySubscriptionId(churchId: string, subscriptionId: string): Promise<SubscriptionFundWithName[]> {
+    const result = await sql<SubscriptionFundWithName>`
       SELECT subscriptionFunds.*, funds.name
       FROM subscriptionFunds
       LEFT JOIN funds ON subscriptionFunds.fundId = funds.id
@@ -68,16 +69,16 @@ export class SubscriptionFundsRepo {
   }
 
   // If the fund gets deleted for a recurring donation, the donations will go to '(General Fund)'
-  public async loadForSubscriptionLog(churchId: string, subscriptionId: string) {
-    const queryResult = await sql<any>`
+  public async loadForSubscriptionLog(churchId: string, subscriptionId: string): Promise<SubscriptionFundWithName[]> {
+    const queryResult = await sql<SubscriptionFundWithName & { removed: boolean | number | null }>`
       SELECT subscriptionFunds.*, funds.name, funds.removed
       FROM subscriptionFunds
       LEFT JOIN funds ON subscriptionFunds.fundId = funds.id
       WHERE subscriptionFunds.churchId = ${churchId}
         AND subscriptionFunds.subscriptionId = ${subscriptionId}`.execute(getDb());
     const subscriptionFunds = queryResult.rows;
-    const generalFund = subscriptionFunds.some((r: any) => r.removed !== false) ? await this.fundRepository.getOrCreateGeneral(churchId) : null;
-    return subscriptionFunds.map((row: any) => {
+    const generalFund = subscriptionFunds.some((r) => r.removed !== false) ? await this.fundRepository.getOrCreateGeneral(churchId) : null;
+    return subscriptionFunds.map((row) => {
       const { removed, ...sf } = row;
       if (removed !== false) {
         sf.fundId = generalFund.id;
@@ -87,7 +88,7 @@ export class SubscriptionFundsRepo {
     });
   }
 
-  public convertToModel(churchId: string, data: any) {
+  public convertToModel(churchId: string, data: SubscriptionFund) {
     const result: SubscriptionFund = {
       id: data.id,
       churchId,
@@ -98,7 +99,7 @@ export class SubscriptionFundsRepo {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    return data.map((d: any) => this.convertToModel(churchId, d));
+  public convertAllToModel(churchId: string, data: SubscriptionFund[]) {
+    return data.map((d) => this.convertToModel(churchId, d));
   }
 }

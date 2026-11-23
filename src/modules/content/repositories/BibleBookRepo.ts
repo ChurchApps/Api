@@ -18,7 +18,7 @@ export class BibleBookRepo {
       abbreviation: model.abbreviation,
       name: model.name,
       sort: model.sort
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -41,8 +41,8 @@ export class BibleBookRepo {
     return (await getDb().selectFrom("bibleBooks").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public async loadAll(translationKey: string) {
-    return getDb().selectFrom("bibleBooks").selectAll().where("translationKey", "=", translationKey).orderBy("sort").execute() as any;
+  public async loadAll(translationKey: string): Promise<BibleBook[]> {
+    return getDb().selectFrom("bibleBooks").selectAll().where("translationKey", "=", translationKey).orderBy("sort").execute();
   }
 
   public async saveAll(models: BibleBook[]) {
@@ -50,10 +50,10 @@ export class BibleBookRepo {
     return Promise.all(promises);
   }
 
-  public convertToModel(data: any) { return data as BibleBook; }
-  public convertAllToModel(data: any[]) { return (data || []) as BibleBook[]; }
+  public convertToModel(data: BibleBook) { return data; }
+  public convertAllToModel(data: BibleBook[]) { return data || []; }
 
-  protected rowToModel(row: any): BibleBook {
+  protected rowToModel(row: BibleBook): BibleBook {
     return {
       id: row.id,
       translationKey: row.translationKey,

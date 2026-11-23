@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
+import type { GatewayRow } from "./types.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Gateway } from "../models/index.js";
 
@@ -28,7 +29,7 @@ export class GatewayRepo {
       currency: gateway.currency,
       settings,
       environment: gateway.environment
-    } as any).execute();
+    }).execute();
     return gateway;
   }
 
@@ -44,7 +45,7 @@ export class GatewayRepo {
       currency: gateway.currency,
       settings,
       environment: gateway.environment
-    } as any).where("id", "=", gateway.id).where("churchId", "=", gateway.churchId).execute();
+    }).where("id", "=", gateway.id).where("churchId", "=", gateway.churchId).execute();
     return gateway;
   }
 
@@ -62,11 +63,11 @@ export class GatewayRepo {
   }
 
   public async loadByProvider(provider: string): Promise<Gateway[]> {
-    const result = await sql<any>`SELECT * FROM gateways WHERE LOWER(provider) = LOWER(${provider})`.execute(getDb());
-    return result.rows.map((r: any) => this.rowToModel(r));
+    const result = await sql<GatewayRow>`SELECT * FROM gateways WHERE LOWER(provider) = LOWER(${provider})`.execute(getDb());
+    return result.rows.map((r) => this.rowToModel(r));
   }
 
-  private rowToModel(data: any): Gateway {
+  private rowToModel(data: GatewayRow): Gateway {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -84,15 +85,15 @@ export class GatewayRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: GatewayRow) {
     const model = this.rowToModel(data);
     // Strip sensitive fields - privateKey/webhookKey should never be returned to clients
     const { privateKey: _privateKey, webhookKey: _webhookKey, ...safeModel } = model;
     return safeModel;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    return data.map((row: any) => this.convertToModel(churchId, row));
+  public convertAllToModel(churchId: string, data: GatewayRow[]) {
+    return data.map((row) => this.convertToModel(churchId, row));
   }
 
   private parseJson(value: unknown) {

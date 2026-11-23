@@ -5,6 +5,7 @@ jest.mock("../../../../shared/helpers/TransactionalEmailHelper", () => ({ Transa
 jest.mock("../../../../shared/infrastructure/RepoManager", () => ({ RepoManager: { getRepos: jest.fn() } }));
 
 import { DunningHelper } from "../DunningHelper";
+import type { Donation } from "../../models/index.js";
 import { TransactionalEmailHelper } from "../../../../shared/helpers/TransactionalEmailHelper";
 import { RepoManager } from "../../../../shared/infrastructure/RepoManager";
 
@@ -13,12 +14,12 @@ const getRepos = RepoManager.getRepos as jest.Mock;
 
 const failedDonation = { id: "don1", churchId: "ch1", personId: "per1", amount: 25, currency: "usd", donationDate: new Date("2026-09-01") };
 
-const makeGivingRepos = (byAge: Record<number, any[]> = {}) => ({
+const makeGivingRepos = (byAge: Record<number, Donation[]> = {}) => ({
   eventLog: { loadByProviderId: jest.fn().mockResolvedValue(null), save: jest.fn().mockResolvedValue({}) },
   donation: { loadFailedByAge: jest.fn().mockImplementation(async (days: number) => byAge[days] || []) }
 });
 
-const makeMembershipRepos = (person: any = { id: "per1", email: "donor@test" }) => ({
+const makeMembershipRepos = (person: { id: string; email?: string } | null = { id: "per1", email: "donor@test" }) => ({
   person: { load: jest.fn().mockResolvedValue(person) },
   church: { loadById: jest.fn().mockResolvedValue({ id: "ch1", name: "Grace Church", subDomain: "grace" }) }
 });
@@ -90,10 +91,10 @@ describe("DunningHelper", () => {
 
       const result = await DunningHelper.run();
 
-      expect(givingRepos.donation.loadFailedByAge.mock.calls.map((c: any[]) => c[0])).toEqual([3, 7]);
+      expect(givingRepos.donation.loadFailedByAge.mock.calls.map((c) => c[0])).toEqual([3, 7]);
       expect(result).toEqual({ sent: 2 });
       expect(sendTransactional).toHaveBeenCalledTimes(2);
-      expect(givingRepos.eventLog.save.mock.calls.map((c: any[]) => c[0].providerId)).toEqual(["don1:3", "don2:7"]);
+      expect(givingRepos.eventLog.save.mock.calls.map((c) => c[0].providerId)).toEqual(["don1:3", "don2:7"]);
     });
 
     it("keeps going when one donor's email throws", async () => {
@@ -122,7 +123,7 @@ describe("DunningHelper", () => {
     });
 
     it("is escaped in the cancellation email", async () => {
-      await DunningHelper.notifyCanceled("ch1", { id: "sub1", personId: "per1" } as any, makeGivingRepos());
+      await DunningHelper.notifyCanceled("ch1", { id: "sub1", personId: "per1" }, makeGivingRepos());
       const contents = sendTransactional.mock.calls[0][5];
       expect(contents).not.toContain("<a href=\"https://x.test\">");
       expect(contents).toContain("&lt;a href=&quot;https://x.test&quot;&gt;Grace&lt;/a&gt;");

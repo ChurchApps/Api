@@ -5,9 +5,14 @@ const loginAttempt = {
 };
 jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: async () => ({ loginAttempt }) } }));
 
+import type express from "express";
 import { DonationRateLimiter } from "../DonationRateLimiter";
+import type { ApiGatewayRequest } from "../types.js";
 
-const req = (xff: string, sourceIp?: string): any => ({ headers: { "x-forwarded-for": xff }, requestContext: sourceIp ? { identity: { sourceIp } } : undefined });
+const req = (xff: string, sourceIp?: string) => {
+  const fake: Partial<express.Request> & ApiGatewayRequest = { headers: { "x-forwarded-for": xff }, requestContext: sourceIp ? { identity: { sourceIp } } : undefined };
+  return fake as express.Request;
+};
 
 beforeEach(() => {
   Object.keys(counts).forEach((k) => delete counts[k]);

@@ -16,6 +16,9 @@ jest.mock("@churchapps/apihelper", () => ({ __esModule: true, ArrayHelper: {}, U
 import { SettingRepo } from "../SettingRepo";
 
 const CHURCH_ID = "tst1173";
+// settings.public is BIT(1): clients post a number even though Setting types it as a string, and "1" is too long for the column.
+const PUBLIC_ON = 1 as unknown as string;
+const PUBLIC_OFF = 0 as unknown as string;
 
 describe("content SettingRepo with duplicate church-level rows", () => {
   beforeEach(cleanup);
@@ -32,11 +35,11 @@ describe("content SettingRepo with duplicate church-level rows", () => {
     const repo = new SettingRepo();
 
     // B1Admin SiteWidgetsEdit: load all, take the first matching row, post it back by id.
-    const adminRow = (await repo.loadAll(CHURCH_ID)).find((s: any) => s.keyName === "announcementBanner");
+    const adminRow = (await repo.loadAll(CHURCH_ID)).find((s) => s.keyName === "announcementBanner");
     await repo.save({ ...adminRow, value: "New banner" });
 
-    const publicResult: any = {};
-    (await repo.loadPublicSettings(CHURCH_ID)).forEach((s: any) => { publicResult[s.keyName] = s.value; });
+    const publicResult: Record<string, string> = {};
+    (await repo.loadPublicSettings(CHURCH_ID)).forEach((s) => { publicResult[s.keyName] = s.value; });
     expect(publicResult.announcementBanner).toBe("New banner");
 
     const remaining = await sql<{ id: string }>`SELECT id FROM settings WHERE churchId = ${CHURCH_ID} AND keyName = 'announcementBanner'`.execute(db);
@@ -45,10 +48,10 @@ describe("content SettingRepo with duplicate church-level rows", () => {
 
   it("a save without an id updates the existing church-level row", async () => {
     const repo = new SettingRepo();
-    const first = await repo.save({ churchId: CHURCH_ID, keyName: "hidePublicSite", value: "true", public: 1 } as any);
-    const second = await repo.save({ churchId: CHURCH_ID, keyName: "hidePublicSite", value: "false", public: 1 } as any);
+    const first = await repo.save({ churchId: CHURCH_ID, keyName: "hidePublicSite", value: "true", public: PUBLIC_ON });
+    const second = await repo.save({ churchId: CHURCH_ID, keyName: "hidePublicSite", value: "false", public: PUBLIC_ON });
 
-    const rows = (await repo.loadAll(CHURCH_ID)).filter((s: any) => s.keyName === "hidePublicSite");
+    const rows = (await repo.loadAll(CHURCH_ID)).filter((s) => s.keyName === "hidePublicSite");
     expect(rows).toHaveLength(1);
     expect(rows[0].value).toBe("false");
     expect(second.id).toBe(first.id);
@@ -59,13 +62,13 @@ describe("content SettingRepo with duplicate church-level rows", () => {
     await sql`INSERT INTO settings (id, churchId, userId, keyName, value, public) VALUES
       ('ccccccccccc', ${CHURCH_ID}, NULL, 'youtubeChannelId', 'chan1', 1),
       ('ddddddddddd', ${CHURCH_ID}, NULL, 'youtubeChannelId', 'chan2', 1)`.execute(db);
-    await repo.save({ churchId: CHURCH_ID, keyName: "theme", value: "church", public: 0 } as any);
-    await repo.save({ churchId: CHURCH_ID, userId: "user1173", keyName: "theme", value: "dark", public: 0 } as any);
-    await repo.save({ churchId: CHURCH_ID, userId: "user1173", keyName: "theme", value: "light", public: 0 } as any);
-    await repo.save({ churchId: CHURCH_ID, keyName: "youtubeChannelId", value: "chan3", public: 1 } as any);
+    await repo.save({ churchId: CHURCH_ID, keyName: "theme", value: "church", public: PUBLIC_OFF });
+    await repo.save({ churchId: CHURCH_ID, userId: "user1173", keyName: "theme", value: "dark", public: PUBLIC_OFF });
+    await repo.save({ churchId: CHURCH_ID, userId: "user1173", keyName: "theme", value: "light", public: PUBLIC_OFF });
+    await repo.save({ churchId: CHURCH_ID, keyName: "youtubeChannelId", value: "chan3", public: PUBLIC_ON });
 
-    expect((await repo.loadAll(CHURCH_ID)).filter((s: any) => s.keyName === "youtubeChannelId")).toHaveLength(3);
-    expect((await repo.loadAll(CHURCH_ID)).find((s: any) => s.keyName === "theme").value).toBe("church");
+    expect((await repo.loadAll(CHURCH_ID)).filter((s) => s.keyName === "youtubeChannelId")).toHaveLength(3);
+    expect((await repo.loadAll(CHURCH_ID)).find((s) => s.keyName === "theme").value).toBe("church");
     expect(await repo.loadUser(CHURCH_ID, "user1173")).toHaveLength(2);
   });
 });

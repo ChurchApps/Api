@@ -1,6 +1,15 @@
+import type { IPermission } from "@churchapps/apihelper";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import type { DonationBatchRepo } from "../repositories/DonationBatchRepo.js";
+import type { DonationRepo } from "../repositories/DonationRepo.js";
+import type { FundDonationRepo } from "../repositories/FundDonationRepo.js";
 
-interface AccessUser { churchId: string; checkAccess: (permission: any) => boolean }
+interface AccessUser { churchId: string; checkAccess: (permission: IPermission) => boolean }
+type BatchRepos = {
+  donationBatch: Pick<DonationBatchRepo, "load">;
+  donation: Pick<DonationRepo, "load">;
+  fundDonation: Pick<FundDonationRepo, "load">;
+};
 
 // Edit Donations may change anything. Enter Donations may only add or change donations in a batch that is still open,
 // so a treasurer can close a counted batch and know it stays the way it was closed. Gifts that came through a
@@ -14,13 +23,13 @@ export class BatchAccessHelper {
     return au.checkAccess(Permissions.donations.edit) || au.checkAccess(Permissions.donations.enter);
   }
 
-  public static async isBatchOpen(repos: any, churchId: string, batchId: string | null | undefined) {
+  public static async isBatchOpen(repos: BatchRepos, churchId: string, batchId: string | null | undefined) {
     if (!batchId) return false;
     return this.isOpen(await repos.donationBatch.load(churchId, batchId));
   }
 
   // The donation's current batch (when it exists) and the batch it is being saved into must both be open.
-  public static async canChangeDonation(repos: any, au: AccessUser, donation: { id?: string; batchId?: string }) {
+  public static async canChangeDonation(repos: BatchRepos, au: AccessUser, donation: { id?: string; batchId?: string }) {
     if (au.checkAccess(Permissions.donations.edit)) return true;
     if (!au.checkAccess(Permissions.donations.enter)) return false;
     if (donation.id) {
@@ -30,7 +39,7 @@ export class BatchAccessHelper {
     return this.isBatchOpen(repos, au.churchId, donation.batchId);
   }
 
-  public static async canDeleteDonation(repos: any, au: AccessUser, donationId: string) {
+  public static async canDeleteDonation(repos: BatchRepos, au: AccessUser, donationId: string) {
     if (au.checkAccess(Permissions.donations.edit)) return true;
     if (!au.checkAccess(Permissions.donations.enter)) return false;
     const existing = await repos.donation.load(au.churchId, donationId);
@@ -38,7 +47,7 @@ export class BatchAccessHelper {
   }
 
   // A fund split belongs to its donation, so it follows the donation's batch.
-  public static async canChangeFundDonation(repos: any, au: AccessUser, fundDonation: { id?: string; donationId?: string }) {
+  public static async canChangeFundDonation(repos: BatchRepos, au: AccessUser, fundDonation: { id?: string; donationId?: string }) {
     if (au.checkAccess(Permissions.donations.edit)) return true;
     if (!au.checkAccess(Permissions.donations.enter)) return false;
     if (fundDonation.id) {
@@ -48,7 +57,7 @@ export class BatchAccessHelper {
     return !!fundDonation.donationId && this.canDeleteDonation(repos, au, fundDonation.donationId);
   }
 
-  public static async canDeleteFundDonation(repos: any, au: AccessUser, id: string) {
+  public static async canDeleteFundDonation(repos: BatchRepos, au: AccessUser, id: string) {
     if (au.checkAccess(Permissions.donations.edit)) return true;
     if (!au.checkAccess(Permissions.donations.enter)) return false;
     const existing = await repos.fundDonation.load(au.churchId, id);

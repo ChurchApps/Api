@@ -26,7 +26,7 @@ export class RedirectRepo {
       fromPath: model.fromPath,
       toPath: model.toPath,
       createdDate: model.createdDate
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -34,7 +34,7 @@ export class RedirectRepo {
     await getDb().updateTable("redirects").set({
       fromPath: model.fromPath,
       toPath: model.toPath
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -47,18 +47,18 @@ export class RedirectRepo {
   }
 
   public async loadAll(churchId: string): Promise<Redirect[]> {
-    return getDb().selectFrom("redirects").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("redirects").selectAll().where("churchId", "=", churchId).execute();
   }
 
   public async loadByFromPath(churchId: string, fromPath: string): Promise<Redirect[]> {
-    return getDb().selectFrom("redirects").selectAll().where("churchId", "=", churchId).where("fromPath", "=", fromPath).execute() as any;
+    return getDb().selectFrom("redirects").selectAll().where("churchId", "=", churchId).where("fromPath", "=", fromPath).execute();
   }
 
   public async count(churchId: string): Promise<number> {
     const row = await getDb().selectFrom("redirects").select((eb) => eb.fn.countAll().as("count")).where("churchId", "=", churchId).executeTakeFirst();
-    return Number((row as any)?.count ?? 0);
+    return Number(row?.count ?? 0);
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Redirect; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Redirect[]; }
+  public convertToModel(_churchId: string, data: Redirect) { return data; }
+  public convertAllToModel(_churchId: string, data: Redirect[]) { return data || []; }
 }

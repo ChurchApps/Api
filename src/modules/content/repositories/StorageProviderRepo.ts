@@ -1,4 +1,5 @@
 import { injectable } from "inversify";
+import type { StorageProviderRow } from "./types.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { StorageProvider } from "../models/index.js";
@@ -50,14 +51,14 @@ export class StorageProviderRepo {
     await getDb().deleteFrom("storageProviders").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(data: any): StorageProvider {
+  protected rowToModel(data: StorageProviderRow): StorageProvider {
     return {
       id: data.id,
       churchId: data.churchId,
       provider: data.provider,
       apiKey: data.apiKey,
       apiSecret: data.apiSecret,
-      enabled: data.enabled === true || data.enabled === 1 || data.enabled?.[0] === 1,
+      enabled: data.enabled === true || data.enabled === 1 || (data.enabled as Buffer)?.[0] === 1,
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
       tokenExpiresAt: data.tokenExpiresAt,
@@ -65,11 +66,11 @@ export class StorageProviderRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: StorageProviderRow) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: StorageProviderRow[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

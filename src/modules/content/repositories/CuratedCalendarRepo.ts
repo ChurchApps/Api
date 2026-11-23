@@ -15,7 +15,7 @@ export class CuratedCalendarRepo {
       id: model.id,
       churchId: model.churchId,
       name: model.name
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -33,13 +33,13 @@ export class CuratedCalendarRepo {
   }
 
   public async loadAll(churchId: string): Promise<CuratedCalendar[]> {
-    return getDb().selectFrom("curatedCalendars").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("curatedCalendars").selectAll().where("churchId", "=", churchId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as CuratedCalendar; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as CuratedCalendar[]; }
+  public convertToModel(_churchId: string, data: CuratedCalendar) { return data; }
+  public convertAllToModel(_churchId: string, data: CuratedCalendar[]) { return data || []; }
 
-  protected rowToModel(row: any): CuratedCalendar {
+  protected rowToModel(row: CuratedCalendar): CuratedCalendar {
     return {
       id: row.id,
       churchId: row.churchId,

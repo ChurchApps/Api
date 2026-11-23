@@ -2,15 +2,17 @@ import "reflect-metadata";
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 
 import { CustomerRepo } from "../CustomerRepo";
+import type { Customer } from "../../models/index.js";
 
 // Regression: save() must scope customer lookup by provider to prevent data loss.
 describe("CustomerRepo.save (provider-scoped customer keying)", () => {
   const makeRepo = () => {
     const repo = new CustomerRepo();
-    jest.spyOn(repo as any, "create").mockImplementation(async (m: any) => m);
-    jest.spyOn(repo as any, "update").mockImplementation(async (m: any) => m);
-    jest.spyOn(repo as any, "delete").mockResolvedValue(undefined);
-    jest.spyOn(repo, "loadByPersonId").mockResolvedValue(null as any);
+    // create and update are private, so they are swapped through bracket access.
+    repo["create"] = jest.fn(async (m: Customer) => m);
+    repo["update"] = jest.fn(async (m: Customer) => m);
+    jest.spyOn(repo, "delete").mockResolvedValue(undefined);
+    jest.spyOn(repo, "loadByPersonId").mockResolvedValue(null);
     return repo;
   };
 
@@ -18,8 +20,8 @@ describe("CustomerRepo.save (provider-scoped customer keying)", () => {
 
   it("looks up the existing customer by person AND provider, never by person alone", async () => {
     const repo = makeRepo();
-    const scoped = jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue(null as any);
-    await repo.save({ id: "ab_123", churchId: "C1", personId: "P1", provider: "kingdomfunding" } as any);
+    const scoped = jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue(null);
+    await repo.save({ id: "ab_123", churchId: "C1", personId: "P1", provider: "kingdomfunding" });
     expect(scoped).toHaveBeenCalledWith("C1", "P1", "kingdomfunding");
     expect(repo.loadByPersonId).not.toHaveBeenCalled();
   });
@@ -27,32 +29,32 @@ describe("CustomerRepo.save (provider-scoped customer keying)", () => {
   it("creates a new row for a second provider instead of clobbering the first provider's customer", async () => {
     const repo = makeRepo();
     // KingdomFunding customer doesn't exist (Stripe customer is a different provider).
-    jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue(null as any);
-    await repo.save({ id: "ab_123", churchId: "C1", personId: "P1", provider: "kingdomfunding" } as any);
-    expect((repo as any).create).toHaveBeenCalledTimes(1);
-    expect((repo as any).delete).not.toHaveBeenCalled();
+    jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue(null);
+    await repo.save({ id: "ab_123", churchId: "C1", personId: "P1", provider: "kingdomfunding" });
+    expect(repo["create"]).toHaveBeenCalledTimes(1);
+    expect(repo.delete).not.toHaveBeenCalled();
   });
 
   it("updates in place when the same provider's customer id already exists", async () => {
     const repo = makeRepo();
-    jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue({ id: "cus_s", churchId: "C1", personId: "P1", provider: "stripe" } as any);
-    await repo.save({ id: "cus_s", churchId: "C1", personId: "P1", provider: "stripe" } as any);
-    expect((repo as any).update).toHaveBeenCalledTimes(1);
-    expect((repo as any).delete).not.toHaveBeenCalled();
+    jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue({ id: "cus_s", churchId: "C1", personId: "P1", provider: "stripe" });
+    await repo.save({ id: "cus_s", churchId: "C1", personId: "P1", provider: "stripe" });
+    expect(repo["update"]).toHaveBeenCalledTimes(1);
+    expect(repo.delete).not.toHaveBeenCalled();
   });
 
   it("replaces (delete + create) only when the provider matches but the external id changed", async () => {
     const repo = makeRepo();
-    jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue({ id: "old", churchId: "C1", personId: "P1", provider: "stripe" } as any);
-    await repo.save({ id: "new", churchId: "C1", personId: "P1", provider: "stripe" } as any);
-    expect((repo as any).delete).toHaveBeenCalledWith("C1", "old");
-    expect((repo as any).create).toHaveBeenCalledTimes(1);
+    jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue({ id: "old", churchId: "C1", personId: "P1", provider: "stripe" });
+    await repo.save({ id: "new", churchId: "C1", personId: "P1", provider: "stripe" });
+    expect(repo.delete).toHaveBeenCalledWith("C1", "old");
+    expect(repo["create"]).toHaveBeenCalledTimes(1);
   });
 
   it("defaults the provider to stripe when unset (legacy callers)", async () => {
     const repo = makeRepo();
-    const scoped = jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue(null as any);
-    await repo.save({ id: "cus_s", churchId: "C1", personId: "P1" } as any);
+    const scoped = jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue(null);
+    await repo.save({ id: "cus_s", churchId: "C1", personId: "P1" });
     expect(scoped).toHaveBeenCalledWith("C1", "P1", "stripe");
   });
 });
@@ -62,7 +64,8 @@ describe("CustomerRepo guest customers", () => {
 
   it("adds a guest customer beside the person's existing one instead of replacing it", async () => {
     const repo = new CustomerRepo();
-    const create = jest.spyOn(repo as any, "create").mockImplementation(async (m: any) => m);
+    const create = jest.fn(async (m: Customer) => m);
+    repo["create"] = create;
     const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined);
     jest.spyOn(repo, "load").mockResolvedValue(null);
     await repo.addGuest({ id: "cus_new", churchId: "C1", personId: "P1", provider: "stripe" });
@@ -71,8 +74,8 @@ describe("CustomerRepo guest customers", () => {
   });
 
   it("prefers the person's own customer over guest-added ones", () => {
-    const repo: any = new CustomerRepo();
-    const picked = repo.pickPrimary([
+    const repo = new CustomerRepo();
+    const picked = repo["pickPrimary"]([
       { id: "cus_guest", churchId: "C1", personId: "P1", provider: "stripe", metadata: "{\"guest\":true}" },
       { id: "cus_own", churchId: "C1", personId: "P1", provider: "stripe", metadata: null }
     ]);

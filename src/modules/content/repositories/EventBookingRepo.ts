@@ -2,6 +2,8 @@ import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { EventBooking } from "../models/index.js";
 import { injectable } from "inversify";
+import { sql } from "kysely";
+import type { EventBookingDetails } from "./types.js";
 
 @injectable()
 export class EventBookingRepo {
@@ -28,7 +30,7 @@ export class EventBookingRepo {
       resolvedBy: model.resolvedBy,
       resolvedDate: model.resolvedDate ? DateHelper.toMysqlDate(model.resolvedDate) : null,
       notifiedDate: model.notifiedDate ? DateHelper.toMysqlDate(model.notifiedDate) : null
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -43,13 +45,13 @@ export class EventBookingRepo {
       resolvedBy: model.resolvedBy,
       resolvedDate: model.resolvedDate ? DateHelper.toMysqlDate(model.resolvedDate) : null,
       notifiedDate: model.notifiedDate ? DateHelper.toMysqlDate(model.notifiedDate) : null
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
   // #1603: update() deliberately keeps the original requester, so moving a request is its own write.
   public async setRequestedByForEvent(churchId: string, eventId: string, personId: string) {
-    await getDb().updateTable("eventBookings").set({ requestedBy: personId } as any).where("eventId", "=", eventId).where("churchId", "=", churchId).execute();
+    await getDb().updateTable("eventBookings").set({ requestedBy: personId }).where("eventId", "=", eventId).where("churchId", "=", churchId).execute();
   }
 
   public async delete(churchId: string, id: string) {
@@ -64,7 +66,7 @@ export class EventBookingRepo {
     return (await getDb().selectFrom("eventBookings").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public async loadForEvent(churchId: string, eventId: string): Promise<any[]> {
+  public async loadForEvent(churchId: string, eventId: string): Promise<EventBookingDetails[]> {
     return getDb().selectFrom("eventBookings")
       .leftJoin("rooms", "rooms.id", "eventBookings.roomId")
       .leftJoin("resources", "resources.id", "eventBookings.resourceId")
@@ -72,22 +74,22 @@ export class EventBookingRepo {
       .select(["rooms.name as roomName", "resources.name as resourceName"])
       .where("eventBookings.churchId", "=", churchId)
       .where("eventBookings.eventId", "=", eventId)
-      .execute() as any;
+      .execute();
   }
 
-  public async loadPending(churchId: string): Promise<any[]> {
+  public async loadPending(churchId: string): Promise<EventBookingDetails[]> {
     return this.approvalQuery(churchId)
       .where("eventBookings.status", "=", "pending")
       .orderBy("eventBookings.requestedDate")
-      .execute() as any;
+      .execute();
   }
 
   // Approved and rejected requests for the approvals history, most recently decided first.
-  public async loadResolved(churchId: string): Promise<any[]> {
+  public async loadResolved(churchId: string): Promise<EventBookingDetails[]> {
     return this.approvalQuery(churchId)
       .where("eventBookings.status", "in", ["approved", "rejected"])
       .orderBy("eventBookings.resolvedDate", "desc")
-      .execute() as any;
+      .execute();
   }
 
   private approvalQuery(churchId: string) {
@@ -110,7 +112,7 @@ export class EventBookingRepo {
   }
 
   // Non-rejected bookings for any of the rooms, joined with their event's schedule, for conflict checks.
-  public async loadActiveForRooms(churchId: string, roomIds: string[], excludeEventId?: string): Promise<any[]> {
+  public async loadActiveForRooms(churchId: string, roomIds: string[], excludeEventId?: string): Promise<EventBookingDetails[]> {
     if (roomIds.length === 0) return [];
     let query = getDb().selectFrom("eventBookings")
       .innerJoin("events", "events.id", "eventBookings.eventId")
@@ -120,10 +122,10 @@ export class EventBookingRepo {
       .where("eventBookings.roomId", "in", roomIds)
       .where("eventBookings.status", "!=", "rejected");
     if (excludeEventId) query = query.where("eventBookings.eventId", "!=", excludeEventId);
-    return query.execute() as any;
+    return query.execute();
   }
 
-  public async loadActiveForResources(churchId: string, resourceIds: string[], excludeEventId?: string): Promise<any[]> {
+  public async loadActiveForResources(churchId: string, resourceIds: string[], excludeEventId?: string): Promise<EventBookingDetails[]> {
     if (resourceIds.length === 0) return [];
     let query = getDb().selectFrom("eventBookings")
       .innerJoin("events", "events.id", "eventBookings.eventId")
@@ -133,12 +135,12 @@ export class EventBookingRepo {
       .where("eventBookings.resourceId", "in", resourceIds)
       .where("eventBookings.status", "!=", "rejected");
     if (excludeEventId) query = query.where("eventBookings.eventId", "!=", excludeEventId);
-    return query.execute() as any;
+    return query.execute();
   }
 
   // Non-rejected bookings for the availability calendar: recurring events are always
   // included (expanded client-side); one-time events only if they overlap the window.
-  public async loadForCalendar(churchId: string, start: Date, end: Date, roomId?: string, resourceId?: string): Promise<any[]> {
+  public async loadForCalendar(churchId: string, start: Date, end: Date, roomId?: string, resourceId?: string): Promise<EventBookingDetails[]> {
     let query = getDb().selectFrom("eventBookings")
       .innerJoin("events", "events.id", "eventBookings.eventId")
       .leftJoin("rooms", "rooms.id", "eventBookings.roomId")
@@ -156,16 +158,16 @@ export class EventBookingRepo {
       .where("eventBookings.status", "!=", "rejected")
       .where((eb) => eb.or([
         eb.and([eb("events.recurrenceRule", "is not", null), eb("events.recurrenceRule", "!=", "")]),
-        eb.and([eb("events.start", "<", DateHelper.toMysqlDate(end) as any), eb("events.end", ">", DateHelper.toMysqlDate(start) as any)])
+        eb.and([eb(sql.ref<string>("events.start"), "<", DateHelper.toMysqlDate(end)), eb(sql.ref<string>("events.end"), ">", DateHelper.toMysqlDate(start))])
       ]));
     if (roomId) query = query.where("eventBookings.roomId", "=", roomId);
     if (resourceId) query = query.where("eventBookings.resourceId", "=", resourceId);
-    return query.execute() as any;
+    return query.execute();
   }
 
   // Cross-church: pending bookings never included in a digest, joined with the
   // approval group that owns them. Used by the 30-minute timer.
-  public async loadUnnotifiedPending(): Promise<any[]> {
+  public async loadUnnotifiedPending(): Promise<EventBookingDetails[]> {
     return getDb().selectFrom("eventBookings")
       .innerJoin("events", "events.id", "eventBookings.eventId")
       .leftJoin("rooms", "rooms.id", "eventBookings.roomId")
@@ -181,14 +183,14 @@ export class EventBookingRepo {
       ])
       .where("eventBookings.status", "=", "pending")
       .where("eventBookings.notifiedDate", "is", null)
-      .execute() as any;
+      .execute();
   }
 
   public async markNotified(ids: string[]) {
     if (ids.length === 0) return;
-    await getDb().updateTable("eventBookings").set({ notifiedDate: DateHelper.toMysqlDate(new Date()) } as any).where("id", "in", ids).execute();
+    await getDb().updateTable("eventBookings").set({ notifiedDate: DateHelper.toMysqlDate(new Date()) }).where("id", "in", ids).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as EventBooking; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as EventBooking[]; }
+  public convertToModel(_churchId: string, data: EventBooking) { return data; }
+  public convertAllToModel(_churchId: string, data: EventBooking[]) { return data || []; }
 }

@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { Link } from "../models/index.js";
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
+import type { LinkRow } from "./types.js";
 
 @injectable()
 export class LinkRepo {
@@ -28,7 +29,7 @@ export class LinkRepo {
       parentId: model.parentId,
       visibility: model.visibility,
       groupIds: model.groupIds
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -46,7 +47,7 @@ export class LinkRepo {
       parentId: model.parentId,
       visibility: model.visibility,
       groupIds: model.groupIds
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -59,7 +60,7 @@ export class LinkRepo {
   }
 
   public async loadAll(churchId: string, siteId = ""): Promise<Link[]> {
-    return getDb().selectFrom("links").selectAll().where("churchId", "=", churchId).where("siteId", "=", siteId).orderBy("sort").execute() as any;
+    return getDb().selectFrom("links").selectAll().where("churchId", "=", churchId).where("siteId", "=", siteId).orderBy("sort").execute();
   }
 
   public async loadByCategoryAndData(churchId: string, category: string, linkData: string): Promise<Link[]> {
@@ -75,7 +76,7 @@ export class LinkRepo {
       .where("churchId", "=", churchId)
       .where("category", "=", category)
       .where("siteId", "=", siteId)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   // siteId must scope the re-sort — otherwise re-ordering one site's nav corrupts another's.
@@ -98,10 +99,10 @@ export class LinkRepo {
     return (await getDb().selectFrom("links").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Link; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Link[]; }
+  public convertToModel(_churchId: string, data: Link) { return data; }
+  public convertAllToModel(_churchId: string, data: Link[]) { return data || []; }
 
-  protected rowToModel(row: any): Link {
+  protected rowToModel(row: LinkRow): Link {
     const result = { ...row };
     if (result.photo === undefined) {
       if (!result.photoUpdated) {
