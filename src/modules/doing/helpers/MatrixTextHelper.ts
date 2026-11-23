@@ -33,7 +33,7 @@ export class MatrixTextHelper {
       const person = await membership.loadPerson(churchId, sched.personId);
       const phoneNumber = (person?.mobilePhone || "").trim();
       if (!person || !phoneNumber) { noPhoneCount++; continue; }
-      if (person.optedOut === true || person.optedOut === 1) { optedOutCount++; continue; }
+      if (person.smsOptedOut === true || person.smsOptedOut === 1) { optedOutCount++; continue; }
       const key = phoneKey(phoneNumber);
       if (seen.has(key)) continue;
       seen.add(key);

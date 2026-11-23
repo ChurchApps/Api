@@ -1,5 +1,6 @@
 import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
 import { StepActionHelper } from "../helpers/StepActionHelper.js";
@@ -242,14 +243,15 @@ export class TaskController extends DoingBaseController {
   // authz-exempt: gated by bulkApply → canEditCard(au, task) per card (tasks.edit or assignee)
   @httpPost("/bulk/reassign")
   public async bulkReassign(req: express.Request<{}, {}, { ids: string[]; assignedToType?: string; assignedToId?: string; assignedToLabel?: string }>, res: express.Response): Promise<any> {
-    return this.bulkApply(req, res, async (task) =>
-      WorkflowHelper.reassign(task, { type: req.body.assignedToType, id: req.body.assignedToId, label: req.body.assignedToLabel }, this.repos));
+    return this.bulkApply(req, res, async (task, au) =>
+      WorkflowHelper.reassign(task, { type: req.body.assignedToType, id: req.body.assignedToId, label: req.body.assignedToLabel }, this.repos, au.personId));
   }
 
   // authz-exempt: gated by bulkApply → canEditCard(au, task) per card (tasks.edit or assignee)
   @httpPost("/bulk/snooze")
-  public async bulkSnooze(req: express.Request<{}, {}, { ids: string[]; days: number }>, res: express.Response): Promise<any> {
-    return this.bulkApply(req, res, async (task) => WorkflowHelper.snooze(task, req.body.days, this.repos));
+  public async bulkSnooze(req: express.Request<{}, {}, { ids: string[]; days?: number; until?: string }>, res: express.Response): Promise<any> {
+    const until = TaskController.snoozeUntil(req.body);
+    return this.bulkApply(req, res, async (task) => (until === null ? null : WorkflowHelper.snooze(task, until, this.repos)));
   }
 
   // Applies op to each editable card, reporting updated vs. skipped (missing/denied) ids.
@@ -259,7 +261,7 @@ export class TaskController extends DoingBaseController {
     return !!step && step.workflowId === task.workflowId;
   }
 
-  private async bulkApply(req: express.Request<{}, {}, { ids: string[] }>, res: express.Response, op: (task: Task) => Promise<Task | null>): Promise<any> {
+  private async bulkApply(req: express.Request<{}, {}, { ids: string[] }>, res: express.Response, op: (task: Task, au: AuthenticatedUser) => Promise<Task | null>): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const ids = req.body.ids || [];
       const tasks = (await Promise.all(ids.map((id) => this.repos.task.load(au.churchId, id)))) as (Task | null)[];
@@ -271,7 +273,7 @@ export class TaskController extends DoingBaseController {
           skipped.push(ids[i]);
           continue;
         }
-        if ((await this.assignmentOperation(task, op)) === null) {
+        if ((await this.assignmentOperation(task, (t) => op(t, au))) === null) {
           skipped.push(ids[i]);
           continue;
         }
@@ -291,12 +293,12 @@ export class TaskController extends DoingBaseController {
   }
 
   // Single-card analogue of bulkApply: load, enforce per-card edit permission, run op.
-  private async withCard(req: express.Request, res: express.Response, id: string, op: (task: Task) => Promise<any>): Promise<any> {
+  private async withCard(req: express.Request, res: express.Response, id: string, op: (task: Task, au: AuthenticatedUser) => Promise<any>): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const task = (await this.repos.task.load(au.churchId, id)) as Task;
       if (!task) return this.json({}, 404);
       if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await this.assignmentOperation(task, op);
+      return await this.assignmentOperation(task, (t) => op(t, au));
     });
   }
 
@@ -352,7 +354,7 @@ export class TaskController extends DoingBaseController {
   // authz-exempt: gated by withCard → canEditCard(au, task) (tasks.edit or assignee)
   @httpPost("/:id/reassign")
   public async reassign(@requestParam("id") id: string, req: express.Request<{}, {}, { assignedToType?: string; assignedToId?: string; assignedToLabel?: string }>, res: express.Response): Promise<any> {
-    return this.withCard(req, res, id, (task) => WorkflowHelper.reassign(task, { type: req.body.assignedToType, id: req.body.assignedToId, label: req.body.assignedToLabel }, this.repos));
+    return this.withCard(req, res, id, (task, au) => WorkflowHelper.reassign(task, { type: req.body.assignedToType, id: req.body.assignedToId, label: req.body.assignedToLabel }, this.repos, au.personId));
   }
 
   // authz-exempt: gated by withCard → canEditCard(au, task) (tasks.edit or assignee)
@@ -380,8 +382,16 @@ export class TaskController extends DoingBaseController {
 
   // authz-exempt: gated by withCard → canEditCard(au, task) (tasks.edit or assignee)
   @httpPost("/:id/snooze")
-  public async snooze(@requestParam("id") id: string, req: express.Request<{}, {}, { days: number }>, res: express.Response): Promise<any> {
-    return this.withCard(req, res, id, (task) => WorkflowHelper.snooze(task, req.body.days, this.repos));
+  public async snooze(@requestParam("id") id: string, req: express.Request<{}, {}, { days?: number; until?: string }>, res: express.Response): Promise<any> {
+    const until = TaskController.snoozeUntil(req.body);
+    return this.withCard(req, res, id, async (task) => (until === null ? this.json({ message: "Invalid snooze date" }, 400) : WorkflowHelper.snooze(task, until, this.repos)));
+  }
+
+  // A picked date wakes the card at that moment; otherwise snooze for a number of days.
+  private static snoozeUntil(body: { days?: number; until?: string }): number | Date | null {
+    if (!body?.until) return Number(body?.days) > 0 ? Number(body.days) : null;
+    const until = new Date(body.until);
+    return isNaN(until.getTime()) || until.getTime() <= Date.now() ? null : until;
   }
 
 }

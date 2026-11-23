@@ -60,7 +60,8 @@ export class GdprErasureHelper {
       nametagNotes: null,
       donorNumber: null,
       removed: true as any,
-      optedOut: true as any
+      optedOut: true as any,
+      smsOptedOut: true as any
     } as any).where("id", "=", personId).where("churchId", "=", churchId).execute();
 
     await Promise.all([

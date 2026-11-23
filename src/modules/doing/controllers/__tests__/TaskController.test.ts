@@ -15,8 +15,10 @@ jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGatewa
 const prepareRequest = jest.fn();
 const completeDecision = jest.fn();
 const notifyReviewers = jest.fn();
+const snooze = jest.fn(async (task: any) => task);
+const reassign = jest.fn(async (task: any) => task);
 jest.mock("../../helpers/index", () => ({
-  WorkflowHelper: {},
+  WorkflowHelper: { snooze: (...args: any[]) => snooze.apply(null, args as any), reassign: (...args: any[]) => reassign.apply(null, args as any) },
   DirectoryUpdateHelper: { handleDirectoryUpdate: jest.fn() },
   AccountDeletionHelper: {
     taskType: "accountDeletion",
@@ -169,6 +171,39 @@ describe("TaskController.moveStep workflow scoping", () => {
   it("skips foreign-workflow steps in bulk moves", async () => {
     const result = await (setup({ id: "s9", workflowId: "w2" }) as any).bulkMoveStep({ body: { ids: ["t1"], stepId: "s9" } }, {});
     expect(result).toEqual({ updated: [], skipped: ["t1"] });
+  });
+});
+
+describe("TaskController card snooze and reassign", () => {
+  function setup() {
+    snooze.mockClear();
+    reassign.mockClear();
+    const repos: any = { task: { load: jest.fn(async () => ({ id: "t1", churchId: "c1", workflowId: "w1" })) } };
+    const controller: any = makeController(["tasksEdit"], repos);
+    controller.canEditCard = () => true;
+    controller.json = (obj: any, status: number) => ({ obj, status });
+    return controller;
+  }
+
+  it("snoozes until a picked date", async () => {
+    await setup().snooze("t1", { body: { until: "2099-01-05T06:00:00.000Z" } }, {});
+    expect(snooze.mock.calls[0][1]).toEqual(new Date("2099-01-05T06:00:00.000Z"));
+  });
+
+  it("still snoozes for a number of days", async () => {
+    await setup().snooze("t1", { body: { days: 3 } }, {});
+    expect(snooze.mock.calls[0][1]).toBe(3);
+  });
+
+  it("rejects a date in the past", async () => {
+    const result = await setup().snooze("t1", { body: { until: "2001-01-01T00:00:00.000Z" } }, {});
+    expect(result.status).toBe(400);
+    expect(snooze).not.toHaveBeenCalled();
+  });
+
+  it("passes the signed-in person to reassign", async () => {
+    await setup().reassign("t1", { body: { assignedToType: "person", assignedToId: "p1", assignedToLabel: "Donald Clark" } }, {});
+    expect(reassign.mock.calls[0][3]).toBe("p1");
   });
 });
 
