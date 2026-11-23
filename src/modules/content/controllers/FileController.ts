@@ -12,7 +12,8 @@ import { StorageResolver } from "../helpers/StorageResolver.js";
 import { GoogleDriveStorageProvider } from "../helpers/GoogleDriveStorageProvider.js";
 import { BYOS_PROVIDERS } from "../helpers/ByosAuth.js";
 import { QuotaExceededError } from "../helpers/MinistryStuffStorageProvider.js";
-import { isPublicFile } from "../helpers/PublicFileAccess.js";
+import { isPublicFile, isPrivateFile } from "../helpers/PublicFileAccess.js";
+import { PersonFileStorage, PERSON_CONTENT_TYPE, PERSON_MAX_TOTAL_BYTES } from "../helpers/PersonFileStorage.js";
 
 // Providers whose public URLs are short-lived; contentPath points at the stable /download route instead.
 const REDIRECT_PROVIDERS = ["googledrive", "dropbox", "onedrive"];
@@ -37,6 +38,7 @@ export class FileController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const file = await this.repos.file.loadById(id);
       if (!file) return this.json({}, 404);
+      if (isPrivateFile(file)) return this.downloadPrivate(file, req, res);
       if (!isPublicFile(file)) {
         const au = this.authUser();
         if (!au?.churchId || au.churchId !== file.churchId) return this.json({}, 401);
@@ -60,16 +62,31 @@ export class FileController extends ContentBaseController {
     });
   }
 
+  // Private files are never served from the raw route; staff with access get a short-lived signed link instead.
+  @httpGet("/download/:id/link")
+  public async downloadLink(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const file = await this.repos.file.load(au.churchId, id);
+      if (!file) return this.json({}, 404);
+      if (!isPrivateFile(file)) return { url: file.contentPath };
+      if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
+      return { url: PersonFileStorage.signLink(file.id) };
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.file.load(au.churchId, id);
+      const file = await this.repos.file.load(au.churchId, id);
+      if (isPrivateFile(file) && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
+      return file;
     });
   }
 
   @httpGet("/:contentType/:contentId")
   public async getByContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (isPrivateFile({ contentType }) && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       return await this.repos.file.loadForContent(au.churchId, contentType, contentId);
     });
   }
@@ -85,6 +102,7 @@ export class FileController extends ContentBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, File[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (Array.isArray(req.body) && req.body.some((f) => isPrivateFile(f))) return this.savePersonFiles(au, req.body);
       const isEditor = au.checkAccess(Permissions.content.edit);
       if (!isEditor && !(await this.canGroupMemberSave(au, req.body))) {
         return this.json({}, 401);
@@ -135,6 +153,7 @@ export class FileController extends ContentBaseController {
   @httpPost("/postUrl")
   public async getUploadUrl(req: express.Request<{}, {}, { resourceId: string; fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (isPrivateFile(req.body)) return this.personUploadUrl(au, req.body);
       const isEditor = au.checkAccess(Permissions.content.edit);
       if (!isEditor && (au.groupIds.indexOf(req.body.contentId) === -1 || req.body.contentType !== "group")) return this.json({}, 401);
       else {
@@ -197,6 +216,13 @@ export class FileController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const existingFile = await this.repos.file.load(au.churchId, id);
       if (!existingFile) return this.json({}, 404);
+      if (isPrivateFile(existingFile)) {
+        if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+        const key = existingFile.externalId || this.buildKey(au.churchId, existingFile.contentType, existingFile.contentId, existingFile.fileName);
+        await PersonFileStorage.remove(key);
+        await this.repos.file.delete(au.churchId, id);
+        return { file: key };
+      }
       if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(existingFile.contentId) === -1) return this.json({}, 401);
       else {
         const storage = await StorageResolver.forFile(this.repos.storageProvider, existingFile);
@@ -207,6 +233,64 @@ export class FileController extends ContentBaseController {
         return { file: key };
       }
     });
+  }
+
+  // Person documents: Edit People only, always new rows, private bytes on the default store.
+  private async savePersonFiles(au: any, files: File[]): Promise<any> {
+    if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+    if (!files.every((f) => f.contentType === PERSON_CONTENT_TYPE && PersonFileStorage.isValidPersonId(f.contentId) && f.fileName)) return this.json({ error: "invalid_file" }, 400);
+    const results: File[] = [];
+    for (const f of files) {
+      const decoded = f.fileContents ? Buffer.byteLength(f.fileContents.split(",").pop() || "", "base64") : 0;
+      if (decoded > 26214400) return this.json({ error: "file_too_large" }, 400);
+      if (f.fileContents) f.size = decoded;
+      const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, f.contentType, f.contentId);
+      const usedBytes = totalBytes?.size || 0;
+      if (usedBytes + (f.size || 0) > PERSON_MAX_TOTAL_BYTES) return this.json({ error: "storage_quota_exceeded", usedBytes, quotaBytes: PERSON_MAX_TOTAL_BYTES }, 400);
+      f.id = undefined;
+      f.churchId = au.churchId;
+      f.fileName = path.basename(f.fileName).replace(/\.\.+/g, ".");
+      const key = this.buildKey(au.churchId, f.contentType, f.contentId, f.fileName);
+      if (f.fileContents) await PersonFileStorage.store(key, f.fileType || "application/octet-stream", Buffer.from(f.fileContents.split(",").pop() || "", "base64"));
+      else if (EnvironmentBase.fileStore !== "S3") return this.json({ error: "invalid_file" }, 400);
+      f.fileContents = null;
+      f.provider = null;
+      f.externalId = key;
+      f.contentPath = "";
+      const saved = await this.repos.file.save(f);
+      saved.contentPath = Environment.contentApi + "/files/download/" + saved.id;
+      results.push(await this.repos.file.save(saved));
+    }
+    return results;
+  }
+
+  private async personUploadUrl(au: any, body: { fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }): Promise<any> {
+    if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+    if (!PersonFileStorage.isValidPersonId(body.contentId) || !body.fileName) return this.json({ error: "invalid_file" }, 400);
+    const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, body.contentType, body.contentId);
+    const usedBytes = totalBytes?.size || 0;
+    if (usedBytes + (body.size || 0) > PERSON_MAX_TOTAL_BYTES) return this.json({ error: "storage_quota_exceeded", usedBytes, quotaBytes: PERSON_MAX_TOTAL_BYTES }, 400);
+    const key = this.buildKey(au.churchId, body.contentType, body.contentId, body.fileName);
+    const mimeType = body.mimeType || inferContentTypeFromKey(key) || "application/octet-stream";
+    return (await PersonFileStorage.getUploadUrl(key, mimeType, body.size || 0)) || {};
+  }
+
+  // Signed link only: the browser opens it directly, so it carries no JWT.
+  private async downloadPrivate(file: File, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    const query: any = req.query || {};
+    if (!PersonFileStorage.verifyLink(file.id, query.exp?.toString(), query.sig?.toString())) return this.json({}, 401);
+    res.set("Cache-Control", "private, no-store");
+    const key = file.externalId || this.buildKey(file.churchId, file.contentType, file.contentId, file.fileName);
+    if (EnvironmentBase.fileStore === "S3") {
+      res.redirect(302, await PersonFileStorage.s3DownloadUrl(key, file.fileName));
+      return;
+    }
+    const contents = PersonFileStorage.readLocal(key);
+    if (!contents) return this.json({}, 404);
+    res.set("Content-Type", file.fileType || "application/octet-stream");
+    res.set("Content-Disposition", PersonFileStorage.contentDisposition(file.fileName));
+    res.set("X-Content-Type-Options", "nosniff");
+    res.send(contents);
   }
 
   private async canGroupMemberSave(au: any, files: File[]): Promise<boolean> {
