@@ -850,6 +850,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-23_person_sms_opted_out": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "people",
+     "column": "smsOptedOut",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {

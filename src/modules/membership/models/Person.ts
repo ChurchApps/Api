@@ -24,6 +24,7 @@ export class Person {
   public removed?: boolean;
   public conversationId?: string;
   public optedOut?: boolean;
+  public smsOptedOut?: boolean;
   public allowDirectMessages?: boolean;
   public nametagNotes?: string;
   public donorNumber?: string;

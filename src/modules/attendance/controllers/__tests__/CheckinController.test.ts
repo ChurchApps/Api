@@ -3,7 +3,7 @@ jest.mock("../AttendanceBaseController", () => ({ AttendanceBaseController: clas
 jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { attendance: { checkin: "checkin", edit: "attEdit", view: "attView" } } }));
 const sendBulkText = jest.fn(async () => ({ ok: true, sent: 1 }));
 jest.mock("../../../../shared/modules/index", () => ({
-  getMembershipModuleGateway: () => ({ loadHouseholdAdults: jest.fn(async () => [{ personId: "a1", mobilePhone: "555", optedOut: false }]) }),
+  getMembershipModuleGateway: () => ({ loadHouseholdAdults: jest.fn(async () => [{ personId: "a1", mobilePhone: "555", smsOptedOut: false }]) }),
   getMessagingModuleGateway: () => ({ sendBulkText })
 }));
 const consume = jest.fn(async () => true);

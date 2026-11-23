@@ -42,6 +42,7 @@ interface PeopleTable {
   campusId?: string;
   conversationId?: string;
   optedOut?: boolean;
+  smsOptedOut?: boolean;
   nametagNotes?: string;
   donorNumber?: string;
   importKey?: string;

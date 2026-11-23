@@ -259,7 +259,7 @@ export class ReminderEngine {
         const gate = PreferenceGateHelper.evaluate(churchId, personId, occ.category || "", "sms", { pref, overrides: overrides.filter((o) => o.personId === personId), churchTimeZone: church?.timeZone });
         const person = gate.allow && !noProvider ? await membership.loadPerson(churchId, personId) : null;
         const phoneNumber = (person?.mobilePhone || "").trim();
-        const optedOut = person?.optedOut === true || person?.optedOut === 1;
+        const optedOut = person?.smsOptedOut === true || person?.smsOptedOut === 1;
         reason = !gate.allow ? gate.reason : noProvider ? "no_provider" : !phoneNumber ? "no_phone" : optedOut ? "opted_out" : undefined;
         if (reason) status = "suppressed";
         else {
