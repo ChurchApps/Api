@@ -18,7 +18,8 @@ export class ResourceRepo {
       description: model.description,
       quantity: model.quantity,
       approvalGroupId: model.approvalGroupId,
-      active: model.active ?? true
+      active: model.active ?? true,
+      categoryName: model.categoryName?.trim() || null
     } as any).execute();
     return model;
   }
@@ -29,7 +30,8 @@ export class ResourceRepo {
       description: model.description,
       quantity: model.quantity ?? null,
       approvalGroupId: model.approvalGroupId ?? null,
-      active: model.active ?? true
+      active: model.active ?? true,
+      categoryName: model.categoryName?.trim() || null
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
