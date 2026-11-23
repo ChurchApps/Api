@@ -10,12 +10,12 @@ export class ServiceController extends AttendanceBaseController {
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.service.searchByCampus(au.churchId, req.query.campusId.toString());
-      return this.repos.service.convertAllToModel(au.churchId, data as any);
+      return this.repos.service.convertAllToModel(au.churchId, data);
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.service.load(au.churchId, id);
       return this.repos.service.convertToModel(au.churchId, data);
@@ -27,12 +27,12 @@ export class ServiceController extends AttendanceBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.service.loadWithCampus(au.churchId);
-      return this.repos.service.convertAllToModel(au.churchId, data as any);
+      return this.repos.service.convertAllToModel(au.churchId, data);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Service[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Service[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       const promises: Promise<Service>[] = [];
@@ -43,7 +43,7 @@ export class ServiceController extends AttendanceBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       await this.repos.service.delete(au.churchId, id);

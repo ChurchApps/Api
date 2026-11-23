@@ -1,6 +1,6 @@
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
-const sendPersonTextMock = jest.fn() as jest.MockedFunction<any>;
-const people: Record<string, any> = {
+const sendPersonTextMock = jest.fn() as jest.MockedFunction<MessagingModuleGateway["sendPersonText"]>;
+const people: Record<string, { id: string; firstName: string; lastName: string; mobilePhone: string; smsOptedOut: boolean | number; optedOut?: boolean }> = {
   P1: { id: "P1", firstName: "Donald", lastName: "Clark", mobilePhone: "(555) 010-1000", smsOptedOut: false },
   P2: { id: "P2", firstName: "Carol", lastName: "Clark", mobilePhone: "1-555-010-1000", smsOptedOut: false }, // shares Donald's phone
   P3: { id: "P3", firstName: "Sam", lastName: "Smith", mobilePhone: "555-010-3000", smsOptedOut: true },
@@ -13,9 +13,11 @@ jest.mock("../../../../shared/modules/index.js", () => ({
 }));
 
 import { MatrixTextHelper } from "../MatrixTextHelper.js";
+import type { OverviewEmailRow } from "../MatrixEmailHelper.js";
+import type { MessagingModuleGateway } from "../../../../shared/modules/MessagingModuleGateway.js";
 
-const rows = ["P1", "P2", "P3", "P4", "P5", "P1"].map((personId, i) => ({ personId, planId: "PL" + (i % 2), planName: "Sunday", serviceDate: "2026-10-18", positionName: "Usher" }));
-rows.push({ personId: null as any, planId: "PL0", planName: "Sunday", serviceDate: "2026-10-18", positionName: "Greeter" });
+const rows: OverviewEmailRow[] = ["P1", "P2", "P3", "P4", "P5", "P1"].map((personId, i) => ({ personId, planId: "PL" + (i % 2), planName: "Sunday", serviceDate: "2026-10-18", positionName: "Usher" }));
+rows.push({ personId: null, planId: "PL0", planName: "Sunday", serviceDate: "2026-10-18", positionName: "Greeter" });
 
 beforeEach(() => sendPersonTextMock.mockReset().mockResolvedValue({ ok: true }));
 

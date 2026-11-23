@@ -1,5 +1,7 @@
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { MauticHelper } from "../../membership/helpers/MauticHelper.js";
+import type { User } from "../../membership/models/index.js";
+import type { Repos as MembershipRepos } from "../../membership/repositories/Repos.js";
 import { Asset } from "../models/index.js";
 import { Repos } from "../repositories/Repos.js";
 import { CommonsMailHelper } from "./CommonsMailHelper.js";
@@ -14,9 +16,9 @@ interface MarketingUser { email: string; firstName?: string; lastName?: string }
 
 async function loadUser(userId: string | undefined): Promise<MarketingUser | undefined> {
   if (!userId) return undefined;
-  const repos = await RepoManager.getRepos<any>("membership");
-  const users: any[] = await repos.user.loadByIds([userId]);
-  return users?.[0]?.email ? users[0] : undefined;
+  const repos = await RepoManager.getRepos<MembershipRepos>("membership");
+  const users: User[] = await repos.user.loadByIds([userId]);
+  return users?.[0]?.email ? users[0] as MarketingUser : undefined;
 }
 
 export class CommonsMauticHelper {

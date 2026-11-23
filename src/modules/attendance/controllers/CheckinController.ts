@@ -44,7 +44,7 @@ export class CheckinController extends AttendanceBaseController {
       if (String(message).length > MAX_MESSAGE_LENGTH) return this.json({ error: "Message is too long" }, 400);
       if (!(await BroadcastRateLimiter.consume(au.churchId))) return this.json({ error: "Too many broadcasts. Please try again later." }, 429);
 
-      const rows = (await this.repos.visit.loadActiveByServiceToday(au.churchId, serviceId)) as any[];
+      const rows = await this.repos.visit.loadActiveByServiceToday(au.churchId, serviceId);
       const personIds = [...new Set(rows.map((r) => r.personId).filter((id) => !!id))];
       if (personIds.length === 0) return { sent: 0, skippedOptedOut: 0, skippedNoPhone: 0 };
 

@@ -7,7 +7,7 @@ import { AttendanceBaseController } from "./AttendanceBaseController.js";
 export class CampusController extends AttendanceBaseController {
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.campus.load(au.churchId, id);
       return this.repos.campus.convertToModel(au.churchId, data);
@@ -15,7 +15,7 @@ export class CampusController extends AttendanceBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.campus.loadAll(au.churchId);
       return this.repos.campus.convertAllToModel(au.churchId, data);

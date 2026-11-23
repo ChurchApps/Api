@@ -37,7 +37,7 @@ interface LegacySongSubmission {
 @controller("/commons/songs")
 export class CommonsSongController extends CommonsBaseController {
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const str = (k: string) => String(req.query?.[k] || "").trim().slice(0, MAX_QUERY) || undefined;
       const rows = await this.withUrls(await this.repos.song.loadPublishedSummaries({ sundayReady: req.query?.sundayReady === "true", confidence: str("confidence"), language: str("language"), q: str("q") }));
@@ -47,7 +47,7 @@ export class CommonsSongController extends CommonsBaseController {
 
   // public: a writer about to submit deserves to know the song is already here, before signing in
   @httpGet("/similar")
-  public async similar(req: express.Request, res: express.Response): Promise<any> {
+  public async similar(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const query = { title: String(req.query.title || ""), writer: String(req.query.writer || ""), firstLine: String(req.query.firstLine || "") };
       if (!query.title.trim() && !query.firstLine.trim()) return [];
@@ -56,7 +56,7 @@ export class CommonsSongController extends CommonsBaseController {
   }
 
   @httpGet("/mine")
-  public async mine(req: express.Request, res: express.Response): Promise<any> {
+  public async mine(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       return await this.withUrls(await this.repos.song.loadBySubmitter(au.id));
     });
@@ -64,7 +64,7 @@ export class CommonsSongController extends CommonsBaseController {
 
   // shim: the saved library is now GET /commons/assets/saved
   @httpGet("/library")
-  public async library(req: express.Request, res: express.Response): Promise<any> {
+  public async library(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       return await this.withUrls(await this.repos.song.loadSaved(au.id));
     });
@@ -72,20 +72,20 @@ export class CommonsSongController extends CommonsBaseController {
 
   // shim: PUT /commons/assets/:id/saved — authz-exempt, keyed by au.id
   @httpPost("/:id/library")
-  public async addToLibrary(req: express.Request, res: express.Response): Promise<any> {
+  public async addToLibrary(req: express.Request, res: express.Response): Promise<unknown> {
     return this.setSaved(req, res, true);
   }
 
   // shim: PUT /commons/assets/:id/saved — authz-exempt, keyed by au.id
   @httpDelete("/:id/library")
-  public async removeFromLibrary(req: express.Request, res: express.Response): Promise<any> {
+  public async removeFromLibrary(req: express.Request, res: express.Response): Promise<unknown> {
     return this.setSaved(req, res, false);
   }
 
   // shim: a transcription is a submission carrying one tune.abc file
   // authz-exempt: au.id required; rows are created for the caller only
   @httpPost("/:id/abc")
-  public async submitAbc(req: express.Request, res: express.Response): Promise<any> {
+  public async submitAbc(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
@@ -109,7 +109,7 @@ export class CommonsSongController extends CommonsBaseController {
   }
 
   @httpGet("/:id")
-  public async get(req: express.Request, res: express.Response): Promise<any> {
+  public async get(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const song = await this.repos.song.loadById(String(req.params.id));
       if (!song || song.status !== "published") return this.json({}, 404);
@@ -119,7 +119,7 @@ export class CommonsSongController extends CommonsBaseController {
 
   // The single fetch the song page needs. actionWrapper tolerates anonymous callers.
   @httpGet("/:id/page")
-  public async page(req: express.Request, res: express.Response): Promise<any> {
+  public async page(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (_au) => {
       const row = await this.repos.song.loadById(String(req.params.id));
       if (!row || row.status !== "published") return this.json({}, 404);
@@ -141,19 +141,19 @@ export class CommonsSongController extends CommonsBaseController {
   }
 
   @httpGet("/:id/chordpro")
-  public async chordpro(req: express.Request, res: express.Response): Promise<any> {
+  public async chordpro(req: express.Request, res: express.Response): Promise<unknown> {
     return this.download(req, res, "cho", ChordProHelper.toCho);
   }
 
   @httpGet("/:id/lyrics")
-  public async lyrics(req: express.Request, res: express.Response): Promise<any> {
+  public async lyrics(req: express.Request, res: express.Response): Promise<unknown> {
     return this.download(req, res, "txt", ChordProHelper.toLyrics);
   }
 
   // shim: the one-shot upload becomes draft → inline files → submit
   // authz-exempt: au.id required; rows are created for the caller only
   @httpPost("/")
-  public async submit(req: express.Request<{}, {}, LegacySongSubmission>, res: express.Response): Promise<any> {
+  public async submit(req: express.Request<{}, {}, LegacySongSubmission>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({ errors: ["Sign in to share a song"] }, 401);
       const body = req.body;
@@ -234,7 +234,7 @@ export class CommonsSongController extends CommonsBaseController {
     return await SongPackageHelper.detail(song, ContentLibraryHelper.fileUrls(asset, files, song.portraitKey), { readText });
   }
 
-  private async download(req: express.Request, res: express.Response, ext: string, convert: (song: SongView) => string): Promise<any> {
+  private async download(req: express.Request, res: express.Response, ext: string, convert: (song: SongView) => string): Promise<unknown> {
     const repos = await this.getRepos<Repos>();
     const song = await repos.song.loadById(String(req.params.id));
     if (!song || song.status !== "published") {

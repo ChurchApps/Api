@@ -4,35 +4,43 @@ jest.mock("@churchapps/apihelper", () => ({ DateHelper: { addDays: (d: Date, n: 
 jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { getRepos: jest.fn() } }));
 jest.mock("../../repositories/index.js", () => ({ Repos: class {} }));
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { jwtSecret: "synthetic-test-secret", doingApi: "http://localhost/doing" } }));
-const delivery = jest.fn(async () => "sent");
-const notify = jest.fn(async () => []);
-jest.mock("../../../../shared/helpers/NotificationService.js", () => ({ NotificationService: { createNotifications: (...args: any[]) => notify(...args) } }));
+const delivery = jest.fn(async (..._args: unknown[]) => "sent");
+const notify = jest.fn(async (..._args: unknown[]): Promise<unknown[]> => []);
+jest.mock("../../../../shared/helpers/NotificationService.js", () => ({ NotificationService: { createNotifications: (...args: unknown[]) => notify(...args) } }));
 jest.mock("../../../../shared/modules/index.js", () => ({
-  getMembershipModuleGateway: () => ({ loadGroupLeaderPersonIds: async () => [], loadPerson: async (_c: string, id: string) => ({ id, displayName: "Sample Volunteer", email: "volunteer@example.test", mobilePhone: "+15555550123" }), loadChurch: async () => ({ name: "Sample Church", timeZone: "UTC", subDomain: "example" }) }),
-  getMessagingModuleGateway: () => ({ sendServingWorkflowMessage: (...args: any[]) => delivery(...args) })
+  getMembershipModuleGateway: () => ({ loadGroupLeaderPersonIds: async (): Promise<string[]> => [], loadPerson: async (_c: string, id: string) => ({ id, displayName: "Sample Volunteer", email: "volunteer@example.test", mobilePhone: "+15555550123" }), loadChurch: async () => ({ name: "Sample Church", timeZone: "UTC", subDomain: "example" }) }),
+  getMessagingModuleGateway: () => ({ sendServingWorkflowMessage: (...args: unknown[]) => delivery(...args) })
 }));
 jest.mock("../ConjunctionHelper.js", () => ({ ConjunctionHelper: { personMatchesStepRoute: jest.fn(async () => false) } }));
-jest.mock("../../../../shared/webhooks/UrlValidator.js", () => ({ UrlValidator: { validate: jest.fn(async () => null) } }));
+jest.mock("../../../../shared/webhooks/UrlValidator.js", () => ({ UrlValidator: { validate: jest.fn(async (): Promise<null> => null) } }));
 
 import { AssignmentWorkflowHelper as Followup } from "../AssignmentWorkflowHelper.js";
 import { WorkflowHelper } from "../WorkflowHelper.js";
 import { WorkflowTemplates } from "../WorkflowTemplates.js";
 import { statusFromError } from "../../../../shared/helpers/httpError.js";
+import type { Assignment, Plan, Position, Task, Time, Workflow, WorkflowStep, WorkflowStepAction } from "../../models/index.js";
+import type { Repos } from "../../repositories/Repos.js";
+import type { CardData, HistoryEntry } from "../CardData.js";
+
+// In-memory fakes return partial rows, so each repo method may resolve to a partial of what the real one returns.
+type Loose<R> = R extends (infer E)[] ? Partial<E>[] : R extends object ? Partial<R> : R;
+type FakeRepo<T> = { [K in keyof T]?: T[K] extends (...args: infer A) => Promise<infer R> ? (...args: A) => Promise<Loose<R>> : T[K] };
+type FakeRepos = { [K in keyof Repos]?: FakeRepo<Repos[K]> };
 
 const clone = <T>(value: T): T => value == null ? value : structuredClone(value);
 function fixture() {
   let id = 0;
-  const plans: any[] = [{ id: "plan1", churchId: "c1", ministryId: "ministry1", name: "Sample Service", serviceDate: new Date(2030, 3, 7), confirmationWorkflowId: "wf1" }];
-  const positions: any[] = [{ id: "pos1", churchId: "c1", planId: "plan1", name: "Greeter" }];
-  const assignments: any[] = [{ id: "a1", churchId: "c1", positionId: "pos1", personId: "p1", status: "Unconfirmed" }];
-  const workflows: any[] = [{ id: "wf1", churchId: "c1", active: true, workflowType: "assignmentConfirmation" }];
-  const steps: any[] = [{ id: "s1", churchId: "c1", workflowId: "wf1", name: "Wait" }, { id: "s2", churchId: "c1", workflowId: "wf1", name: "Call", expectedResponseDays: 1, defaultAssignToType: "person", defaultAssignToId: "leader1", defaultAssignToLabel: "Sample Leader" }];
-  const actions: any[] = WorkflowTemplates.get("assignmentConfirmation").steps[0].actions.map((a, i) => ({ ...a, config: JSON.stringify(a.config || {}), id: `action${i}`, stepId: "s1" }));
-  const tasks: any[] = [];
+  const plans: Plan[] = [{ id: "plan1", churchId: "c1", ministryId: "ministry1", name: "Sample Service", serviceDate: new Date(2030, 3, 7), confirmationWorkflowId: "wf1" }];
+  const positions: Position[] = [{ id: "pos1", churchId: "c1", planId: "plan1", name: "Greeter" }];
+  const assignments: Assignment[] = [{ id: "a1", churchId: "c1", positionId: "pos1", personId: "p1", status: "Unconfirmed" }];
+  const workflows: Workflow[] = [{ id: "wf1", churchId: "c1", active: true, workflowType: "assignmentConfirmation" }];
+  const steps: WorkflowStep[] = [{ id: "s1", churchId: "c1", workflowId: "wf1", name: "Wait" }, { id: "s2", churchId: "c1", workflowId: "wf1", name: "Call", expectedResponseDays: 1, defaultAssignToType: "person", defaultAssignToId: "leader1", defaultAssignToLabel: "Sample Leader" }];
+  const actions: WorkflowStepAction[] = WorkflowTemplates.get("assignmentConfirmation").steps[0].actions.map((a, i) => ({ ...a, config: JSON.stringify(a.config || {}), id: `action${i}`, stepId: "s1" }));
+  const tasks: Task[] = [];
   const locks = new Set<string>();
-  const load = (list: any[]) => jest.fn(async (c: string, key: string) => clone(list.find((x) => x.churchId === c && x.id === key) || null));
-  const repos: any = {
-    time: { loadByPlanId: jest.fn(async () => []) },
+  const load = <T extends { churchId?: string; id?: string }>(list: T[]) => jest.fn(async (c: string, key: string) => clone(list.find((x) => x.churchId === c && x.id === key) || null));
+  const mocks = {
+    time: { loadByPlanId: jest.fn(async (): Promise<Time[]> => []) },
     plan: { load: load(plans) },
     position: { load: load(positions) },
     workflow: { load: load(workflows) },
@@ -48,15 +56,16 @@ function fixture() {
     task: {
       load: load(tasks),
       loadMaxSortForStep: jest.fn(async () => 1),
-      save: jest.fn(async (task: any) => { task.id ||= `task${++id}`; const i = tasks.findIndex((t) => t.id === task.id && t.churchId === task.churchId); if (i === -1) tasks.push(clone(task)); else tasks[i] = clone(task); return task; }),
+      save: jest.fn(async (task: Task) => { task.id ||= `task${++id}`; const i = tasks.findIndex((t) => t.id === task.id && t.churchId === task.churchId); if (i === -1) tasks.push(clone(task)); else tasks[i] = clone(task); return task; }),
       loadByFollowupKey: jest.fn(async (c: string, key: string) => clone(tasks.find((t) => t.churchId === c && t.followupKey === key) || null)),
       loadForAssignment: jest.fn(async (c: string, key: string) => clone(tasks.filter((t) => t.churchId === c && t.assignmentId === key && t.status === "Open"))),
       loadOpenAssignmentCards: jest.fn(async () => clone(tasks.filter((t) => t.assignmentId && t.workflowId && t.status === "Open"))),
       loadSnoozedDueAllChurches: jest.fn(async () => clone(tasks.filter((t) => t.status === "Open" && t.snoozedUntil && new Date(t.snoozedUntil) <= new Date()))),
-      withAssignmentLock: jest.fn(async (c: string, key: string, fn: () => Promise<any>) => { const lock = `${c}/${key}`; if (locks.has(lock)) return null; locks.add(lock); try { return await fn(); } finally { locks.delete(lock); } })
+      withAssignmentLock: jest.fn(async (c: string, key: string, fn: () => Promise<unknown>) => { const lock = `${c}/${key}`; if (locks.has(lock)) return null; locks.add(lock); try { return await fn(); } finally { locks.delete(lock); } })
     }
   };
-  return { repos, plans, positions, assignments, workflows, steps, actions, tasks };
+  const fake: FakeRepos = mocks;
+  return { repos: fake as Repos & typeof mocks, plans, positions, assignments, workflows, steps, actions, tasks };
 }
 
 beforeEach(() => { jest.clearAllMocks(); jest.useFakeTimers().setSystemTime(new Date("2030-04-01T12:00:00Z")); delivery.mockResolvedValue("sent"); });
@@ -176,8 +185,8 @@ it("does not replay an action after a crash with an uncertain provider result", 
   const f = fixture();
   const save = f.repos.task.save.getMockImplementation();
   let failed = false;
-  f.repos.task.save.mockImplementation(async (task: any) => {
-    if (!failed && JSON.parse(task.data || "{}").actionAttempts?.action0 === "finished") { failed = true; throw new Error("crash after provider send"); }
+  f.repos.task.save.mockImplementation(async (task: Task) => {
+    if (!failed && (JSON.parse(task.data || "{}") as CardData).actionAttempts?.action0 === "finished") { failed = true; throw new Error("crash after provider send"); }
     return save(task);
   });
   await expect(Followup.issuePlan("c1", "plan1", f.repos)).rejects.toThrow("crash");
@@ -201,7 +210,7 @@ it("blocks generic text/email actions on assignment-bound cards", async () => {
   f.actions.unshift({ id: "genericText", stepId: "s1", actionType: "sendText", config: JSON.stringify({ message: "Generic shortcut" }) });
   f.actions.unshift({ id: "genericEmail", stepId: "s1", actionType: "sendEmail", config: JSON.stringify({ templateId: "template1" }) });
   await Followup.issuePlan("c1", "plan1", f.repos);
-  const history = JSON.parse(f.tasks[0].data).history.map((h: any) => h.message);
+  const history = JSON.parse(f.tasks[0].data).history.map((h: HistoryEntry) => h.message);
   expect(history).toContain("Action sendText failed: Use a serving request message for assignment confirmation");
   expect(history).toContain("Action sendEmail failed: Use a serving request message for assignment confirmation");
   expect(delivery).toHaveBeenCalledTimes(2);
@@ -245,7 +254,7 @@ it("wakes a human snooze without replaying outreach", async () => {
   await WorkflowHelper.snooze(structuredClone(f.tasks[0]), 1, f.repos);
   jest.setSystemTime(new Date("2030-04-05T12:03:00Z")); await Followup.processPending(f.repos);
   expect(f.tasks[0].snoozedUntil).toBeNull(); expect(f.tasks[0].stepId).toBe("s2"); expect(delivery).toHaveBeenCalledTimes(3);
-  expect(JSON.parse(f.tasks[0].data).history.map((h: any) => h.message)).toContain("Snooze ended");
+  expect(JSON.parse(f.tasks[0].data).history.map((h: HistoryEntry) => h.message)).toContain("Snooze ended");
 });
 
 

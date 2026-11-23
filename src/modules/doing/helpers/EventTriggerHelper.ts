@@ -12,6 +12,36 @@ interface Subject {
   label?: string;
 }
 
+// The record published with a triggerable event (person, donation, group member, form
+// submission, visit, registration or list member); each event fills only its own fields.
+interface TriggerEventPayload {
+  id?: string;
+  personId?: string;
+  displayName?: string;
+  membershipStatus?: string;
+  gender?: string;
+  maritalStatus?: string;
+  amount?: number;
+  currency?: string;
+  donationDate?: string | Date;
+  method?: string;
+  groupId?: string;
+  name?: string;
+  categoryName?: string;
+  contentType?: string;
+  contentId?: string;
+  submittedBy?: string;
+  submitterName?: string;
+  formName?: string;
+  formId?: string;
+  visitSessions?: { sessionId?: string }[];
+  eventId?: string;
+  listId?: string;
+  listName?: string;
+}
+
+type TriggerFacts = Record<string, unknown>;
+
 // Canonical membership statuses (mirror B1Admin people/helpers/MembershipStatusOptions.ts).
 const MEMBERSHIP_STATUS_OPTIONS = [
   { value: "Visitor", label: "Visitor" },
@@ -139,7 +169,7 @@ export class EventTriggerHelper {
 
   // Subscribed to InternalEventBus. Wrapped in try/catch — the doing module may
   // not be booted in this process, and a trigger failure must never break the write.
-  public static async onEvent(churchId: string, event: string, payload: any): Promise<void> {
+  public static async onEvent(churchId: string, event: string, payload: unknown): Promise<void> {
     try {
       if (!churchId || !payload) return;
       const repos = await RepoManager.getRepos<Repos>("doing");
@@ -150,8 +180,10 @@ export class EventTriggerHelper {
       if (triggers.length === 0) return;
 
       // Most events resolve to one subject; some (e.g. multi-person form posts) to several.
-      const resolved = await EventTriggerHelper.resolve(churchId, event, payload);
-      const context = EventTriggerHelper.eventContext(event, payload);
+      // Bus payloads are untyped records; form submissions may also arrive as an array (handled in resolve).
+      const record = payload as TriggerEventPayload;
+      const resolved = await EventTriggerHelper.resolve(churchId, event, record);
+      const context = EventTriggerHelper.eventContext(event, record);
       for (const { subject, facts } of resolved) {
         for (const t of triggers) {
           if (!t.workflowId) continue;
@@ -172,14 +204,15 @@ export class EventTriggerHelper {
   }
 
   // What the card keeps of the triggering record, for the gift merge fields in its emails and texts.
-  private static eventContext(event: string, payload: any): EventContext | undefined {
+  private static eventContext(event: string, payload: TriggerEventPayload): EventContext | undefined {
     if (event !== "donation.created") return undefined;
     return { type: event, donationId: payload.id, amount: payload.amount, currency: payload.currency, donationDate: payload.donationDate, method: payload.method };
   }
 
   // Per-record-type logic: load related records (cross-module via gateways), then
   // return the card subject(s) + a flat facts map. One case per event; [] = no subject.
-  private static async resolve(churchId: string, event: string, payload: any): Promise<{ subject: Subject; facts: Record<string, any> }[]> {
+  // Not private so tests can spy on it; treat as internal.
+  static async resolve(churchId: string, event: string, payload: TriggerEventPayload): Promise<{ subject: Subject; facts: TriggerFacts }[]> {
     switch (event) {
       case "person.created":
       case "person.updated":
@@ -237,8 +270,8 @@ export class EventTriggerHelper {
         // payload is a submission (or, defensively, an array of them). The subject is
         // the person the submission is about (contentType "person"), falling back to
         // the logged-in submitter, then to the submission itself for anonymous posts.
-        const subs = Array.isArray(payload) ? payload : [payload];
-        const out: { subject: Subject; facts: Record<string, any> }[] = [];
+        const subs: TriggerEventPayload[] = Array.isArray(payload) ? payload : [payload];
+        const out: { subject: Subject; facts: TriggerFacts }[] = [];
         for (const sub of subs) {
           const personId = sub?.contentType === "person" && sub.contentId ? sub.contentId : sub?.submittedBy;
           const subject: Subject = personId
@@ -257,7 +290,7 @@ export class EventTriggerHelper {
         if (!payload.personId) return [];
         const groupIds = new Set<string>();
         if (payload.groupId) groupIds.add(payload.groupId);
-        const sessionIds = (payload.visitSessions || []).map((vs: any) => vs?.sessionId).filter(Boolean);
+        const sessionIds = (payload.visitSessions || []).map((vs) => vs?.sessionId).filter(Boolean);
         if (sessionIds.length > 0) {
           const fromSessions = await getAttendanceModuleGateway().loadSessionGroupIds(churchId, sessionIds);
           fromSessions.forEach((id) => groupIds.add(id));
@@ -297,7 +330,8 @@ export class EventTriggerHelper {
     }
   }
 
-  private static async eventTypesForChurch(churchId: string, repos: Repos): Promise<Set<string>> {
+  // Not private so tests can spy on it; treat as internal.
+  static async eventTypesForChurch(churchId: string, repos: Repos): Promise<Set<string>> {
     const entry = EventTriggerHelper.cache.get(churchId);
     if (entry && entry.expires > Date.now()) return entry.types;
     const types = new Set(await repos.workflowTrigger.loadEventTypesForChurch(churchId));

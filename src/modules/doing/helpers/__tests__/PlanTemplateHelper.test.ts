@@ -1,19 +1,29 @@
 /** Tests plan template capture/apply using in-memory repo fakes. */
 
 import { PlanTemplateHelper } from "../PlanTemplateHelper.js";
+import type { PlanTemplateData } from "../PlanTemplateHelper.js";
+import type { Assignment, Plan, PlanItem, PlanItemTime, Position } from "../../models/index.js";
+import type { Repos } from "../../repositories/Repos.js";
 
-function makeRepos() {
-  const planItems: any[] = [];
-  const positions: any[] = [];
-  const planItemTimes: any[] = [];
-  const assignments: any[] = [];
-  const plans: any[] = [];
+// In-memory fakes return partial rows, so each repo method may resolve to a partial of what the real one returns.
+type Loose<R> = R extends (infer E)[] ? Partial<E>[] : R extends object ? Partial<R> : R;
+type FakeRepo<T> = { [K in keyof T]?: T[K] extends (...args: infer A) => Promise<infer R> ? (...args: A) => Promise<Loose<R>> : T[K] };
+type FakeRepos = { [K in keyof Repos]?: FakeRepo<Repos[K]> };
+interface Store { planItems: PlanItem[]; positions: Position[]; planItemTimes: PlanItemTime[]; assignments: Assignment[]; plans: Plan[] }
+type TestRepos = Repos & { _store: Store };
+
+function makeRepos(): TestRepos {
+  const planItems: PlanItem[] = [];
+  const positions: Position[] = [];
+  const planItemTimes: PlanItemTime[] = [];
+  const assignments: Assignment[] = [];
+  const plans: Plan[] = [];
   let seq = 0;
   const nextId = () => "new" + ++seq;
-  const removeWhere = (arr: any[], pred: (r: any) => boolean) => {
+  const removeWhere = <T>(arr: T[], pred: (r: T) => boolean) => {
     for (let i = arr.length - 1; i >= 0; i--) if (pred(arr[i])) arr.splice(i, 1);
   };
-  return {
+  const repos: FakeRepos & { _store: Store } = {
     _store: { planItems, positions, planItemTimes, assignments, plans },
     plan: {
       load: async (c: string, id: string) => plans.find((p) => p.churchId === c && p.id === id) || null,
@@ -21,7 +31,7 @@ function makeRepos() {
     },
     planItem: {
       loadForPlan: async (c: string, planId: string) => planItems.filter((i) => i.churchId === c && i.planId === planId).sort((a, b) => (a.sort || 0) - (b.sort || 0)),
-      save: async (m: any) => { if (!m.id) m.id = nextId(); planItems.push(m); return m; },
+      save: async (m: PlanItem) => { if (!m.id) m.id = nextId(); planItems.push(m); return m; },
       deleteByPlanId: async (c: string, planId: string) => removeWhere(planItems, (i) => i.churchId === c && i.planId === planId)
     },
     planItemTime: {
@@ -32,7 +42,7 @@ function makeRepos() {
     },
     position: {
       loadByPlanId: async (c: string, planId: string) => positions.filter((p) => p.churchId === c && p.planId === planId),
-      save: async (m: any) => { if (!m.id) m.id = nextId(); positions.push(m); return m; },
+      save: async (m: Position) => { if (!m.id) m.id = nextId(); positions.push(m); return m; },
       deleteByPlanId: async (c: string, planId: string) => removeWhere(positions, (p) => p.churchId === c && p.planId === planId)
     },
     assignment: {
@@ -41,10 +51,11 @@ function makeRepos() {
         removeWhere(assignments, (a) => posIds.includes(a.positionId));
       }
     }
-  } as any;
+  };
+  return repos as TestRepos;
 }
 
-function seedSourcePlan(repos: any) {
+function seedSourcePlan(repos: TestRepos) {
   const c = "ch1";
   repos._store.plans.push({ churchId: c, id: "src", notes: "Welcome friends" });
   // two-level tree: H1 -> (I1, I2), H2 -> (I3)
@@ -88,22 +99,22 @@ describe("PlanTemplateHelper", () => {
     const dstItems = await repos.planItem.loadForPlan("ch1", "dst");
     expect(dstItems).toHaveLength(5);
 
-    const headers = dstItems.filter((i: any) => !i.parentId);
-    expect(headers.map((h: any) => h.label).sort()).toEqual(["Message", "Worship"]);
+    const headers = dstItems.filter((i) => !i.parentId);
+    expect(headers.map((h) => h.label).sort()).toEqual(["Message", "Worship"]);
 
-    const worship = dstItems.find((i: any) => i.label === "Worship");
-    const children = dstItems.filter((i: any) => i.parentId === worship.id);
-    expect(children.map((c: any) => c.label).sort()).toEqual(["Song A", "Song B"]);
+    const worship = dstItems.find((i) => i.label === "Worship");
+    const children = dstItems.filter((i) => i.parentId === worship.id);
+    expect(children.map((c) => c.label).sort()).toEqual(["Song A", "Song B"]);
     // remapped to a NEW id, never the source header id
     expect(worship.id).not.toBe("H1");
-    expect(children.every((c: any) => c.parentId !== "H1")).toBe(true);
+    expect(children.every((c) => c.parentId !== "H1")).toBe(true);
 
-    const songA = dstItems.find((i: any) => i.label === "Song A");
+    const songA = dstItems.find((i) => i.label === "Song A");
     expect(songA.seconds).toBe(300);
     expect(songA.sort).toBe(1);
 
     const dstPositions = await repos.position.loadByPlanId("ch1", "dst");
-    expect(dstPositions.find((p: any) => p.name === "Vocals").count).toBe(3);
+    expect(dstPositions.find((p) => p.name === "Vocals").count).toBe(3);
   });
 
   it("replaces existing order of service when applying (does not append)", async () => {
@@ -116,7 +127,7 @@ describe("PlanTemplateHelper", () => {
     await PlanTemplateHelper.applyToPlan(repos, "ch1", "dst", data, { serviceOrder: true, positions: false });
 
     const dstItems = await repos.planItem.loadForPlan("ch1", "dst");
-    expect(dstItems.some((i: any) => i.label === "Stale")).toBe(false);
+    expect(dstItems.some((i) => i.label === "Stale")).toBe(false);
     expect(dstItems).toHaveLength(5);
   });
 
@@ -136,18 +147,18 @@ describe("PlanTemplateHelper", () => {
   it("copies a grandchild whose parent is listed after it", async () => {
     const repos = makeRepos();
     repos._store.plans.push({ churchId: "ch1", id: "dst" });
-    const data = {
+    const data: PlanTemplateData = {
       items: [
         { id: "A1", parentId: "S1", sort: 1, label: "Action" },
         { id: "H1", parentId: null, sort: 1, label: "Header" },
         { id: "S1", parentId: "H1", sort: 1, label: "Section" }
       ],
       positions: []
-    } as any;
+    };
     await PlanTemplateHelper.applyToPlan(repos, "ch1", "dst", data, { serviceOrder: true, positions: false });
     const dstItems = await repos.planItem.loadForPlan("ch1", "dst");
-    const section = dstItems.find((i: any) => i.label === "Section");
-    const action = dstItems.find((i: any) => i.label === "Action");
+    const section = dstItems.find((i) => i.label === "Section");
+    const action = dstItems.find((i) => i.label === "Action");
     expect(action).toBeDefined();
     expect(action.parentId).toBe(section.id);
   });

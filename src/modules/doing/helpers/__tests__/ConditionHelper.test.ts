@@ -1,9 +1,10 @@
 jest.mock("../../../../shared/modules/index.js", () => ({ getMembershipModuleGateway: () => ({}) }));
 
 import { ConditionHelper } from "../ConditionHelper.js";
+import type { Condition } from "../../models/index.js";
 
 const today = { iso: "2026-09-23", dayOfMonth: 23, dayOfWeek: 4, month: 9 };
-const cond = (operator: string, value: string, datePart?: string) => ({ field: "today", operator, value, fieldData: datePart ? JSON.stringify({ datePart }) : undefined }) as any;
+const cond = (operator: string, value: string, datePart?: string): Condition => ({ field: "today", operator, value, fieldData: datePart ? JSON.stringify({ datePart }) : undefined });
 
 describe("ConditionHelper today conditions", () => {
   it("matches a date equal to the church's today", () => {

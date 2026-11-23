@@ -2,6 +2,8 @@ import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { Asset, Report, Submission } from "../models/index.js";
+import type { User } from "../../membership/models/index.js";
+import type { Repos as MembershipRepos } from "../../membership/repositories/Repos.js";
 
 const APP = "WorshipCommons";
 
@@ -167,8 +169,8 @@ export class CommonsMailHelper {
   private static async mailWriter(userId: string | undefined, subject: string, contents: string): Promise<void> {
     try {
       if (!userId) return;
-      const repos = await RepoManager.getRepos<any>("membership");
-      const users: any[] = await repos.user.loadByIds([userId]);
+      const repos = await RepoManager.getRepos<MembershipRepos>("membership");
+      const users: User[] = await repos.user.loadByIds([userId]);
       await this.mailTo(users?.[0]?.email, subject, contents);
     } catch (e) {
       console.error("[CommonsMailHelper] writer email failed:", e);

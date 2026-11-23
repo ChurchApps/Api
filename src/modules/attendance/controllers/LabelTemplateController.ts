@@ -18,7 +18,7 @@ export class LabelTemplateController extends AttendanceBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
-      else return this.repos.labelTemplate.convertAllToModel(au.churchId, (await this.repos.labelTemplate.loadAll(au.churchId)) as any);
+      else return this.repos.labelTemplate.convertAllToModel(au.churchId, await this.repos.labelTemplate.loadAll(au.churchId));
     });
   }
 

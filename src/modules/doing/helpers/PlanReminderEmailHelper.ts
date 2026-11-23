@@ -3,13 +3,23 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { ReminderTokenHelper } from "./ReminderTokenHelper.js";
 import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
+import { Repos } from "../repositories/index.js";
+
+// Row shape of AssignmentRepo.loadForReminder.
+interface ReminderAssignmentRow {
+  id: string;
+  personId: string;
+  status: string;
+  positionName: string;
+  categoryName?: string;
+}
 
 const esc = (s: unknown): string =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c] as string));
 
 export class PlanReminderEmailHelper {
   public static async build(churchId: string, planId: string, personIds: string[], customMessage?: string): Promise<Record<string, { subject: string; html: string }>> {
-    const repos = await RepoManager.getRepos<any>("doing");
+    const repos = await RepoManager.getRepos<Repos>("doing");
     const plan = await repos.plan.load(churchId, planId);
     if (!plan) return {};
 
@@ -20,7 +30,7 @@ export class PlanReminderEmailHelper {
     const dateStr = new Date(plan.serviceDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
     const wanted = new Set(personIds);
-    const assignments = (await repos.assignment.loadForReminder(churchId, planId)) as any[];
+    const assignments = (await repos.assignment.loadForReminder(churchId, planId)) as ReminderAssignmentRow[];
     const byPerson = new Map<string, { positions: Set<string>; unconfirmedId: string | null }>();
     for (const a of assignments) {
       if (!a.personId || !wanted.has(a.personId)) continue;
@@ -31,7 +41,7 @@ export class PlanReminderEmailHelper {
     }
 
     const names = new Map<string, string>();
-    for (const p of (await membership.loadPeople(churchId, [...byPerson.keys()])) as any[]) names.set(p.id, p.displayName);
+    for (const p of await membership.loadPeople(churchId, [...byPerson.keys()])) names.set(p.id, p.displayName);
 
     const out: Record<string, { subject: string; html: string }> = {};
     for (const [personId, g] of byPerson) {
@@ -55,7 +65,7 @@ export class PlanReminderEmailHelper {
   private static buildEmailHtml(o: {
     firstName: string; planName: string; dateStr: string; positions: string;
     notes?: string; customMessage?: string; planUrl: string;
-    unconfirmedId: string | null; churchId: string; serviceDate: any;
+    unconfirmedId: string | null; churchId: string; serviceDate: Date | string;
   }): string {
     const parts: string[] = [];
     parts.push("<h2>Serving Reminder</h2>");

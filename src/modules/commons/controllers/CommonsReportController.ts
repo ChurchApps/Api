@@ -12,7 +12,7 @@ const RATE_WINDOW_SECONDS = 3600;
 @controller("/commons/reports")
 export class CommonsReportController extends CommonsBaseController {
   @httpPost("/")
-  public async create(req: express.Request<{}, {}, Report>, res: express.Response): Promise<any> {
+  public async create(req: express.Request<{}, {}, Report>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const b = req.body || {};
       const isWriter = !!au.id && b.reporterRole === "writer";

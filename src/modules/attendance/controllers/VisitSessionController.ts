@@ -6,6 +6,12 @@ import { VisitSession, Visit, Session, ServiceTime } from "../models/index.js";
 import { Permissions, Environment } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
+// The fields read from membership's /groupmembers/basic/:groupId response.
+interface GroupMemberBasic {
+  personId: string;
+  displayName: string;
+}
+
 @controller("/attendance/visitsessions")
 export class VisitSessionController extends AttendanceBaseController {
   @httpPost("/log")
@@ -33,10 +39,10 @@ export class VisitSessionController extends AttendanceBaseController {
             visitDate: session.sessionDate
           };
 
-          if (session.serviceTimeId === null) (visit as any).groupId = session.groupId;
+          if (session.serviceTimeId === null) visit.groupId = session.groupId;
           else {
             const st: ServiceTime = await this.repos.serviceTime.load(au.churchId, session.serviceTimeId);
-            (visit as any).serviceId = st?.serviceId;
+            visit.serviceId = st?.serviceId;
           }
           visit = await this.repos.visit.save(visit);
           newVisit = true;
@@ -54,7 +60,7 @@ export class VisitSessionController extends AttendanceBaseController {
   }
 
   @httpGet("/download/:sessionId")
-  public async download(@requestParam("sessionId") sessionId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+  public async download(@requestParam("sessionId") sessionId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json([], 401);
       else {
@@ -71,14 +77,14 @@ export class VisitSessionController extends AttendanceBaseController {
         const session: Session = await this.repos.session.load(au.churchId, sessionId);
 
         if (visitSessions.length > 0 && session) {
-          const url = apiUrl + `/groupmembers/basic/${(session as any).groupId}`;
+          const url = apiUrl + `/groupmembers/basic/${session.groupId}`;
           const config = { headers: { Authorization: "Bearer " + au.jwt } };
-          const groupMembers: any = (await axios.get(url, config)).data;
+          const groupMembers = (await axios.get<GroupMemberBasic[]>(url, config)).data;
 
-          const visitSessionPersonIds = new Set(visitSessions.map((session: any) => session.visit?.personId));
-          groupMembers?.forEach((member: any) => {
+          const visitSessionPersonIds = new Set(visitSessions.map((session) => session.visit?.personId));
+          groupMembers?.forEach((member) => {
             const status = visitSessionPersonIds.has(member.personId) ? "present" : "absent";
-            const visitSession = visitSessions.find((session: any) => session.visit?.personId === member.personId);
+            const visitSession = visitSessions.find((session) => session.visit?.personId === member.personId);
             result.push({
               id: visitSession ? visitSession.id : "",
               personId: member.personId,
@@ -122,7 +128,7 @@ export class VisitSessionController extends AttendanceBaseController {
         if (sessionId !== "") return (await this.repos.visitSession.loadForSession(au.churchId, sessionId)) || [];
         else {
           const data = await this.repos.visitSession.loadAll(au.churchId);
-          return this.repos.visitSession.convertAllToModel(au.churchId, data as any) || [];
+          return this.repos.visitSession.convertAllToModel(au.churchId, data) || [];
         }
       }
     });
@@ -170,7 +176,7 @@ export class VisitSessionController extends AttendanceBaseController {
         const visit: Visit = await this.repos.visit.loadForSessionPerson(au.churchId, sessionId, personId);
         if (visit !== null) {
           const existingSession = await this.repos.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
-          if (existingSession !== null) await this.repos.visitSession.delete(au.churchId, (existingSession as any).id);
+          if (existingSession !== null) await this.repos.visitSession.delete(au.churchId, existingSession.id);
           const visitSessions: VisitSession[] = ((await this.repos.visitSession.loadByVisitId(au.churchId, visit.id)) as VisitSession[]) || [];
           if (visitSessions.length === 0) await this.repos.visit.delete(au.churchId, visit.id);
         }

@@ -3,6 +3,7 @@ const loadChurch = jest.fn().mockResolvedValue({ id: "CHU1", timeZone: "America/
 jest.mock("../../../../shared/modules/index.js", () => ({ getMembershipModuleGateway: () => ({ loadIdsMatchingCondition, loadChurch }) }));
 
 import { ConditionHelper } from "../ConditionHelper.js";
+import type { Condition } from "../../models/index.js";
 
 describe("ConditionHelper person-date conditions use the church's today", () => {
   beforeEach(() => {
@@ -13,7 +14,7 @@ describe("ConditionHelper person-date conditions use the church's today", () => 
   afterEach(() => jest.useRealTimers());
 
   it("resolves Birth Date day of month = Today to the church-local day without changing the stored condition", async () => {
-    const condition: any = { churchId: "CHU1", field: "birthDate", operator: "=", value: "{currentDay}", fieldData: JSON.stringify({ datePart: "dayOfMonth" }) };
+    const condition: Condition = { churchId: "CHU1", field: "birthDate", operator: "=", value: "{currentDay}", fieldData: JSON.stringify({ datePart: "dayOfMonth" }) };
     const [result] = await ConditionHelper.getPeopleIdsMatchingConditions([condition]);
     expect(loadIdsMatchingCondition).toHaveBeenCalledWith(expect.objectContaining({ field: "birthDate", value: "22" }));
     expect(result.matchingIds).toEqual(["PER1"]);

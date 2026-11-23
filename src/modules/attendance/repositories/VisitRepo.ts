@@ -4,6 +4,9 @@ import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { getDb } from "../db/index.js";
 import { Visit } from "../models/index.js";
 
+// A visits table row (SELECT * / v.*): a Visit without the nested visitSessions.
+export type VisitRow = Omit<Visit, "visitSessions">;
+
 export class VisitRepo {
   public async save(model: Visit) {
     return model.id ? this.update(model) : this.create(model);
@@ -19,8 +22,8 @@ export class VisitRepo {
       personId: model.personId,
       serviceId: model.serviceId,
       groupId: model.groupId,
-      visitDate: visitDate as any,
-      checkinTime: checkinTime as any,
+      visitDate: visitDate,
+      checkinTime: checkinTime,
       addedBy: model.addedBy,
       securityCode: model.securityCode,
       checkinType: model.checkinType,
@@ -36,8 +39,8 @@ export class VisitRepo {
       personId: model.personId,
       serviceId: model.serviceId,
       groupId: model.groupId,
-      visitDate: visitDate as any,
-      checkinTime: checkinTime as any,
+      visitDate: visitDate,
+      checkinTime: checkinTime,
       addedBy: model.addedBy,
       securityCode: model.securityCode,
       checkinType: model.checkinType ?? null,
@@ -63,18 +66,18 @@ export class VisitRepo {
   public async loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
     const start = DateHelper.toMysqlDateOnly(startDate);
     const end = DateHelper.toMysqlDateOnly(endDate);
-    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate BETWEEN ${start} AND ${end}`.execute(getDb());
+    const rows = await sql<VisitRow>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate BETWEEN ${start} AND ${end}`.execute(getDb());
     return rows.rows;
   }
 
   public async loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
-    const rows = await sql<any>`SELECT v.* FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId INNER JOIN visits v on(v.serviceId = st.serviceId or v.groupId = s.groupId) and v.visitDate = s.sessionDate WHERE v.churchId=${churchId} AND s.id = ${sessionId} AND v.personId=${personId} LIMIT 1`.execute(getDb());
+    const rows = await sql<VisitRow>`SELECT v.* FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId INNER JOIN visits v on(v.serviceId = st.serviceId or v.groupId = s.groupId) and v.visitDate = s.sessionDate WHERE v.churchId=${churchId} AND s.id = ${sessionId} AND v.personId=${personId} LIMIT 1`.execute(getDb());
     return rows.rows.length > 0 ? rows.rows[0] : null;
   }
 
   public async loadByServiceDatePeopleIds(churchId: string, serviceId: string, visitDate: Date, peopleIds: string[]) {
     const vsDate = DateHelper.toMysqlDateOnly(visitDate);
-    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND serviceId = ${serviceId} AND visitDate = ${vsDate} AND personId IN (${sql.join(peopleIds)})`.execute(getDb());
+    const rows = await sql<VisitRow>`SELECT * FROM visits WHERE churchId=${churchId} AND serviceId = ${serviceId} AND visitDate = ${vsDate} AND personId IN (${sql.join(peopleIds)})`.execute(getDb());
     return rows.rows;
   }
 
@@ -82,8 +85,8 @@ export class VisitRepo {
     let result = new Date();
     result.setHours(0, 0, 0, 0);
 
-    const rows = await sql<any>`SELECT max(visitDate) as visitDate FROM visits WHERE churchId=${churchId} AND serviceId = ${serviceId} AND personId IN (${sql.join(peopleIds)})`.execute(getDb());
-    const data: any = rows.rows.length > 0 ? rows.rows[0] : null;
+    const rows = await sql<{ visitDate: Date | null }>`SELECT max(visitDate) as visitDate FROM visits WHERE churchId=${churchId} AND serviceId = ${serviceId} AND personId IN (${sql.join(peopleIds)})`.execute(getDb());
+    const data = rows.rows.length > 0 ? rows.rows[0] : null;
 
     if (data?.visitDate) result = new Date(data.visitDate);
     return result;
@@ -95,20 +98,20 @@ export class VisitRepo {
 
   public async loadByCodeToday(churchId: string, code: string) {
     const today = DateHelper.toMysqlDateOnly(new Date());
-    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate=${today} AND UPPER(securityCode)=UPPER(${code}) AND checkoutTime IS NULL`.execute(getDb());
+    const rows = await sql<VisitRow>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate=${today} AND UPPER(securityCode)=UPPER(${code}) AND checkoutTime IS NULL`.execute(getDb());
     return rows.rows;
   }
 
   public async loadActiveTodayByPeople(churchId: string, personIds: string[]) {
     if (personIds.length === 0) return [];
     const today = DateHelper.toMysqlDateOnly(new Date());
-    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate=${today} AND personId IN (${sql.join(personIds)}) AND checkoutTime IS NULL`.execute(getDb());
+    const rows = await sql<VisitRow>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate=${today} AND personId IN (${sql.join(personIds)}) AND checkoutTime IS NULL`.execute(getDb());
     return rows.rows;
   }
 
   public async checkout(churchId: string, visitIds: string[], checkedOutBy?: string, checkedOutById?: string) {
     await getDb().updateTable("visits").set({
-      checkoutTime: DateHelper.toMysqlDate(new Date()) as any,
+      checkoutTime: DateHelper.toMysqlDate(new Date()),
       checkedOutBy,
       checkedOutById
     }).where("churchId", "=", churchId)
@@ -128,8 +131,8 @@ export class VisitRepo {
 
   public async loadConsecutiveWeekStreaks(churchId: string, personIds: string[]): Promise<Record<string, number>> {
     if (personIds.length === 0) return {};
-    const rows = await sql<any>`SELECT personId, YEARWEEK(visitDate, 3) AS yw FROM visits WHERE churchId = ${churchId} AND personId IN (${sql.join(personIds)}) GROUP BY personId, yw ORDER BY personId, yw DESC`.execute(getDb());
-    const data: any[] = rows.rows as any[];
+    const rows = await sql<{ personId: string; yw: number }>`SELECT personId, YEARWEEK(visitDate, 3) AS yw FROM visits WHERE churchId = ${churchId} AND personId IN (${sql.join(personIds)}) GROUP BY personId, yw ORDER BY personId, yw DESC`.execute(getDb());
+    const data = rows.rows;
 
     const byPerson: Record<string, number[]> = {};
     for (const row of data) {
@@ -177,15 +180,15 @@ export class VisitRepo {
     return (year - 1) * 100 + lastWeek;
   }
 
-  public convertToModel(_churchId: string, data: any): Visit {
+  public convertToModel(_churchId: string, data: VisitRow): Visit {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): Visit[] {
+  public convertAllToModel(_churchId: string, data: VisitRow[]): Visit[] {
     return data.map((row) => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): Visit {
+  protected rowToModel(row: VisitRow): Visit {
     return {
       id: row.id,
       personId: row.personId,
@@ -206,7 +209,7 @@ export class VisitRepo {
     if (groupIds.length === 0) return [];
     const today = DateHelper.toMysqlDateOnly(new Date());
     const excludeClause = excludePersonIds.length > 0 ? sql`AND v.personId NOT IN (${sql.join(excludePersonIds)})` : sql``;
-    const rows = await sql<any>`
+    const rows = await sql<{ groupId: string; total: number | string | null; volunteers: number | string | null; guests: number | string | null }>`
       SELECT s.groupId AS groupId,
         COUNT(*) AS total,
         SUM(CASE WHEN v.checkinType = 'volunteer' THEN 1 ELSE 0 END) AS volunteers,
@@ -218,12 +221,12 @@ export class VisitRepo {
         AND DATE(s.sessionDate) = ${today} AND v.checkoutTime IS NULL ${excludeClause}
       GROUP BY s.groupId
     `.execute(getDb());
-    return rows.rows.map((r: any) => ({ groupId: r.groupId, total: Number(r.total ?? 0), volunteers: Number(r.volunteers ?? 0), guests: Number(r.guests ?? 0) }));
+    return rows.rows.map((r) => ({ groupId: r.groupId, total: Number(r.total ?? 0), volunteers: Number(r.volunteers ?? 0), guests: Number(r.guests ?? 0) }));
   }
 
   public async loadActiveByServiceToday(churchId: string, serviceId: string) {
     const today = DateHelper.toMysqlDateOnly(new Date());
-    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND serviceId=${serviceId} AND visitDate=${today} AND checkoutTime IS NULL`.execute(getDb());
+    const rows = await sql<VisitRow>`SELECT * FROM visits WHERE churchId=${churchId} AND serviceId=${serviceId} AND visitDate=${today} AND checkoutTime IS NULL`.execute(getDb());
     return rows.rows;
   }
 }

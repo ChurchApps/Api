@@ -4,13 +4,13 @@ import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { ContentLibraryHelper, PublishHelper, ReviewerHelper, recordAssetDownload, userNames } from "../helpers/index.js";
-import { Asset, AssetFile } from "../models/index.js";
+import { Asset, AssetFile, Song } from "../models/index.js";
 import { baseName } from "../helpers/PackageLayout.js";
 
 @controller("/commons/assets")
 export class CommonsAssetController extends CommonsBaseController {
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const page = Number(req.query.page) || 1;
       const pageSize = Number(req.query.pageSize) || 50;
@@ -30,7 +30,7 @@ export class CommonsAssetController extends CommonsBaseController {
   }
 
   @httpGet("/saved")
-  public async saved(req: express.Request, res: express.Response): Promise<any> {
+  public async saved(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const ids = await this.repos.rating.loadSavedAssetIds(au.id);
       const assets = (await this.repos.asset.loadByIds(ids)).filter((a) => a.status === "published");
@@ -40,7 +40,7 @@ export class CommonsAssetController extends CommonsBaseController {
   }
 
   @httpGet("/mine")
-  public async mine(req: express.Request, res: express.Response): Promise<any> {
+  public async mine(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const assets = await this.repos.asset.loadByPublisher(au.id);
       const views = await this.publicViews(assets);
@@ -50,7 +50,7 @@ export class CommonsAssetController extends CommonsBaseController {
   }
 
   @httpGet("/:id")
-  public async get(req: express.Request, res: express.Response): Promise<any> {
+  public async get(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset) return this.json({}, 404);
@@ -76,7 +76,7 @@ export class CommonsAssetController extends CommonsBaseController {
   }
 
   @httpGet("/:id/history")
-  public async history(req: express.Request, res: express.Response): Promise<any> {
+  public async history(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || asset.status === "pending") return this.json({}, 404);
@@ -85,7 +85,7 @@ export class CommonsAssetController extends CommonsBaseController {
   }
 
   @httpGet("/:id/editable")
-  public async editable(req: express.Request, res: express.Response): Promise<any> {
+  public async editable(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || asset.status === "removed" || asset.status === "pending") return this.json({}, 404);
@@ -95,7 +95,7 @@ export class CommonsAssetController extends CommonsBaseController {
   }
 
   @httpPost("/:id/download")
-  public async download(req: express.Request, res: express.Response): Promise<any> {
+  public async download(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset) return this.json({}, 404);
@@ -108,7 +108,7 @@ export class CommonsAssetController extends CommonsBaseController {
   }
 
   @httpPost("/:id/files/:name/download")
-  public async downloadFile(req: express.Request, res: express.Response): Promise<any> {
+  public async downloadFile(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset) return this.json({}, 404);
@@ -123,7 +123,7 @@ export class CommonsAssetController extends CommonsBaseController {
 
   // authz-exempt: saves are keyed by au.id, so a signed-in user can only write their own row
   @httpPut("/:id/saved")
-  public async save(req: express.Request<{ id: string }, {}, { saved?: boolean }>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{ id: string }, {}, { saved?: boolean }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset) return this.json({}, 404);
@@ -137,13 +137,13 @@ export class CommonsAssetController extends CommonsBaseController {
 
   // authz-exempt: publisher ownership check lives in ownVisibility()
   @httpPost("/:id/unpublish")
-  public async unpublish(req: express.Request, res: express.Response): Promise<any> {
+  public async unpublish(req: express.Request, res: express.Response): Promise<unknown> {
     return this.ownVisibility(req, res, "published", "unpublished");
   }
 
   // authz-exempt: publisher ownership check lives in ownVisibility()
   @httpPost("/:id/republish")
-  public async republish(req: express.Request, res: express.Response): Promise<any> {
+  public async republish(req: express.Request, res: express.Response): Promise<unknown> {
     return this.ownVisibility(req, res, "unpublished", "published");
   }
 
@@ -153,12 +153,12 @@ export class CommonsAssetController extends CommonsBaseController {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || !(await this.repos.asset.isPublisher(asset, au.id))) return this.json({}, 404);
       if (asset.status !== from) return this.json({ errors: [`asset is ${asset.status}`] }, 400);
-      await this.repos.asset.update(asset.id || "", { status: to, unpublishedAt: to === "unpublished" ? new Date() : null as any, removedReason: to === "unpublished" ? "publisher" : null as any });
+      await this.repos.asset.update(asset.id || "", { status: to, unpublishedAt: to === "unpublished" ? new Date() : null, removedReason: to === "unpublished" ? "publisher" : null });
       return { status: to };
     });
   }
 
-  private async publicViews(assets: Asset[]): Promise<(Asset & { fileUrls: Record<string, string>; files: AssetFile[]; publisherName?: string; version?: number; hasPendingSubmission?: boolean; detail?: any; mySaved?: boolean })[]> {
+  private async publicViews(assets: Asset[]): Promise<(Asset & { fileUrls: Record<string, string>; files: AssetFile[]; publisherName?: string; version?: number; hasPendingSubmission?: boolean; detail?: Omit<Song, "qualityDetail" | "proAnswer" | "qualityScore">; mySaved?: boolean })[]> {
     const files = await this.repos.assetFile.loadLiveMany(assets.map((a) => a.id || ""));
     const names = await userNames(assets.map((a) => a.publisherUserId));
     return assets.map((a) => {

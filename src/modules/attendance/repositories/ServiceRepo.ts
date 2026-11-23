@@ -4,6 +4,9 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Service } from "../models/index.js";
 
+// A services row, optionally joined with its campus name.
+export type ServiceRow = Omit<Service, "campus"> & { campusName?: string };
+
 @injectable()
 export class ServiceRepo {
   public async save(model: Service) {
@@ -45,24 +48,24 @@ export class ServiceRepo {
   }
 
   public async loadWithCampus(churchId: string) {
-    const rows = await sql<any>`SELECT s.*, c.name as campusName FROM services s LEFT JOIN campuses c on c.id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND s.removed=0 ORDER BY c.name, s.name`.execute(getDb());
+    const rows = await sql<ServiceRow>`SELECT s.*, c.name as campusName FROM services s LEFT JOIN campuses c on c.id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND s.removed=0 ORDER BY c.name, s.name`.execute(getDb());
     return rows.rows;
   }
 
   public async searchByCampus(churchId: string, campusId: string) {
-    const rows = await sql<any>`SELECT * FROM services WHERE churchId=${churchId} AND (${campusId}='0' OR campusId=${campusId}) AND removed=0 ORDER BY name`.execute(getDb());
+    const rows = await sql<ServiceRow>`SELECT * FROM services WHERE churchId=${churchId} AND (${campusId}='0' OR campusId=${campusId}) AND removed=0 ORDER BY name`.execute(getDb());
     return rows.rows;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: ServiceRow) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): Service[] {
+  public convertAllToModel(_churchId: string, data: ServiceRow[]): Service[] {
     return data.map((row) => this.rowToModel(row));
   }
 
-  protected rowToModel(data: any): Service {
+  protected rowToModel(data: ServiceRow): Service {
     const result: Service = { id: data.id, campusId: data.campusId, name: data.name };
     if (data.campusName !== undefined) result.campus = { id: result.campusId, name: data.campusName };
     return result;

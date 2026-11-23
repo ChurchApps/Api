@@ -26,6 +26,11 @@ jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { 
 jest.mock("../../repositories/index.js", () => ({ Repos: class {} }));
 
 import { PlanHelper, AutofillContext } from "../PlanHelper.js";
+import type { Repos } from "../../repositories/Repos.js";
+import type { Assignment, BlockoutDate, Plan, PlanItem, Position, SchedulingPreference, Time } from "../../models/index.js";
+
+type FakeRepos = { [K in keyof Repos]?: { [M in keyof Repos[K]]?: Repos[K][M] extends (...args: infer A) => unknown ? (...args: A) => unknown : Repos[K][M] } };
+const asRepos = (fake: FakeRepos) => fake as Repos;
 
 const daysFromNow = (n: number) => {
   const d = new Date();
@@ -52,7 +57,7 @@ function baseContext(overrides: Partial<AutofillContext> = {}): AutofillContext 
 describe("PlanHelper.computeAssignments", () => {
   it("fills open slots in least-recently-served order, never-served first", () => {
     const ctx = baseContext({
-      positions: [{ id: "pos1", churchId: "c1", count: 2 } as any],
+      positions: [{ id: "pos1", churchId: "c1", count: 2 } as Position],
       lastServed: [
         { personId: "p1", serviceDate: daysFromNow(-7) },
         { personId: "p2", serviceDate: daysFromNow(-28) }
@@ -116,7 +121,7 @@ describe("PlanHelper.computeAssignments", () => {
   it("prefers a volunteer whose preferred time matches over one who mismatches, even if longer-rested", () => {
     const ctx = baseContext({
       teams: [{ positionId: "pos1", personIds: ["p1", "p2"] }],
-      times: [{ id: "t1", displayName: "First Service", startTime: new Date(SERVICE_DATE.getTime() + 9 * 3600000) } as any],
+      times: [{ id: "t1", displayName: "First Service", startTime: new Date(SERVICE_DATE.getTime() + 9 * 3600000) } as Time],
       // p2 longer rested but prefers a different time
       lastServed: [{ personId: "p2", serviceDate: daysFromNow(-60) }],
       preferences: [
@@ -131,7 +136,7 @@ describe("PlanHelper.computeAssignments", () => {
   it("treats no time preference the same as a match", () => {
     const ctx = baseContext({
       teams: [{ positionId: "pos1", personIds: ["p1", "p2"] }],
-      times: [{ id: "t1", displayName: "First Service" } as any],
+      times: [{ id: "t1", displayName: "First Service" } as Time],
       lastServed: [
         { personId: "p1", serviceDate: daysFromNow(-30) },
         { personId: "p2", serviceDate: daysFromNow(-60) }
@@ -174,8 +179,8 @@ describe("PlanHelper.computeAssignments", () => {
   it("never double-books a person across positions and fills scarce positions first", () => {
     const ctx = baseContext({
       positions: [
-        { id: "pos1", churchId: "c1", count: 1 } as any,
-        { id: "pos2", churchId: "c1", count: 1 } as any
+        { id: "pos1", churchId: "c1", count: 1 } as Position,
+        { id: "pos2", churchId: "c1", count: 1 } as Position
       ],
       teams: [
         { positionId: "pos1", personIds: ["p1", "p2"] },
@@ -195,7 +200,7 @@ describe("PlanHelper.computeAssignments", () => {
 });
 
 describe("PlanHelper.matchesPreferredTime", () => {
-  const times = [{ displayName: "First Service", startTime: new Date(2026, 5, 14, 9, 0) } as any];
+  const times = [{ displayName: "First Service", startTime: new Date(2026, 5, 14, 9, 0) } as Time];
 
   it("returns null with no preference", () => {
     expect(PlanHelper.matchesPreferredTime(undefined, times)).toBeNull();
@@ -223,11 +228,11 @@ describe("PlanHelper.matchesPreferredTime", () => {
 
 describe("PlanHelper.autofill", () => {
   it("stamps assignments with the run id and records it on the plan for undo", async () => {
-    const saved: any[] = [];
-    const repos: any = {
-      assignment: { save: jest.fn(async (a: any) => { saved.push(a); return a; }) },
-      plan: { updateLastAutofillRunId: jest.fn(async () => undefined) }
-    };
+    const saved: Assignment[] = [];
+    const repos = asRepos({
+      assignment: { save: jest.fn(async (a: Assignment) => { saved.push(a); return a; }) },
+      plan: { updateLastAutofillRunId: jest.fn(async (): Promise<void> => undefined) }
+    });
     const created = await PlanHelper.autofill(baseContext(), "run123", repos);
     expect(created.length).toBe(1);
     expect(saved[0].autofillRunId).toBe("run123");
@@ -235,10 +240,10 @@ describe("PlanHelper.autofill", () => {
   });
 
   it("does not record a run when nothing was assigned", async () => {
-    const repos: any = {
+    const repos = asRepos({
       assignment: { save: jest.fn() },
       plan: { updateLastAutofillRunId: jest.fn() }
-    };
+    });
     const ctx = baseContext({ teams: [{ positionId: "pos1", personIds: [] }] });
     const created = await PlanHelper.autofill(ctx, "run123", repos);
     expect(created).toEqual([]);
@@ -247,22 +252,22 @@ describe("PlanHelper.autofill", () => {
 });
 
 describe("PlanHelper.autoReplaceDeclined", () => {
-  function buildRepos(plan: any, position: any, assignments: any[] = []) {
-    const saved: any[] = [];
-    const repos: any = {
+  function buildRepos(plan: Plan, position: Position, assignments: Assignment[] = []) {
+    const saved: Assignment[] = [];
+    const repos = asRepos({
       position: { load: jest.fn(async () => position) },
       plan: { load: jest.fn(async () => plan) },
       assignment: {
         loadByPlanId: jest.fn(async () => assignments),
-        loadLastServed: jest.fn(async () => []),
-        loadByServiceDate: jest.fn(async () => []),
-        loadMonthServeCounts: jest.fn(async () => []),
-        save: jest.fn(async (a: any) => { saved.push(a); return a; })
+        loadLastServed: jest.fn(async (): Promise<{ personId: string; serviceDate: Date }[]> => []),
+        loadByServiceDate: jest.fn(async (): Promise<Assignment[]> => []),
+        loadMonthServeCounts: jest.fn(async (): Promise<{ personId: string; count: number }[]> => []),
+        save: jest.fn(async (a: Assignment) => { saved.push(a); return a; })
       },
-      blockoutDate: { loadUpcoming: jest.fn(async () => []) },
-      time: { loadByPlanId: jest.fn(async () => []) },
-      schedulingPreference: { loadByPersonIds: jest.fn(async () => []) }
-    };
+      blockoutDate: { loadUpcoming: jest.fn(async (): Promise<BlockoutDate[]> => []) },
+      time: { loadByPlanId: jest.fn(async (): Promise<Time[]> => []) },
+      schedulingPreference: { loadByPersonIds: jest.fn(async (): Promise<SchedulingPreference[]> => []) }
+    });
     return { repos, saved };
   }
 
@@ -278,7 +283,7 @@ describe("PlanHelper.autoReplaceDeclined", () => {
   it("creates and notifies a replacement, skipping the decliner", async () => {
     const plan = { id: "plan1", churchId: "c1", name: "Sunday", serviceDate: SERVICE_DATE, autoReplaceOnDecline: true };
     const { repos, saved } = buildRepos(plan, position, [declined]);
-    const created = await PlanHelper.autoReplaceDeclined("c1", declined as any, repos);
+    const created = await PlanHelper.autoReplaceDeclined("c1", declined, repos);
     expect(created.map((a) => a.personId)).toEqual(["p2"]);
     expect(saved[0].status).toBe("Unconfirmed");
     expect(saved[0].notified).toBeInstanceOf(Date);
@@ -289,7 +294,7 @@ describe("PlanHelper.autoReplaceDeclined", () => {
     const { AssignmentWorkflowHelper } = await import("../AssignmentWorkflowHelper.js");
     const plan = { id: "plan1", churchId: "c1", name: "Sample Service", serviceDate: SERVICE_DATE, autoReplaceOnDecline: true, confirmationWorkflowId: "wf1" };
     const { repos, saved } = buildRepos(plan, position, [declined]);
-    await PlanHelper.autoReplaceDeclined("c1", declined as any, repos);
+    await PlanHelper.autoReplaceDeclined("c1", declined, repos);
     expect(saved[0].notified).toBeUndefined();
     expect(AssignmentWorkflowHelper.issuePlan).toHaveBeenCalledWith("c1", "plan1", repos);
     expect(notifyMock).not.toHaveBeenCalled(); // The confirmation workflow owns the app alert and messages.
@@ -298,19 +303,19 @@ describe("PlanHelper.autoReplaceDeclined", () => {
   it("does nothing when the plan has not opted in", async () => {
     const plan = { id: "plan1", churchId: "c1", serviceDate: SERVICE_DATE, autoReplaceOnDecline: false };
     const { repos } = buildRepos(plan, position, [declined]);
-    expect(await PlanHelper.autoReplaceDeclined("c1", declined as any, repos)).toEqual([]);
+    expect(await PlanHelper.autoReplaceDeclined("c1", declined, repos)).toEqual([]);
   });
 
   it("does nothing for past plans", async () => {
     const plan = { id: "plan1", churchId: "c1", serviceDate: daysFromNow(-7), autoReplaceOnDecline: true };
     const { repos } = buildRepos(plan, position, [declined]);
-    expect(await PlanHelper.autoReplaceDeclined("c1", declined as any, repos)).toEqual([]);
+    expect(await PlanHelper.autoReplaceDeclined("c1", declined, repos)).toEqual([]);
   });
 
   it("holds the notification when the plan is penciled in (prepared)", async () => {
     const plan = { id: "plan1", churchId: "c1", serviceDate: SERVICE_DATE, autoReplaceOnDecline: true, prepared: true };
     const { repos, saved } = buildRepos(plan, position, [declined]);
-    const created = await PlanHelper.autoReplaceDeclined("c1", declined as any, repos);
+    const created = await PlanHelper.autoReplaceDeclined("c1", declined, repos);
     expect(created.length).toBe(1);
     expect(notifyMock).not.toHaveBeenCalled();
     expect(saved[0].notified).toBeUndefined();
@@ -322,7 +327,7 @@ describe("PlanHelper.notifyLeadersOfResponse", () => {
   const plan = { id: "plan1", churchId: "c1", ministryId: "min1", name: "Sunday AM", serviceDate: SERVICE_DATE };
   const accepted = { id: "a1", churchId: "c1", positionId: "pos1", personId: "vol1", status: "Accepted" };
 
-  const buildRepos = (p: any = plan, pos: any = position) => ({
+  const buildRepos = (p: Plan = plan, pos: Position = position): FakeRepos => ({
     position: { load: jest.fn(async () => pos) },
     plan: { load: jest.fn(async () => p) }
   });
@@ -335,7 +340,7 @@ describe("PlanHelper.notifyLeadersOfResponse", () => {
   });
 
   it("alerts the ministry leaders, excluding the responder, with name/role/plan/response", async () => {
-    await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos() as any);
+    await PlanHelper.notifyLeadersOfResponse("c1", accepted, buildRepos() as Repos);
     expect(loadGroupLeaderPersonIdsMock).toHaveBeenCalledWith("c1", "min1");
     expect(notifyMock).toHaveBeenCalledTimes(1);
     const [ids, churchId, contentType, contentId, message] = notifyMock.mock.calls[0];
@@ -350,24 +355,24 @@ describe("PlanHelper.notifyLeadersOfResponse", () => {
   });
 
   it("says 'declined' for a declined response", async () => {
-    await PlanHelper.notifyLeadersOfResponse("c1", { ...accepted, status: "Declined" } as any, buildRepos() as any);
+    await PlanHelper.notifyLeadersOfResponse("c1", { ...accepted, status: "Declined" }, buildRepos() as Repos);
     expect(notifyMock.mock.calls[0][4]).toContain("declined");
   });
 
   it("links the leader notification to the real plan route, not the non-existent /my/plans", async () => {
-    await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos() as any);
+    await PlanHelper.notifyLeadersOfResponse("c1", accepted, buildRepos() as Repos);
     expect(notifyMock.mock.calls[0][5]).toBe("https://demo.b1.church/mobile/plans/plan1");
   });
 
   it("does nothing when the plan has no ministry", async () => {
-    await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos({ ...plan, ministryId: undefined }) as any);
+    await PlanHelper.notifyLeadersOfResponse("c1", accepted, buildRepos({ ...plan, ministryId: undefined }) as Repos);
     expect(loadGroupLeaderPersonIdsMock).not.toHaveBeenCalled();
     expect(notifyMock).not.toHaveBeenCalled();
   });
 
   it("does nothing when the only leader is the responder", async () => {
     loadGroupLeaderPersonIdsMock.mockResolvedValue(["vol1"]);
-    await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos() as any);
+    await PlanHelper.notifyLeadersOfResponse("c1", accepted, buildRepos() as Repos);
     expect(notifyMock).not.toHaveBeenCalled();
   });
 });
@@ -381,12 +386,12 @@ describe("PlanHelper.attachAssignees", () => {
       { positionId: "pos2", personId: "p4", status: "Declined" }
     ]);
     loadPeopleMock.mockResolvedValue([{ id: "p1", displayName: "Jane Smith" }, { id: "p2", displayName: "Bob Jones" }, { id: "p3", displayName: "Amy Lee" }]);
-    const tree: any[] = [
+    const tree: PlanItem[] = [
       { id: "i1", positionId: "pos1", children: [{ id: "i2", positionId: "pos2" }] },
       { id: "i3" },
       { id: "i4", positionId: "pos9" }
     ];
-    await PlanHelper.attachAssignees("c1", "plan1", tree, { assignment: { loadByPlanId } } as any);
+    await PlanHelper.attachAssignees("c1", "plan1", tree, asRepos({ assignment: { loadByPlanId } }));
     expect(tree[0].assignees).toBe("Jane Smith");
     expect(tree[0].children[0].assignees).toBe("Bob Jones, Amy Lee");
     expect(tree[1].assignees).toBeUndefined();
@@ -396,7 +401,7 @@ describe("PlanHelper.attachAssignees", () => {
 
   it("skips the queries when no item has a position", async () => {
     const loadByPlanId = jest.fn();
-    await PlanHelper.attachAssignees("c1", "plan1", [{ id: "i1" }], { assignment: { loadByPlanId } } as any);
+    await PlanHelper.attachAssignees("c1", "plan1", [{ id: "i1" }], asRepos({ assignment: { loadByPlanId } }));
     expect(loadByPlanId).not.toHaveBeenCalled();
   });
 });
