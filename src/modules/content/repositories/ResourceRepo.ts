@@ -19,7 +19,8 @@ export class ResourceRepo {
       description: model.description,
       quantity: model.quantity,
       approvalGroupId: model.approvalGroupId,
-      active: model.active ?? true
+      active: model.active ?? true,
+      categoryName: model.categoryName?.trim() || null
     }).execute();
     return model;
   }
@@ -28,9 +29,10 @@ export class ResourceRepo {
     await getDb().updateTable("resources").set({
       name: model.name,
       description: model.description,
-      quantity: model.quantity,
+      quantity: model.quantity ?? null,
       approvalGroupId: model.approvalGroupId ?? null,
-      active: model.active ?? true
+      active: model.active ?? true,
+      categoryName: model.categoryName?.trim() || null
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }

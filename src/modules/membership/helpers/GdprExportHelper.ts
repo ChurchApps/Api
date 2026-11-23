@@ -61,7 +61,8 @@ export class GdprExportHelper {
       registrations,
       registrationMembers,
       eventRsvps,
-      eventBookings
+      eventBookings,
+      documents
     ] = await Promise.all([
       membershipRepos.person.load(churchId, personId),
       membershipRepos.groupMember.loadForPerson(churchId, personId),
@@ -88,7 +89,8 @@ export class GdprExportHelper {
       content.loadRegistrationsByPerson(churchId, personId),
       content.loadRegistrationMembersByPerson(churchId, personId),
       content.loadEventRsvpsByPerson(churchId, personId),
-      content.loadEventBookingsByPerson(churchId, personId)
+      content.loadEventBookingsByPerson(churchId, personId),
+      content.loadPersonDocuments(churchId, personId)
     ]);
 
     // Load household if person has one
@@ -126,7 +128,8 @@ export class GdprExportHelper {
       registrations,
       registrationMembers,
       eventRsvps,
-      eventBookings
+      eventBookings,
+      documents
     };
   }
 

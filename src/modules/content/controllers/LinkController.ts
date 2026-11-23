@@ -5,6 +5,10 @@ import { ContentBaseController } from "./ContentBaseController.js";
 import { Link } from "../models/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 
+// Links on a person's record are staff-only: never listed through the public or member link routes.
+const PERSON_LINK_CATEGORY = "personLink";
+const isPersonLink = (link: { category?: string } | null | undefined) => link?.category === PERSON_LINK_CATEGORY;
+
 @controller("/content/links")
 export class LinkController extends ContentBaseController {
 
@@ -14,10 +18,11 @@ export class LinkController extends ContentBaseController {
   public async loadFiltered(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query.category?.toString();
+      if (category === PERSON_LINK_CATEGORY) return [];
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       const links = category
         ? await this.repos.link.loadByCategory(churchId, category, siteId)
-        : await this.repos.link.loadAll(churchId, siteId);
+        : (await this.repos.link.loadAll(churchId, siteId)).filter((l: Link) => !isPersonLink(l));
 
       // Filter links based on visibility (except "team" which needs client-side check)
       const viewer = au.churchId === churchId ? au : {};
@@ -56,8 +61,9 @@ export class LinkController extends ContentBaseController {
   public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const category = req.query.category?.toString();
+      if (category === PERSON_LINK_CATEGORY) return [];
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
-      if (!category) return await this.repos.link.loadAll(churchId, siteId);
+      if (!category) return (await this.repos.link.loadAll(churchId, siteId)).filter((l: Link) => !isPersonLink(l));
       else return await this.repos.link.loadByCategory(churchId, category, siteId);
     });
   }
@@ -66,6 +72,7 @@ export class LinkController extends ContentBaseController {
   public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.link.load(au.churchId, id);
+      if (isPersonLink(data) && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       return this.repos.link.convertToModel(au.churchId, data);
     });
   }
@@ -75,8 +82,14 @@ export class LinkController extends ContentBaseController {
   public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query?.category?.toString();
+      if (category === PERSON_LINK_CATEGORY) {
+        if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
+        const personId = req.query.linkData?.toString();
+        if (!personId) return [];
+        return this.repos.link.convertAllToModel(au.churchId, await this.repos.link.loadByCategoryAndData(au.churchId, category, personId));
+      }
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
-      const data = category ? await this.repos.link.loadByCategory(au.churchId, category, siteId) : await this.repos.link.loadAll(au.churchId, siteId);
+      const data = category ? await this.repos.link.loadByCategory(au.churchId, category, siteId) : (await this.repos.link.loadAll(au.churchId, siteId)).filter((l: Link) => !isPersonLink(l));
       return this.repos.link.convertAllToModel(au.churchId, data);
     });
   }
@@ -84,7 +97,7 @@ export class LinkController extends ContentBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      if (!(await this.canSave(au, req.body))) return this.json({}, 401);
       const promises: Promise<Link>[] = [];
       req.body.forEach((item) => { item.churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.link.save(item)); });
       const result = await Promise.all(promises);
@@ -104,12 +117,29 @@ export class LinkController extends ContentBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const existing = await this.repos.link.load(au.churchId, id);
+      const permission = isPersonLink(existing) ? Permissions.people.edit : Permissions.content.edit;
+      if (!au.checkAccess(permission)) return this.json({}, 401);
       else {
         await this.repos.link.delete(au.churchId, id);
         this.bumpSiteCache(au.churchId);
         return this.json({});
       }
     });
+  }
+
+  // Person links need Edit People (and nothing else in the batch); every other link needs content edit.
+  // An existing row keeps the rule of its stored category, so an id can't be used to cross between them.
+  private async canSave(au: any, links: Link[]): Promise<boolean> {
+    if (!Array.isArray(links) || links.length === 0) return au.checkAccess(Permissions.content.edit);
+    const personLinks = links.filter((l) => isPersonLink(l));
+    if (personLinks.length > 0 && personLinks.length !== links.length) return false;
+    for (const link of links) {
+      if (!link.id) continue;
+      const existing = await this.repos.link.load(au.churchId, link.id);
+      if (existing && isPersonLink(existing) !== isPersonLink(link)) return false;
+    }
+    if (personLinks.length > 0) return au.checkAccess(Permissions.people.edit) && personLinks.every((l) => !!l.linkData);
+    return au.checkAccess(Permissions.content.edit);
   }
 }

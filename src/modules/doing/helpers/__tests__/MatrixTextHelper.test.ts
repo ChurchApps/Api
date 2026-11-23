@@ -1,11 +1,11 @@
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
 const sendPersonTextMock = jest.fn() as jest.MockedFunction<MessagingModuleGateway["sendPersonText"]>;
-const people: Record<string, { id: string; firstName: string; lastName: string; mobilePhone: string; optedOut: boolean | number }> = {
-  P1: { id: "P1", firstName: "Donald", lastName: "Clark", mobilePhone: "(555) 010-1000", optedOut: false },
-  P2: { id: "P2", firstName: "Carol", lastName: "Clark", mobilePhone: "1-555-010-1000", optedOut: false }, // shares Donald's phone
-  P3: { id: "P3", firstName: "Sam", lastName: "Smith", mobilePhone: "555-010-3000", optedOut: true },
-  P4: { id: "P4", firstName: "Pat", lastName: "Jones", mobilePhone: "", optedOut: false },
-  P5: { id: "P5", firstName: "Lee", lastName: "Wong", mobilePhone: "555-010-5000", optedOut: 0 }
+const people: Record<string, { id: string; firstName: string; lastName: string; mobilePhone: string; smsOptedOut: boolean | number; optedOut?: boolean }> = {
+  P1: { id: "P1", firstName: "Donald", lastName: "Clark", mobilePhone: "(555) 010-1000", smsOptedOut: false },
+  P2: { id: "P2", firstName: "Carol", lastName: "Clark", mobilePhone: "1-555-010-1000", smsOptedOut: false }, // shares Donald's phone
+  P3: { id: "P3", firstName: "Sam", lastName: "Smith", mobilePhone: "555-010-3000", smsOptedOut: true },
+  P4: { id: "P4", firstName: "Pat", lastName: "Jones", mobilePhone: "", smsOptedOut: false },
+  P5: { id: "P5", firstName: "Lee", lastName: "Wong", mobilePhone: "555-010-5000", smsOptedOut: 0, optedOut: true }
 };
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({ loadPerson: async (_c: string, id: string) => people[id] || null, loadChurch: async () => ({ name: "Grace Church" }) }),

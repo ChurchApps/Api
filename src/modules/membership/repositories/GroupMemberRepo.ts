@@ -16,6 +16,7 @@ interface GroupMemberRow extends Omit<GroupMember, "person" | "group"> {
   mobilePhone?: string;
   workPhone?: string;
   optedOut?: boolean;
+  smsOptedOut?: boolean;
   address1?: string;
   address2?: string;
   city?: string;
@@ -114,7 +115,7 @@ export class GroupMemberRepo {
       .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb(sql.ref<number>("p.removed"), "=", 0), eb("p.removed", "is", null)])))
       .selectAll("gm")
       .select([
-        "p.photoUpdated", "p.displayName", "p.firstName", "p.lastName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole", "p.birthDate"
+        "p.photoUpdated", "p.displayName", "p.firstName", "p.lastName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.smsOptedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole", "p.birthDate"
       ])
       .where("gm.churchId", "=", churchId)
       .where("gm.groupId", "=", groupId)
@@ -309,7 +310,8 @@ export class GroupMemberRepo {
         },
         householdId: row.householdId,
         householdRole: row.householdRole,
-        optedOut: row.optedOut
+        optedOut: row.optedOut,
+        smsOptedOut: row.smsOptedOut
       };
       result.person.photo = PersonHelper.getPhotoPath(row.churchId, result.person);
     }
