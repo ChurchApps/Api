@@ -1667,6 +1667,23 @@
     }
    ],
    "schemaChanges": 2
+  },
+  "2026-11-22_rooms_resources_category": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "rooms",
+     "column": "categoryName",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "resources",
+     "column": "categoryName",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
   }
  },
  "giving": {
