@@ -108,4 +108,16 @@ export class UserHelper {
       "<p style=\"color: #6b7280; font-size: 14px;\">This code expires in 15 minutes. If you did not request a password reset, you can safely ignore this email.</p>";
     return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, appName + " Password Reset", contents);
   }
+
+  static sendLoginCodeEmail(email: string, code: string): Promise<void> {
+    const appName = "ChurchApps";
+    const appUrl = Environment.b1AdminRoot;
+
+    const contents =
+      "<h2>Sign-in Code</h2>" +
+      "<p>Enter this code in the app to sign in:</p>" +
+      `<p style="font-size: 28px; font-weight: bold; letter-spacing: 6px; text-align: center; font-family: monospace; padding: 16px; background: #f3f4f6; border-radius: 6px;">${code}</p>` +
+      "<p style=\"color: #6b7280; font-size: 14px;\">This code expires in 10 minutes and works once. If you did not try to sign in, you can safely ignore this email.</p>";
+    return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, appName + " Sign-in Code", contents);
+  }
 }

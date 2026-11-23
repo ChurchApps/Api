@@ -54,6 +54,17 @@ export class UserRepo {
     return parseInt(String(row?.verificationAttempts ?? "0"), 10);
   }
 
+  // Single conditional UPDATE, so of N racing requests holding the right code exactly one consumes it.
+  public async consumeVerification(userId: string, expectedHash: string): Promise<boolean> {
+    if (!userId || !expectedHash) return false;
+    const result = await getDb().updateTable("users")
+      .set({ verificationCode: null, verificationExpires: null, verificationAttempts: 0 })
+      .where("id", "=", userId)
+      .where("verificationCode", "=", expectedHash)
+      .executeTakeFirst();
+    return Number(result?.numUpdatedRows ?? 0) > 0;
+  }
+
   public async clearVerification(userId: string): Promise<void> {
     await getDb().updateTable("users").set({
       verificationCode: null,

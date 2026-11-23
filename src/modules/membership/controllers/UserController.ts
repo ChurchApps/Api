@@ -50,6 +50,11 @@ const REGISTER_MIN_FILL_MS = 2000;
 const CHECK_EMAIL_MAX_PER_IP = 60;
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const VERIFICATION_MAX_ATTEMPTS = 5;
+// Sign-in codes share the users.verification* slot with reset codes; the prefix keeps each usable only on its own endpoint.
+const LOGIN_CODE_PREFIX = "login:";
+const LOGIN_CODE_TTL_MS = 10 * 60 * 1000;
+const CODE_ISSUE_BUCKET = "forgot:";
+const CODE_VERIFY_BUCKET = "verify:";
 
 // A throwaway hash at the same cost factor as real passwords. Compared against when the email is
 // unknown so both failure paths burn the same bcrypt time and cannot be told apart by response time.
@@ -117,34 +122,112 @@ export class UserController extends MembershipBaseController {
           await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
           return this.json({ mfaRequired: true, mfaToken: MfaHelper.createLoginToken(user.id) }, 200);
         } else {
-          const userChurches = await this.getUserChurches(user.id);
-
-          const churchesOnly: Church[] = [];
-          userChurches.forEach((uc) => churchesOnly.push(uc.church));
-          await ChurchHelper.appendLogos(churchesOnly);
-          userChurches.forEach((uc) => {
-            const foundChurch = ArrayHelper.getOne(churchesOnly, "id", uc.church.id);
-            uc.church.settings = foundChurch?.settings || [];
-          });
-
-          const result = await AuthenticatedUser.login(userChurches, user);
-          if (result === null) return this.denyAccess(["No permissions"]);
-          else {
-            user.lastLogin = new Date();
-            await this.repos.user.save(user);
-            if (!isJwtRefresh) await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
-            MauticHelper.trackLogin(user.email, req.body.appName).catch(() => {});
-            const selectedChurch = userChurches[0];
-            if (selectedChurch) {
-              AuditLogHelper.logLogin(this.repos, selectedChurch.church.id, user.id, true, ip, { email: user.email });
-            }
-            return this.json(result, 200);
-          }
+          return await this.completeLogin(user, req.body.appName, ip, isJwtRefresh ? null : async () => LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp));
         }
       } catch (e) {
         if (Environment.currentEnvironment === "dev") {
           throw e;
         }
+        this.logger.error(e);
+        return this.error(["Unexpected error"]);
+      }
+    });
+  }
+
+  /** The response every successful sign-in returns, whichever credential proved it. */
+  private async completeLogin(user: User, appName: string, ip: string, onSuccess: (() => Promise<void>) | null, auditDetails: object = {}): Promise<unknown> {
+    const userChurches = await this.getUserChurches(user.id);
+
+    const churchesOnly: Church[] = [];
+    userChurches.forEach((uc) => churchesOnly.push(uc.church));
+    await ChurchHelper.appendLogos(churchesOnly);
+    userChurches.forEach((uc) => {
+      const foundChurch = ArrayHelper.getOne(churchesOnly, "id", uc.church.id);
+      uc.church.settings = foundChurch?.settings || [];
+    });
+
+    const result = await AuthenticatedUser.login(userChurches, user);
+    if (result === null) return this.denyAccess(["No permissions"]);
+    user.lastLogin = new Date();
+    await this.repos.user.save(user);
+    if (onSuccess) await onSuccess();
+    MauticHelper.trackLogin(user.email, appName).catch(() => {});
+    const selectedChurch = userChurches[0];
+    if (selectedChurch) {
+      AuditLogHelper.logLogin(this.repos, selectedChurch.church.id, user.id, true, ip, { email: user.email, ...auditDetails });
+    }
+    return this.json(result, 200);
+  }
+
+  @httpPost("/requestLoginCode", body("email").isEmail().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"))
+  public async requestLoginCode(req: express.Request<{}, {}, { email: string }>, res: express.Response): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+        if (!Environment.isMailConfigured) return res.status(400).json({ errors: ["Email is not configured on this server."], mailConfigured: false });
+
+        const rateLimitIp = LoginRateLimiter.getClientIp(req);
+        const account = CODE_ISSUE_BUCKET + (req.body.email || "").toString().trim().toLowerCase();
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
+        await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
+
+        const user = await this.loadByTypedEmail(req, req.body.email);
+        if (user !== null) {
+          const code = generateVerificationCode();
+          await this.repos.user.updateVerification(user.id, LOGIN_CODE_PREFIX + bcrypt.hashSync(code, 10), new Date(Date.now() + LOGIN_CODE_TTL_MS));
+          await UserHelper.sendLoginCodeEmail(user.email, code);
+          AuditLogHelper.log(this.repos, "", user.id, "security", "login_code_requested", "user", user.id, { email: user.email }, AuditLogHelper.getClientIp(req));
+        }
+        // Same answer for unknown addresses, so this cannot be used to find out who has an account.
+        return this.json({ emailed: true }, 200);
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") throw e;
+        this.logger.error(e);
+        return this.error(["Unexpected error"]);
+      }
+    });
+  }
+
+  @httpPost("/loginWithCode", body("email").isEmail().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"), body("code").isString().isLength({ min: 6, max: 6 }).withMessage("enter a 6-digit code"))
+  public async loginWithCode(req: express.Request<{}, {}, { email: string; code: string; appName?: string }>, res: express.Response): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+        // Shares the reset-code bucket, so alternating the two endpoints cannot double the guess budget.
+        const rateLimitIp = LoginRateLimiter.getClientIp(req);
+        const account = CODE_VERIFY_BUCKET + (req.body.email || "").toString().trim().toLowerCase();
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
+
+        const ip = AuditLogHelper.getClientIp(req);
+        const user = await this.loadByTypedEmail(req, req.body.email);
+        const stored = user?.verificationCode || "";
+        const isLive = !!user && stored.startsWith(LOGIN_CODE_PREFIX) && !!user.verificationExpires && new Date(user.verificationExpires).getTime() >= Date.now();
+        let attemptsOk = false;
+        if (isLive) {
+          attemptsOk = (await this.repos.user.incrementVerificationAttempts(user.id)) <= VERIFICATION_MAX_ATTEMPTS;
+          if (!attemptsOk) {
+            await this.repos.user.clearVerification(user.id);
+            AuditLogHelper.log(this.repos, "", user.id, "security", "verification_locked", "user", user.id, { email: user.email }, ip);
+          }
+        }
+        // One bcrypt compare on every path (unknown email, no code, expired, locked), so failures cost the same.
+        const matched = await bcrypt.compare(req.body.code || "", isLive && attemptsOk ? stored.slice(LOGIN_CODE_PREFIX.length) : TIMING_EQUALIZER_HASH);
+        const consumed = isLive && attemptsOk && matched && (await this.repos.user.consumeVerification(user.id, stored));
+        if (!consumed) {
+          await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
+          AuditLogHelper.logLogin(this.repos, "", user?.id || "", false, ip, { email: req.body.email, reason: "Invalid sign-in code" });
+          return this.json({ errors: ["Invalid or expired code"] }, 400);
+        }
+
+        await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
+        // A code proves the mailbox, not the second factor: MFA accounts get the same challenge as a password login.
+        if (await this.repos.userMfa.isEnabled(user.id)) return this.json({ mfaRequired: true, mfaToken: MfaHelper.createLoginToken(user.id) }, 200);
+        return await this.completeLogin(user, req.body.appName, ip, null, { method: "emailCode" });
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") throw e;
         this.logger.error(e);
         return this.error(["Unexpected error"]);
       }
@@ -455,7 +538,7 @@ export class UserController extends MembershipBaseController {
 
         const rateLimitIp = LoginRateLimiter.getClientIp(req);
         // Own bucket so reset requests don't lock out password login; every request counts since each one reissues a code.
-        const account = "forgot:" + (req.body.userEmail || "").toString().trim().toLowerCase();
+        const account = CODE_ISSUE_BUCKET + (req.body.userEmail || "").toString().trim().toLowerCase();
         if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
         await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
 
@@ -494,12 +577,12 @@ export class UserController extends MembershipBaseController {
 
         // Per-account bucket that survives code reissue, so /forgot can't reset the guess budget.
         const rateLimitIp = LoginRateLimiter.getClientIp(req);
-        const account = "verify:" + (req.body.email || "").toString().trim().toLowerCase();
+        const account = CODE_VERIFY_BUCKET + (req.body.email || "").toString().trim().toLowerCase();
         if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
 
         const user = await this.loadByTypedEmail(req, req.body.email);
         if (user === null) return this.json({ errors: ["invalid code"] }, 400);
-        if (!user.verificationCode || !user.verificationExpires) return this.json({ errors: ["invalid code"] }, 400);
+        if (!user.verificationCode || !user.verificationExpires || user.verificationCode.startsWith(LOGIN_CODE_PREFIX)) return this.json({ errors: ["invalid code"] }, 400);
         if (new Date(user.verificationExpires).getTime() < Date.now()) return this.json({ errors: ["code expired"] }, 400);
 
         const attempts = await this.repos.user.incrementVerificationAttempts(user.id);

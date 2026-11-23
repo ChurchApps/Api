@@ -79,3 +79,29 @@ describe("UserRepo.consumeAuthGuid", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("UserRepo.consumeVerification", () => {
+  it("clears the code only while the stored hash still matches", async () => {
+    const { proxy, calls } = recordingDb([{ numUpdatedRows: BigInt(1) }]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    expect(await new UserRepo().consumeVerification("u1", "login:hash")).toBe(true);
+    expect(calls.find((c) => c.method === "set")?.args).toEqual([{ verificationCode: null, verificationExpires: null, verificationAttempts: 0 }]);
+    expect(calls.filter((c) => c.method === "where").map((c) => c.args)).toEqual([
+      ["id", "=", "u1"],
+      ["verificationCode", "=", "login:hash"]
+    ]);
+  });
+
+  it("reports failure when another request already used the code", async () => {
+    const { proxy } = recordingDb([{ numUpdatedRows: BigInt(0) }]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    expect(await new UserRepo().consumeVerification("u1", "login:hash")).toBe(false);
+  });
+
+  it("does not issue an unguarded update", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    expect(await new UserRepo().consumeVerification("u1", "")).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});

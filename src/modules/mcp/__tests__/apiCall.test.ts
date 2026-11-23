@@ -25,7 +25,7 @@ describe("MCP api_call", () => {
     expect(seenIp).toBe("198.51.100.4");
   });
 
-  it.each(["/membership/users/login", "/membership/users/verifyCode", "/membership/users/forgot", "/membership/users/register", "/mcp"])("refuses credential endpoint %s", async (path) => {
+  it.each(["/membership/users/login", "/membership/users/verifyCode", "/membership/users/forgot", "/membership/users/requestLoginCode", "/membership/users/loginWithCode", "/membership/users/register", "/mcp"])("refuses credential endpoint %s", async (path) => {
     seenIp = "untouched";
     const handler = makeApiCallHandler(() => "Bearer x", () => "198.51.100.4");
     const result = await handler({ method: "POST", path });
