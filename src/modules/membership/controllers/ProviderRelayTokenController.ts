@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { controller, httpPost, requestParam } from "inversify-express-utils";
 import express from "express";
-import { getProvider, getProviderConfig, setProviderSecret, TokenHelper, ContentProviderConfig, GoCurriculumProvider } from "@churchapps/content-providers";
+import { getProvider, getProviderConfig, setProviderSecret, TokenHelper, ContentProviderConfig, ContentProviderAuthData, GoCurriculumProvider } from "@churchapps/content-providers";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { PublicPersonRateLimiter } from "../helpers/PublicPersonRateLimiter.js";
 import { LoginRateLimiter } from "../helpers/LoginRateLimiter.js";
@@ -24,7 +24,7 @@ function splitRedirect(stored: string): { redirectUri: string; codeChallenge: st
   return { redirectUri: stored.slice(0, idx), codeChallenge: stored.slice(idx + 1) };
 }
 
-function deviceTokens(tokens: any, fallbackRefresh = "") {
+function deviceTokens(tokens: ContentProviderAuthData, fallbackRefresh = "") {
   return {
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token || fallbackRefresh,
@@ -40,7 +40,7 @@ export class ProviderRelayTokenController extends MembershipBaseController {
 
   // Anonymous: FreePlay has no B1 user. Only the auth code captured on this relay session is exchanged, and only if the verifier matches the challenge stored at create.
   @httpPost("/sessions/:sessionCode/exchange")
-  public async exchange(@requestParam("sessionCode") sessionCode: string, req: express.Request<{}, {}, { codeVerifier?: string }>, res: express.Response): Promise<any> {
+  public async exchange(@requestParam("sessionCode") sessionCode: string, req: express.Request<{}, {}, { codeVerifier?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       applySecrets();
       const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
@@ -62,8 +62,8 @@ export class ProviderRelayTokenController extends MembershipBaseController {
       if (!session.authCode) return this.json({ error: "invalid_grant", error_description: "Relay session has no authorization code" }, 400);
       const authCode = session.authCode;
       await this.repos.oAuthRelaySession.delete(session.id);
-      const provider = getProvider(providerId) as { exchangeCodeForTokens?: (code: string, codeVerifier: string, redirectUri: string) => Promise<any> } | null;
-      let tokens: any = null;
+      const provider = getProvider(providerId) as { exchangeCodeForTokens?: (code: string, codeVerifier: string, redirectUri: string) => Promise<ContentProviderAuthData | null> } | null;
+      let tokens: ContentProviderAuthData | null = null;
       try { tokens = await provider?.exchangeCodeForTokens?.(authCode, verifier, redirectUri); } catch { tokens = null; }
       if (!tokens?.access_token) return this.json({ error: "invalid_grant", error_description: "Failed to exchange authorization code for tokens" }, 400);
       return this.json({ status: "completed", ...deviceTokens(tokens) });
@@ -72,7 +72,7 @@ export class ProviderRelayTokenController extends MembershipBaseController {
 
   // Anonymous: refresh token is the device credential. Provider is limited to onedrive and googledrive. Does not accept an auth code.
   @httpPost("/refresh")
-  public async refresh(req: express.Request<{}, {}, { provider?: string; refreshToken?: string }>, res: express.Response): Promise<any> {
+  public async refresh(req: express.Request<{}, {}, { provider?: string; refreshToken?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       applySecrets();
       const providerId = req.body?.provider || "";
@@ -82,7 +82,7 @@ export class ProviderRelayTokenController extends MembershipBaseController {
       if (!process.env[SECRET_ENV[providerId]]) return this.json({ error: "server_error", error_description: "Provider secret is not configured" }, 500);
       const config = getProviderConfig(providerId) as ContentProviderConfig | null;
       if (!config) return this.json({ error: "server_error", error_description: "Provider is not available" }, 500);
-      let refreshed: any = null;
+      let refreshed: ContentProviderAuthData | null = null;
       try {
         refreshed = await new TokenHelper().refreshToken(config, { access_token: "", refresh_token: refreshToken, token_type: "Bearer", created_at: 0, expires_in: 0, scope: "" });
       } catch { refreshed = null; }
@@ -93,7 +93,7 @@ export class ProviderRelayTokenController extends MembershipBaseController {
 
   // Anonymous: the Go access token is the device credential. getCatalog verifies it with Go before returning the private catalog.
   @httpPost("/gocurriculum/catalog")
-  public async goCurriculumCatalog(req: express.Request<{}, {}, { groupId?: string; accessToken?: string }>, res: express.Response): Promise<any> {
+  public async goCurriculumCatalog(req: express.Request<{}, {}, { groupId?: string; accessToken?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       applySecrets();
       const groupId = req.body?.groupId;

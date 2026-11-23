@@ -22,7 +22,7 @@ interface ConfigGroup {
 export class ServerHealthController extends MembershipBaseController {
 
   @httpGet("/jobs")
-  public async getJobs(req: express.Request, res: express.Response): Promise<any> {
+  public async getJobs(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const latest = await this.repos.jobRun.loadLatest();
@@ -33,7 +33,7 @@ export class ServerHealthController extends MembershipBaseController {
 
   /** Applied and pending database migrations for every module, read from this environment's databases. */
   @httpGet("/migrations")
-  public async getMigrations(req: express.Request, res: express.Response): Promise<any> {
+  public async getMigrations(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       return { environment: Environment.currentEnvironment, modules: await MigrationRunner.statusAll() };
@@ -45,7 +45,7 @@ export class ServerHealthController extends MembershipBaseController {
    * well inside the API Gateway timeout; the admin page walks the modules in order.
    */
   @httpPost("/migrations/:module/run")
-  public async runMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<any> {
+  public async runMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const moduleName = req.params.module;
@@ -57,7 +57,7 @@ export class ServerHealthController extends MembershipBaseController {
 
   /** For a module with no migration history: which migrations its live schema already reflects. Read-only. */
   @httpGet("/migrations/:module/detect")
-  public async detectMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<any> {
+  public async detectMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       if (!MigrationRunner.isModule(req.params.module)) return this.json({ error: "Unknown module" }, 400);
@@ -71,7 +71,7 @@ export class ServerHealthController extends MembershipBaseController {
    * names exactly as detect (with the same rerun list) suggested.
    */
   @httpPost("/migrations/:module/baseline")
-  public async baselineMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<any> {
+  public async baselineMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       if (!MigrationRunner.isModule(req.params.module)) return this.json({ error: "Unknown module" }, 400);
@@ -83,7 +83,7 @@ export class ServerHealthController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getStatus(req: express.Request, res: express.Response): Promise<any> {
+  public async getStatus(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
 

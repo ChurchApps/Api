@@ -8,7 +8,7 @@ import { getContentModuleGateway } from "../../../shared/modules/ContentModuleGa
 @controller("/membership/sites")
 export class SiteController extends MembershipBaseController {
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.site.loadAll(au.churchId);
       return this.repos.site.convertAllToModel(au.churchId, data);
@@ -16,7 +16,7 @@ export class SiteController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Site[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Site[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const sites = req.body;
@@ -48,7 +48,7 @@ export class SiteController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const site = await this.repos.site.load(au.churchId, id);

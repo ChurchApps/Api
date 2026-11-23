@@ -18,8 +18,8 @@ export class MembershipBaseController extends BaseController {
     // Leaders of the group a form is linked to can read its submissions, never manage the form.
     if (access === "view" && this.leadsGroup(au, form.groupId)) return true;
 
-    const formData = (await this.repos.form.loadWithMemberPermissions(au.churchId, formId, au.personId)) as any;
-    if (formData?.contentType === "form") return (formData as any).action === "admin" || (formData as any).action === access;
+    const formData = await this.repos.form.loadWithMemberPermissions(au.churchId, formId, au.personId);
+    if (formData?.contentType === "form") return formData.action === "admin" || formData.action === access;
     if (au.checkAccess(Permissions.forms.edit)) return true;
     return false;
   }
@@ -32,6 +32,6 @@ export class MembershipBaseController extends BaseController {
     const ids = [...new Set(roleIds.filter((id) => !!id))];
     if (ids.length === 0) return true;
     const roles = await this.repos.role.loadByIds(ids);
-    return roles.length === ids.length && roles.every((r: any) => r.churchId === churchId);
+    return roles.length === ids.length && roles.every((r) => r.churchId === churchId);
   }
 }

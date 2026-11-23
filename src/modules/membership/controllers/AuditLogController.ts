@@ -8,7 +8,7 @@ import { AuditLogFilter } from "../repositories/AuditLogRepo.js";
 export class AuditLogController extends MembershipBaseController {
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
 
@@ -34,7 +34,7 @@ export class AuditLogController extends MembershipBaseController {
   }
 
   @httpGet("/person/:personId")
-  public async getForPerson(req: express.Request<{ personId: string }>, res: express.Response): Promise<any> {
+  public async getForPerson(req: express.Request<{ personId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
 

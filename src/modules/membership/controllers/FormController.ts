@@ -7,17 +7,17 @@ import { Permissions } from "../helpers/index.js";
 @controller("/membership/forms")
 export class FormController extends MembershipBaseController {
   @httpGet("/archived")
-  public async getArchived(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getArchived(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const contentType = (req.query?.contentType as string) || null;
       if (au.checkAccess(Permissions.forms.admin)) {
-        const all = await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadAllArchived(au.churchId)) as any[]);
+        const all = await this.repos.form.convertAllToModel(au.churchId, await this.repos.form.loadAllArchived(au.churchId));
         return contentType ? all.filter((f) => f.contentType !== "form") : all;
       } else {
-        const memberForms = await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadMemberArchivedForms(au.churchId, au.personId)) as any[]);
+        const memberForms = await this.repos.form.convertAllToModel(au.churchId, await this.repos.form.loadMemberArchivedForms(au.churchId, au.personId));
         const filteredMember = contentType ? memberForms.filter((f) => f.contentType !== "form") : memberForms;
         const nonMemberForms = au.checkAccess(Permissions.forms.edit)
-          ? await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadNonMemberArchivedForms(au.churchId)) as any[])
+          ? await this.repos.form.convertAllToModel(au.churchId, await this.repos.form.loadNonMemberArchivedForms(au.churchId))
           : [];
         return [...filteredMember, ...nonMemberForms];
       }
@@ -25,7 +25,7 @@ export class FormController extends MembershipBaseController {
   }
 
   @httpGet("/standalone/:id")
-  public async getStandAlone(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getStandAlone(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // authz-exempt: churchId identifies the embeddable public form's owner church
       const churchId = req?.query?.churchId?.toString();
@@ -40,12 +40,12 @@ export class FormController extends MembershipBaseController {
   // Forms linked to a group, for its group page. Members see the open ones to fill out; leaders also see closed ones.
   // No submission data here — leaders read answers through /formsubmissions/group/:groupId.
   @httpGet("/group/:groupId")
-  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Forms admins already see every form, so they get the leader's view (open and closed).
       const canSeeAll = this.leadsGroup(au, groupId) || au.checkAccess(Permissions.forms.admin);
       if (!canSeeAll && !au.groupIds?.includes(groupId)) return this.json([], 401);
-      const forms: Form[] = this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadForGroup(au.churchId, groupId)) as any[]);
+      const forms: Form[] = this.repos.form.convertAllToModel(au.churchId, await this.repos.form.loadForGroup(au.churchId, groupId));
       return forms
         .filter((f) => f.contentType === "form")
         .map((f) => ({ id: f.id, name: f.name, description: f.description, open: this.isOpen(f) }))
@@ -62,7 +62,7 @@ export class FormController extends MembershipBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!(await this.formAccess(au, id, "view"))) return this.json({}, 401);
       else return await this.repos.form.convertToModel(au.churchId, await this.repos.form.load(au.churchId, id));
@@ -70,23 +70,23 @@ export class FormController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const contentType = (req.query?.contentType as string) || null;
       if (au.checkAccess(Permissions.forms.admin)) {
-        const all = await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadAll(au.churchId)) as any[]);
+        const all = await this.repos.form.convertAllToModel(au.churchId, await this.repos.form.loadAll(au.churchId));
         return contentType ? all.filter((f) => f.contentType !== "form") : all;
       } else {
-        const memberForms = await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadMemberForms(au.churchId, au.personId)) as any[]);
+        const memberForms = await this.repos.form.convertAllToModel(au.churchId, await this.repos.form.loadMemberForms(au.churchId, au.personId));
         const filteredMember = contentType ? memberForms.filter((f) => f.contentType !== "form") : memberForms;
-        const nonMemberForms = au.checkAccess(Permissions.forms.edit) ? await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadNonMemberForms(au.churchId)) as any[]) : [];
+        const nonMemberForms = au.checkAccess(Permissions.forms.edit) ? await this.repos.form.convertAllToModel(au.churchId, await this.repos.form.loadNonMemberForms(au.churchId)) : [];
         return [...filteredMember, ...nonMemberForms];
       }
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Form[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Form[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const formPromises: Promise<Form>[] = [];
       const newStandAloneFormPromises: Promise<Form>[] = [];
@@ -120,7 +120,7 @@ export class FormController extends MembershipBaseController {
 
   // authz-exempt: gated by this.formAccess(au, id) — enforces forms.admin/edit or per-member form permission
   @httpPost("/duplicate/:id")
-  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await this.formAccess(au, id)) return this.json({}, 401);
       const form = await this.repos.form.load(au.churchId, id);
@@ -138,7 +138,7 @@ export class FormController extends MembershipBaseController {
 
   // authz-exempt: gated by this.formAccess(au, id) — enforces forms.admin/edit or per-member form permission
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!(await this.formAccess(au, id))) return this.json({}, 401);
       else {
