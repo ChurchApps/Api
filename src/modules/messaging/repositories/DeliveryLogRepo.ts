@@ -95,6 +95,16 @@ export class DeliveryLogRepo {
     return query.orderBy("attemptTime", "desc").execute();
   }
 
+  public async loadLatestEmailEvent(churchId: string, personId: string) {
+    return (await getDb().selectFrom("deliveryLogs").selectAll()
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .where("deliveryMethod", "in", ["email", "sesBounce"])
+      .orderBy("attemptTime", "desc")
+      .limit(1)
+      .executeTakeFirst()) ?? null;
+  }
+
   public async loadRecent(churchId: string, limit: number = 100) {
     return getDb().selectFrom("deliveryLogs").selectAll()
       .where("churchId", "=", churchId)
