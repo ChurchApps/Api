@@ -10,6 +10,7 @@ export interface ForeignPersonRow {
   lastName?: string;
   mobilePhone?: string;
   optedOut?: boolean | number;
+  smsOptedOut?: boolean | number;
   donorNumber?: string;
 }
 
@@ -43,7 +44,7 @@ export interface MembershipRepos {
     loadByIds(churchId: string, ids: string[]): Promise<ForeignPersonRow[]>;
     loadByIdsOnly(ids: string[]): Promise<ForeignPersonRow[]>;
     loadIdsByMobileDigits(churchId: string, digits: string): Promise<string[]>;
-    updateOptedOut(churchId: string, personId: string, optedOut: boolean): Promise<unknown>;
+    updateSmsOptedOut(churchId: string, personId: string, smsOptedOut: boolean): Promise<unknown>;
   };
   church: {
     load(churchId: string, id: string): Promise<ForeignChurchRow | null | undefined>;

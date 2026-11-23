@@ -15,10 +15,10 @@ const asRepos = (mocks: RepoMocks) => mocks as Repos;
 const createNotificationsMock: jest.MockedFunction<typeof NotificationHelper.createNotifications> = jest.fn();
 const sendPersonTextMock: jest.MockedFunction<MessagingModuleGateway["sendPersonText"]> = jest.fn();
 const people: Record<string, ForeignPersonRow> = {
-  P1: { id: "P1", firstName: "Donald", lastName: "Clark", mobilePhone: "555-0101", optedOut: false },
-  P2: { id: "P2", firstName: "Carol", lastName: "Clark", mobilePhone: "555-0102", optedOut: true },
-  P3: { id: "P3", firstName: "Sam", lastName: "Smith", mobilePhone: "", optedOut: false },
-  P4: { id: "P4", firstName: "Pat", lastName: "Jones", mobilePhone: "555-0104", optedOut: false }
+  P1: { id: "P1", firstName: "Donald", lastName: "Clark", mobilePhone: "555-0101", smsOptedOut: false },
+  P2: { id: "P2", firstName: "Carol", lastName: "Clark", mobilePhone: "555-0102", smsOptedOut: true },
+  P3: { id: "P3", firstName: "Sam", lastName: "Smith", mobilePhone: "", smsOptedOut: false },
+  P4: { id: "P4", firstName: "Pat", lastName: "Jones", mobilePhone: "555-0104", smsOptedOut: false }
 };
 jest.mock("../NotificationHelper.js", () => ({ NotificationHelper: { createNotifications: createNotificationsMock } }));
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({

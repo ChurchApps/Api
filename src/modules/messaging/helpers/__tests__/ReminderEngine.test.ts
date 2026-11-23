@@ -316,6 +316,14 @@ describe("ReminderEngine.scan channels->email wiring", () => {
     expect(options).toMatchObject({ category: "event_reminders", deliveryStartLevel: 1, emailImmediate: true, emailByPerson: emailMap });
   });
 
+  it("keeps a send-now row on the email allowance when the timer retries it", async () => {
+    const repos = buildRepos("email");
+    repos.reminderOccurrence.loadDue.mockResolvedValue([{ ...occ, occurrenceKey: "D1:now:1764601200000" }]);
+    ReminderEngine.init(asRepos(repos));
+    await ReminderEngine.scan();
+    expect(createNotificationsMock.mock.calls[0][7]).toMatchObject({ emailImmediate: true, churchAuthored: true });
+  });
+
   it("leaves options identical to today when channels omit email", async () => {
     const repos = buildRepos("push");
     ReminderEngine.init(asRepos(repos));
@@ -400,6 +408,21 @@ describe("ReminderEngine.sendNow", () => {
     await ReminderEngine.sendNow(def, new Date("2026-12-01T15:00:00Z"));
     expect(repos.rows.find((r) => r.id === "OLD").status).toBe("pending");
     expect(repos.reminderOccurrence.claim).not.toHaveBeenCalledWith("OLD");
+  });
+
+  it("draws an emailed send-now on the church's email allowance", async () => {
+    const repos = buildRepos();
+    repos.reminderDefinition.load.mockResolvedValue({ ...def, channels: "push,email" });
+    ReminderEngine.init(asRepos(repos));
+    await ReminderEngine.sendNow({ ...def, channels: "push,email" }, new Date("2026-12-01T15:00:00Z"));
+    expect(createNotificationsMock.mock.calls[0][7]).toMatchObject({ emailImmediate: true, churchAuthored: true });
+  });
+
+  it("leaves a push-only send-now off the email allowance", async () => {
+    const repos = buildRepos();
+    ReminderEngine.init(asRepos(repos));
+    await ReminderEngine.sendNow(def, new Date("2026-12-01T15:00:00Z"));
+    expect(createNotificationsMock.mock.calls[0][7].churchAuthored).toBeUndefined();
   });
 
   it("returns 0 when the timer already claimed the row", async () => {

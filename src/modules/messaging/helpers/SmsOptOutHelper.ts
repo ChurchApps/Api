@@ -8,6 +8,8 @@ import { MembershipRepos } from "./ForeignRepos.js";
 const STOP_WORDS = new Set([
   "STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT", "OPTOUT", "REVOKE"
 ]);
+const START_WORDS = new Set(["START", "UNSTOP"]);
+const keyword = (text: string) => (text || "").trim().replace(/[^a-z]/gi, "").toUpperCase();
 
 // Inbound webhook fields; values are whatever the provider sent.
 type InboundSmsFields = { [field: string]: unknown; subscriber?: InboundSmsFields };
@@ -36,7 +38,11 @@ export class SmsOptOutHelper {
   }
 
   static isStop(text: string): boolean {
-    return STOP_WORDS.has((text || "").trim().replace(/[^a-z]/gi, "").toUpperCase());
+    return STOP_WORDS.has(keyword(text));
+  }
+
+  static isStart(text: string): boolean {
+    return START_WORDS.has(keyword(text));
   }
 
   // Providers post different shapes (Twilio-style form fields, Clearstream/TextInChurch JSON); pull the sender and the reply text.
@@ -48,7 +54,7 @@ export class SmsOptOutHelper {
     return { from, text };
   }
 
-  // Marks every matching person opted out and turns their text reminders off. Returns how many people matched.
+  // Marks every matching person opted out of texts and turns their text reminders off. Returns how many people matched.
   static async optOut(churchId: string, phone: string): Promise<number> {
     const digits = (phone || "").replace(/\D/g, "");
     if (digits.length < 7) return 0;
@@ -56,10 +62,20 @@ export class SmsOptOutHelper {
     const messaging = await RepoManager.getRepos<Repos>("messaging");
     const personIds: string[] = await membership.person.loadIdsByMobileDigits(churchId, digits);
     for (const personId of personIds) {
-      await membership.person.updateOptedOut(churchId, personId, true);
+      await membership.person.updateSmsOptedOut(churchId, personId, true);
       const pref = await messaging.notificationPreference.loadByPersonId(churchId, personId);
       if (pref?.allowSms) await messaging.notificationPreference.save({ ...pref, allowSms: false });
     }
+    return personIds.length;
+  }
+
+  // START lifts the text opt-out only; text reminders stay off until staff turn them back on.
+  static async optIn(churchId: string, phone: string): Promise<number> {
+    const digits = (phone || "").replace(/\D/g, "");
+    if (digits.length < 7) return 0;
+    const membership = await RepoManager.getRepos<MembershipRepos>("membership");
+    const personIds: string[] = await membership.person.loadIdsByMobileDigits(churchId, digits);
+    for (const personId of personIds) await membership.person.updateSmsOptedOut(churchId, personId, false);
     return personIds.length;
   }
 }

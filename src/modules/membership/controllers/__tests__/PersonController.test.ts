@@ -52,6 +52,7 @@ interface SettingRow { keyName: string; value: string; public?: number }
 interface ControllerOpts {
   person?: PersonRow;
   duplicates?: PersonRow[];
+  duplicatePairs?: { personId1: string; personId2: string; matchedOn: string[] }[];
   rowsByIds?: PersonRow[];
   isPublicGroupLeader?: boolean;
   church?: { id: string; archivedDate?: Date };
@@ -103,6 +104,7 @@ function personController(opts: ControllerOpts = {}) {
       delete: jest.fn(),
       deleteByIds: jest.fn(),
       findPossibleDuplicates: jest.fn(async () => opts.duplicates ?? []),
+      findPossibleDuplicatePairs: jest.fn(async () => opts.duplicatePairs ?? []),
       loadByIds: jest.fn(async () => opts.rowsByIds ?? []),
       convertAllToBasicModel: jest.fn((_c: string, rows: PersonRow[]) => rows.map((r) => ({
         id: r.id,
@@ -700,6 +702,37 @@ describe("PersonController.duplicates", () => {
   });
 });
 
+describe("PersonController.getPossibleDuplicates", () => {
+  it("requires people.edit (401 for view-only)", async () => {
+    const { controller, repos } = personController({ access: ["peopleView"] });
+    const result = (await controller.getPossibleDuplicates(req, res)) as JsonOut;
+    expect(result.status).toBe(401);
+    expect(repos.person.findPossibleDuplicatePairs).not.toHaveBeenCalled();
+  });
+
+  it("returns pairs with both people, sorted by the first person's name, dropping pairs with a missing person", async () => {
+    const rows = [
+      { id: "a", name: { first: "Zed", last: "Young" } },
+      { id: "b", name: { first: "Zed", last: "Young" } },
+      { id: "c", name: { first: "Ann", last: "Adams" } },
+      { id: "d", name: { first: "Ann", last: "Adams" } }
+    ];
+    const duplicatePairs = [
+      { personId1: "a", personId2: "b", matchedOn: ["email"] },
+      { personId1: "c", personId2: "d", matchedOn: ["phone", "nameBirthDate"] },
+      { personId1: "c", personId2: "gone", matchedOn: ["email"] }
+    ];
+    const { controller, repos } = personController({ access: ["peopleEdit"], duplicatePairs, rowsByIds: rows });
+    const result = await controller.getPossibleDuplicates(req, res);
+    expect(repos.person.findPossibleDuplicatePairs).toHaveBeenCalledWith("c1");
+    expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["a", "b", "c", "d", "gone"]);
+    expect(result).toEqual([
+      { person1: rows[2], person2: rows[3], matchedOn: ["phone", "nameBirthDate"] },
+      { person1: rows[0], person2: rows[1], matchedOn: ["email"] }
+    ]);
+  });
+});
+
 // The directory gate must honour the church's directoryVisibility tier, not a hardcoded
 // Member/Staff check (ChurchAppsSupport#1089).
 describe("PersonController directory visibility gate", () => {
@@ -962,5 +995,49 @@ describe("PersonController.addFamilyMember", () => {
     const blank = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: {} }, settings: [] });
     expect(((await blank.controller.addFamilyMember(makeReq({ body: { first: " " } }), res)) as JsonOut).status).toBe(400);
     expect(blank.repos.person.save).not.toHaveBeenCalled();
+  });
+});
+
+// "Hide me from the member directory" must only hide a person from the directory,
+// not from the staff People list or recent-people picker (ChurchAppsSupport#1648).
+describe("PersonController opted-out people in staff lists", () => {
+  const rows = [
+    { id: "p2", name: { display: "Donald Clark" }, membershipStatus: "Member", optedOut: false },
+    { id: "p3", name: { display: "Carol Clark" }, membershipStatus: "Member", optedOut: true }
+  ];
+  const visible = (filterOptedOut: boolean) => rows.filter((r) => !filterOptedOut || !r.optedOut);
+  function listController(access: string[], membershipStatus = "Guest") {
+    const settings = [{ keyName: "directoryVisibility", value: "Members" }];
+    const { controller, repos } = personController({ access, membershipStatus, settings });
+    repos.person.loadAlphabetical = jest.fn(async (_c: string, _size: number, filterOptedOut: boolean) => visible(filterOptedOut));
+    repos.person.loadRecent = jest.fn(async (_c: string, filterOptedOut: boolean) => visible(filterOptedOut));
+    repos.person.search = jest.fn(async (_c: string, _t: string, filterOptedOut: boolean) => visible(filterOptedOut));
+    return { controller, repos };
+  }
+
+  it("GET /list includes an opted-out person for a View People caller who is not a server admin", async () => {
+    const { controller } = listController(["peopleView"]);
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as Person[];
+    expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
+  });
+
+  it("GET /recent includes an opted-out person for a View People caller who is not a server admin", async () => {
+    const { controller } = listController(["peopleView"]);
+    const result = (await controller.getRecent(makeReq({ query: {} }), res)) as Person[];
+    expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
+  });
+
+  it("GET /search includes an opted-out person for a View People caller who is not a server admin", async () => {
+    const { controller } = listController(["peopleView"]);
+    const result = (await controller.search(makeReq({ query: { term: "Clark" } }), res)) as Person[];
+    expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
+  });
+
+  it("still hides an opted-out person from a member browsing the directory", async () => {
+    const { controller } = listController([], "Member");
+    const list = (await controller.getList(makeReq({ query: {} }), res)) as Person[];
+    const recent = (await controller.getRecent(makeReq({ query: {} }), res)) as Person[];
+    expect(list.map((p) => p.id)).toEqual(["p2"]);
+    expect(recent.map((p) => p.id)).toEqual(["p2"]);
   });
 });

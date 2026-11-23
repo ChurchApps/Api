@@ -8,4 +8,5 @@ export class WorkflowStep {
   public defaultAssignToId?: string;
   public defaultAssignToLabel?: string;
   public expectedResponseDays?: number;
+  public instructions?: string;
 }

@@ -1,6 +1,6 @@
 const appendHistory = jest.fn();
 jest.mock("../../helpers/StepActionHelper.js", () => ({ StepActionHelper: { appendHistory: (...args: unknown[]) => appendHistory.apply(null, args) } }));
-jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn() } }));
+jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn(), stopIfResolved: jest.fn(async () => false) } }));
 import "reflect-metadata";
 
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
@@ -15,8 +15,10 @@ jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGatewa
 const prepareRequest = jest.fn();
 const completeDecision = jest.fn();
 const notifyReviewers = jest.fn();
+const snooze = jest.fn(async (task: Task, ..._rest: unknown[]) => task);
+const reassign = jest.fn(async (task: Task, ..._rest: unknown[]) => task);
 jest.mock("../../helpers/index", () => ({
-  WorkflowHelper: {},
+  WorkflowHelper: { snooze: (...args: Parameters<typeof snooze>) => snooze.apply(null, args), reassign: (...args: Parameters<typeof reassign>) => reassign.apply(null, args) },
   DirectoryUpdateHelper: { handleDirectoryUpdate: jest.fn() },
   AccountDeletionHelper: {
     taskType: "accountDeletion",
@@ -52,7 +54,7 @@ describe("TaskController.save accountDeletion self-service", () => {
     prepareRequest.mockReset();
     completeDecision.mockReset();
     notifyReviewers.mockReset().mockResolvedValue(undefined);
-    repos = { task: { save: jest.fn(async (t: Task) => ({ ...t, id: t.id || "new" })), loadForAccountDeletion: jest.fn(async () => []), load: jest.fn() } };
+    repos = { task: { save: jest.fn(async (t: Task) => ({ ...t, id: t.id || "new" })), loadForAccountDeletion: jest.fn(async (): Promise<Task[]> => []), load: jest.fn() } };
   });
 
   it("still requires tasks edit for ordinary task creation", async () => {
@@ -181,6 +183,40 @@ describe("TaskController.moveStep workflow scoping", () => {
   });
 });
 
+describe("TaskController card snooze and reassign", () => {
+  function setup() {
+    snooze.mockClear();
+    reassign.mockClear();
+    const repos: MockRepos = { task: { load: jest.fn(async () => ({ id: "t1", churchId: "c1", workflowId: "w1" })) } };
+    const controller = makeController(["tasksEdit"], repos);
+    controller.canEditCard = () => true;
+    // json is protected on the real base class, so set it as a plain property.
+    Object.assign(controller, { json: (obj: unknown, status: number) => ({ obj, status }) });
+    return controller;
+  }
+
+  it("snoozes until a picked date", async () => {
+    await setup().snooze("t1", req({ body: { until: "2099-01-05T06:00:00.000Z" } }), res);
+    expect(snooze.mock.calls[0][1]).toEqual(new Date("2099-01-05T06:00:00.000Z"));
+  });
+
+  it("still snoozes for a number of days", async () => {
+    await setup().snooze("t1", req({ body: { days: 3 } }), res);
+    expect(snooze.mock.calls[0][1]).toBe(3);
+  });
+
+  it("rejects a date in the past", async () => {
+    const result = (await setup().snooze("t1", req({ body: { until: "2001-01-01T00:00:00.000Z" } }), res)) as JsonOut;
+    expect(result.status).toBe(400);
+    expect(snooze).not.toHaveBeenCalled();
+  });
+
+  it("passes the signed-in person to reassign", async () => {
+    await setup().reassign("t1", req({ body: { assignedToType: "person", assignedToId: "p1", assignedToLabel: "Donald Clark" } }), res);
+    expect(reassign.mock.calls[0][3]).toBe("p1");
+  });
+});
+
 describe("TaskController.setConversation", () => {
   beforeEach(() => {
     loadConversationMock.mockReset();
@@ -277,7 +313,7 @@ describe("TaskController.save reassignment history", () => {
   let repos: MockRepos;
   beforeEach(() => {
     appendHistory.mockReset();
-    repos = { task: { save: jest.fn(async (t: Task) => t), load: jest.fn(async () => ({ id: "t1", title: "Call", assignedToType: "person", assignedToId: "p1", assignedToLabel: "Donald Clark", data: null })) } };
+    repos = { task: { save: jest.fn(async (t: Task) => t), load: jest.fn(async (): Promise<Task> => ({ id: "t1", title: "Call", assignedToType: "person", assignedToId: "p1", assignedToLabel: "Donald Clark", data: null })) } };
   });
 
   it("records a reassignment of a plain task", async () => {
@@ -299,10 +335,48 @@ describe("TaskController.save reassignment history", () => {
   });
 });
 
+describe("TaskController.save reopen", () => {
+  const closedAt = new Date("2026-11-21T09:14:00Z");
+  let repos: MockRepos;
+  beforeEach(() => {
+    repos = {
+      task: {
+        save: jest.fn(async (t: Task) => t),
+        load: jest.fn(async () => ({ id: "t1", title: "Call", status: "Closed", dateClosed: closedAt })),
+        loadByFollowupKey: jest.fn(async (): Promise<Task> => null),
+        withAssignmentLock: jest.fn(async (_c: string, _a: string, fn: () => unknown) => fn())
+      }
+    };
+  });
+
+  it("clears the closed date when a plain task is reopened", async () => {
+    await makeController(["tasksEdit"], repos).save(req({ query: {}, body: [{ id: "t1", title: "Call", status: "Open" }] }), res);
+    expect(repos.task.save.mock.calls[0][0].dateClosed).toBeNull();
+  });
+
+  it("clears the closed date when a serving follow-up is reopened", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", title: "Call", status: "Closed", dateClosed: closedAt, assignmentId: "a1" });
+    await makeController(["tasksEdit"], repos).save(req({ query: {}, body: [{ id: "t1", title: "Call", status: "Open" }] }), res);
+    expect(repos.task.save.mock.calls[0][0].dateClosed).toBeNull();
+  });
+
+  it("keeps the original close time when a closed serving follow-up is edited", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", title: "Call", status: "Closed", dateClosed: closedAt, assignmentId: "a1" });
+    await makeController(["tasksEdit"], repos).save(req({ query: {}, body: [{ id: "t1", title: "Renamed", status: "Closed" }] }), res);
+    expect(repos.task.save.mock.calls[0][0].dateClosed).toBe(closedAt);
+  });
+
+  it("stamps a close date when an open task is closed", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", title: "Call", status: "Open", dateClosed: null });
+    await makeController(["tasksEdit"], repos).save(req({ query: {}, body: [{ id: "t1", title: "Call", status: "Closed" }] }), res);
+    expect(repos.task.save.mock.calls[0][0].dateClosed).toBeInstanceOf(Date);
+  });
+});
+
 describe("TaskController.delete", () => {
   let repos: MockRepos;
   beforeEach(() => {
-    repos = { task: { load: jest.fn(async () => ({ id: "t1", churchId: "c1", title: "Call", status: "Closed" })), delete: jest.fn(async () => undefined) } };
+    repos = { task: { load: jest.fn(async () => ({ id: "t1", churchId: "c1", title: "Call", status: "Closed" })), delete: jest.fn(async (): Promise<void> => undefined) } };
   });
 
   it("requires tasks edit", async () => {

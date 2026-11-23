@@ -5,6 +5,13 @@ const PUBLIC_CONTENT_TYPES = ["website", "arrangement"];
 // sermon and playlist thumbnails, gallery uploads). They are public-read on S3 as well.
 const PUBLIC_CHURCH_FOLDERS = ["membership", "settings", "streamingLive", "gallery"];
 
+// Staff-only records: never public, downloaded only through a signed link (see PersonFileStorage).
+const PRIVATE_CONTENT_TYPES = ["person"];
+
+export function isPrivateFile(file: { contentType?: string } | null | undefined): boolean {
+  return PRIVATE_CONTENT_TYPES.includes(file?.contentType || "");
+}
+
 export function isPublicFile(file: { contentType?: string } | null | undefined): boolean {
   return PUBLIC_CONTENT_TYPES.includes(file?.contentType || "");
 }

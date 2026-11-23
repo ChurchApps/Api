@@ -76,8 +76,8 @@ function userController(initial: User | null) {
       clearVerification: jest.fn()
     },
     userChurch: { loadByUserId: jest.fn(), save: jest.fn() },
-    person: { searchEmail: jest.fn(async () => []) },
-    role: { loadAll: jest.fn(async () => []) },
+    person: { searchEmail: jest.fn(async (): Promise<unknown[]> => []) },
+    role: { loadAll: jest.fn(async (): Promise<unknown[]> => []) },
     roleMember: { save: jest.fn() },
     userMfa: { isEnabled: jest.fn(async () => false) }
   };
@@ -481,6 +481,18 @@ describe("UserController.sendInviteEmail", () => {
     expect(send).toHaveBeenCalled();
     expect(result.status).toBe(200);
     expect(result.obj).toEqual({ success: true });
+  });
+
+  // Prod 2026-11-15: a person record whose address has a space in the domain went to SES,
+  // which threw "Domain contains control or whitespace" and the invite answered 500 four times.
+  it("answers 400 without sending when the address has whitespace in it", async () => {
+    const { controller, repos } = userController(null);
+    repos.person.searchEmail.mockResolvedValue([{ email: "new@b .c" }]);
+    repos.church = { loadById: jest.fn(async () => ({ name: "Grace" })) };
+    const res = Object.assign({} as express.Response, { status: jest.fn(function (this: Record<string, unknown>, code: number) { this.code = code; return this; }), json: jest.fn(function (this: Record<string, unknown>) { return this; }) });
+    await controller.sendInviteEmail(req({ body: { email: "new@b .c", personName: "New", contextName: "Staff" }, headers: {} }), res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(send).not.toHaveBeenCalled();
   });
 });
 

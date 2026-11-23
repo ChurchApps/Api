@@ -4,12 +4,14 @@ import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { getDoingModuleGateway, getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
-import { Environment } from "./index.js";
+import { Environment, UserHelper } from "./index.js";
 import { ListRuleHelper } from "./ListRuleHelper.js";
 
 // Nightly job: re-evaluates auto-refresh lists, diffs against the cached membership,
 // runs attached actions for newly added people and notifies the creator on change.
 export class ListRefreshHelper {
+  private static maxNames = 100;
+
   public static async refreshAutoLists(): Promise<{ refreshed: number; errors: number }> {
     const repos = await RepoManager.getRepos<Repos>("membership");
     const lists = await repos.list.loadAutoRefresh();
@@ -37,7 +39,7 @@ export class ListRefreshHelper {
     for (const personId of added) await WebhookDispatcher.emit(list.churchId, "list.member.added", { listId: list.id, listName: list.name, personId });
     for (const personId of removed) await WebhookDispatcher.emit(list.churchId, "list.member.removed", { listId: list.id, listName: list.name, personId });
     if (added.length > 0) await this.runActions(repos, list, added);
-    if (list.notifyOnChange && (added.length > 0 || removed.length > 0)) await this.notifyCreator(repos, list, added.length, removed.length);
+    if (list.notifyOnChange && (added.length > 0 || removed.length > 0)) await this.notifyCreator(repos, list, added, removed);
     return { added, removed };
   }
 
@@ -65,17 +67,27 @@ export class ListRefreshHelper {
     }
   }
 
-  private static async notifyCreator(repos: Repos, list: List, addedCount: number, removedCount: number) {
+  private static async notifyCreator(repos: Repos, list: List, addedIds: string[], removedIds: string[]) {
     if (!list.createdByPersonId) return;
     const creator = await repos.person.load(list.churchId, list.createdByPersonId);
     if (!creator?.email) return;
     const church = await repos.church.loadById(list.churchId).catch((): null => null);
     const subject = `List "${list.name}" membership changed`;
-    const contents = `<h2>${list.name}</h2><p>The nightly refresh updated this list: ${addedCount} added, ${removedCount} removed.</p>`;
+    const added = await this.getNamesHtml(repos, list.churchId, "Added", addedIds);
+    const removed = await this.getNamesHtml(repos, list.churchId, "Removed", removedIds);
+    const contents = `<h2>${UserHelper.escapeHtml(list.name)}</h2><p>The nightly refresh updated this list: ${addedIds.length} added, ${removedIds.length} removed.</p>${added}${removed}`;
     try {
       await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church?.name), creator.email, "B1.church", Environment.b1AdminRoot ?? "", subject, contents, "ChurchEmailTemplate.html");
     } catch (e) {
       console.error(`[ListRefreshHelper] Notification email failed for list ${list.id}:`, e);
     }
+  }
+
+  public static async getNamesHtml(repos: Repos, churchId: string, heading: string, personIds: string[]) {
+    if (personIds.length === 0) return "";
+    const people = await repos.person.loadByIds(churchId, personIds.slice(0, this.maxNames));
+    const items = people.map((p) => `<li>${UserHelper.escapeHtml(p.displayName || [p.firstName, p.lastName].filter(Boolean).join(" "))}</li>`).join("");
+    const more = personIds.length > this.maxNames ? `<p>And ${personIds.length - this.maxNames} more.</p>` : "";
+    return `<h3>${heading}</h3><ul>${items}</ul>${more}`;
   }
 }

@@ -266,3 +266,43 @@ describe("PersonRepo.loadRecent ordering", () => {
     expect(result.map((r) => r.id)).toEqual(["z1", "a1"]);
   });
 });
+
+describe("PersonRepo.findPossibleDuplicatePairs", () => {
+  function rawDb(rows: Record<string, unknown>[]) {
+    const queries: unknown[] = [];
+    const executor = {
+      transformQuery: (node: unknown) => node,
+      compileQuery: (node: unknown) => { queries.push(node); return { sql: "", parameters: [] as unknown[], query: node }; },
+      executeQuery: async () => ({ rows })
+    };
+    return { db: { getExecutor: () => executor }, queries };
+  }
+
+  it("expands each matching group into pairs and merges the reasons for a repeated pair", async () => {
+    const { db } = rawDb([
+      { matchType: "email", ids: "p1,p2" },
+      { matchType: "phone", ids: "p1,p2,p3" },
+      { matchType: "phone", ids: "p1,p2" }
+    ]);
+    (getDb as jest.Mock).mockReturnValue(db);
+    const result = await new PersonRepo().findPossibleDuplicatePairs("c1");
+    expect(result).toEqual([
+      { personId1: "p1", personId2: "p2", matchedOn: ["email", "phone"] },
+      { personId1: "p1", personId2: "p3", matchedOn: ["phone"] },
+      { personId1: "p2", personId2: "p3", matchedOn: ["phone"] }
+    ]);
+  });
+
+  it("stops adding new pairs at the limit", async () => {
+    const { db } = rawDb([{ matchType: "nameBirthDate", ids: "a,b,c,d" }]);
+    (getDb as jest.Mock).mockReturnValue(db);
+    const result = await new PersonRepo().findPossibleDuplicatePairs("c1", 2);
+    expect(result.length).toBe(2);
+  });
+
+  it("returns [] when no keys are shared", async () => {
+    const { db } = rawDb([]);
+    (getDb as jest.Mock).mockReturnValue(db);
+    expect(await new PersonRepo().findPossibleDuplicatePairs("c1")).toEqual([]);
+  });
+});

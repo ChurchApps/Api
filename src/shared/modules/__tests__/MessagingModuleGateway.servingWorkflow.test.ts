@@ -9,7 +9,7 @@ import { getMessagingModuleGateway } from "../MessagingModuleGateway.js";
 const gateway = getMessagingModuleGateway();
 const person = { email: "volunteer@example.test", mobilePhone: "+15555550123" };
 const message = { subject: "Serving request", html: "<p>Confirm request</p>", text: "Confirm request" };
-const send = (channel: "email" | "sms", p: { email?: string; mobilePhone?: string; optedOut?: boolean } = person) => gateway.sendServingWorkflowMessage("c1", "p1", "card1", channel, p, message, "Sample Church");
+const send = (channel: "email" | "sms", p: { email?: string; mobilePhone?: string; smsOptedOut?: boolean } = person) => gateway.sendServingWorkflowMessage("c1", "p1", "card1", channel, p, message, "Sample Church");
 let text: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
@@ -28,7 +28,7 @@ it("honors serving-category SMS opt-out", async () => {
   expect(await send("sms")).toContain("category_opt_out"); expect(text).not.toHaveBeenCalled();
 });
 it("honors person opt-out and missing phones", async () => {
-  expect(await send("sms", { ...person, optedOut: true })).toContain("skipped");
+  expect(await send("sms", { ...person, smsOptedOut: true })).toContain("skipped");
   expect(await send("sms", { ...person, mobilePhone: "" })).toContain("skipped"); expect(text).not.toHaveBeenCalled();
 });
 it("reports missing providers without falling back to another channel", async () => {
