@@ -306,7 +306,8 @@ export class WorkflowHelper {
           defaultAssignToType: step.defaultAssignToType,
           defaultAssignToId: step.defaultAssignToId,
           defaultAssignToLabel: step.defaultAssignToLabel,
-          expectedResponseDays: step.expectedResponseDays
+          expectedResponseDays: step.expectedResponseDays,
+          instructions: step.instructions
         })) as WorkflowStep;
         if (newStep.id) createdStepIds.push(newStep.id);
         if (step.id && newStep.id) {
