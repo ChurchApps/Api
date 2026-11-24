@@ -7,6 +7,7 @@ jest.mock("../../../../shared/helpers/index", () => ({ PlanAuth: { canEditPositi
 jest.mock("../../helpers/PlanHelper", () => ({ PlanHelper: { loadPickerContext } }));
 jest.mock("../../helpers/ReminderTokenHelper", () => ({ ReminderTokenHelper: {} }));
 jest.mock("../../helpers/SignupDeadlineHelper", () => ({ SignupDeadlineHelper: {} }));
+jest.mock("../../helpers/ServingFeedHelper", () => ({ ServingFeedHelper: {} }));
 
 import express from "express";
 import { AuthenticatedUser } from "@churchapps/apihelper";
