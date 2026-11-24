@@ -2623,6 +2623,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-24_assignment_decline_reason": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "assignments",
+     "column": "declineReason",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  }
 }

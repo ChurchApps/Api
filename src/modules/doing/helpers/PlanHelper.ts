@@ -239,7 +239,9 @@ export class PlanHelper {
       const name = responder?.displayName || "A volunteer";
       const verb = assignment.status === "Accepted" ? "accepted" : "declined";
       const role = position.name ? ` as ${position.name}` : "";
-      const message = `${name} ${verb} serving${role} for ${plan.name}${dateStr ? ` on ${dateStr}` : ""}`;
+      // Plain text; the email and push senders escape notification messages.
+      const reason = assignment.status === "Declined" && assignment.declineReason ? `. Reason: ${assignment.declineReason}` : "";
+      const message = `${name} ${verb} serving${role} for ${plan.name}${dateStr ? ` on ${dateStr}` : ""}${reason}`;
 
       await NotificationService.createNotifications(leaderIds, churchId, "assignment", plan.id, message, planUrl, assignment.personId);
     } catch (e) {
