@@ -56,7 +56,9 @@ export class ListRuleHelper {
       case "field": return this.evalField(c, ctx);
       case "giving": {
         const { start, end } = this.getWindow(c);
-        return new Set(await getGivingModuleGateway().loadDonorPersonIds(ctx.churchId, c.entityId || null, start, end));
+        const donors = new Set(await getGivingModuleGateway().loadDonorPersonIds(ctx.churchId, c.entityId || null, start, end));
+        // "Has not donated": the church's people minus the donors in the window (giving lives in its own database).
+        return c.operator === "notIn" ? this.complement(donors, ctx) : donors;
       }
       case "attendance": {
         const { start, end } = this.getWindow(c);
