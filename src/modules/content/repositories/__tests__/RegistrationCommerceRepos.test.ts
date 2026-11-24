@@ -123,3 +123,43 @@ describe("RegistrationRepo.promoteFromWaitlist", () => {
     expect(promoted).toBeNull();
   });
 });
+
+describe("RegistrationRepo.loadRegisteredPersonIds", () => {
+  function whereRecordingDb(rows: { personId: string | null }[]) {
+    const wheres: unknown[][] = [];
+    const proxy: Record<string, unknown> = new Proxy({}, {
+      get(_t, prop) {
+        if (typeof prop === "symbol" || prop === "then") return undefined;
+        if (prop === "execute") return async () => rows;
+        if (prop === "where") return (...args: unknown[]) => { wheres.push(args); return proxy; };
+        return () => proxy;
+      }
+    });
+    return { proxy, wheres };
+  }
+
+  it("skips the query when there is nobody to check", async () => {
+    (getDb as jest.Mock).mockClear();
+    expect(await new RegistrationRepo().loadRegisteredPersonIds("c1", "e1", [])).toEqual([]);
+    expect(getDb).not.toHaveBeenCalled();
+  });
+
+  it("scopes to the church and event, ignores cancelled registrations, and dedupes", async () => {
+    const { proxy, wheres } = whereRecordingDb([{ personId: "p1" }, { personId: "p1" }, { personId: null }]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const ids = await new RegistrationRepo().loadRegisteredPersonIds("c1", "e1", ["p1", "p2"], "r1");
+    expect(ids).toEqual(["p1"]);
+    expect(wheres).toEqual(expect.arrayContaining([
+      ["churchId", "=", "c1"],
+      ["eventId", "=", "e1"],
+      ["status", "<>", "cancelled"],
+      ["personId", "in", ["p1", "p2"]],
+      ["id", "<>", "r1"],
+      ["r.churchId", "=", "c1"],
+      ["r.eventId", "=", "e1"],
+      ["r.status", "<>", "cancelled"],
+      ["m.personId", "in", ["p1", "p2"]],
+      ["r.id", "<>", "r1"]
+    ]));
+  });
+});
