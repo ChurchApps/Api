@@ -1,6 +1,8 @@
 import "reflect-metadata";
 import express from "express";
 
+// @churchapps/apihelper ships ESM that jest does not transform; the controller only uses its CurrencyHelper (balance reminders).
+jest.mock("@churchapps/apihelper", () => ({ CurrencyHelper: { formatCurrencyWithLocale: (n: number) => n.toFixed(2) } }));
 jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
   Permissions: { registrations: { view: "regView", edit: "regEdit" } },
