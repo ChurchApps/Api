@@ -32,7 +32,7 @@ import { Event, Registration, RegistrationCoupon, RegistrationMember, Registrati
 
 type JsonResult = { obj: unknown; status: number };
 // Actions return either the saved registration or the json(obj, status) stub's error shape.
-type RegResult = Omit<Registration, "status"> & { status?: string | number; obj?: { error?: string; reason?: string; status?: string } };
+type RegResult = Omit<Registration, "status"> & { status?: string | number; obj?: { error?: string; reason?: string; status?: string; code?: string } };
 // MySQL DECIMAL columns come back as strings, so fixtures mirror that.
 type DbRegistrationType = Omit<RegistrationType, "price"> & { price?: number | string };
 type DbRegistrationCoupon = Omit<RegistrationCoupon, "value"> & { value?: number | string };
@@ -53,6 +53,8 @@ interface ControllerOpts {
   auPersonId?: string;
   leaderGroupIds?: string[];
   checkAccess?: boolean;
+  typeCount?: number;
+  payments?: RegistrationPayment[];
 }
 
 const processCharge = GatewayService.processCharge as jest.Mock;
@@ -67,14 +69,20 @@ function makeController(opts: ControllerOpts = {}) {
       delete: jest.fn(),
       load: jest.fn(async () => opts.existing),
       countActiveForCoupon: jest.fn(async () => opts.couponUses ?? 0),
-      promoteFromWaitlist: jest.fn(async () => opts.promoted ?? null)
+      promoteFromWaitlist: jest.fn(async () => opts.promoted ?? null),
+      restoreWithCapacityCheck: jest.fn(async (..._args: unknown[]) => opts.capacityOk ?? true)
     },
     registrationType: { loadForEvent: jest.fn(async () => opts.types ?? []) },
     registrationSelection: { loadForEvent: jest.fn(async () => opts.selections ?? []) },
     registrationCoupon: { loadByCode: jest.fn(async () => opts.coupon), load: jest.fn(async () => opts.coupon) },
-    registrationMember: { atomicInsertWithTypeCapacity: jest.fn(async (_m: RegistrationMember, _capacity: number | null) => opts.typeOk ?? true), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async () => opts.savedMembers ?? []) },
+    registrationMember: {
+      atomicInsertWithTypeCapacity: jest.fn(async (_m: RegistrationMember, _capacity: number | null) => opts.typeOk ?? true),
+      deleteForRegistration: jest.fn(),
+      loadForRegistration: jest.fn(async () => opts.savedMembers ?? []),
+      countActiveForType: jest.fn(async () => opts.typeCount ?? 0)
+    },
     registrationSelectionChoice: { atomicInsertWithCapacityCheck: jest.fn(async () => opts.selOk ?? true), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async (): Promise<RegistrationSelectionChoice[]> => []) },
-    registrationPayment: { save: jest.fn(async (r: RegistrationPayment) => r), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async (): Promise<RegistrationPayment[]> => []) }
+    registrationPayment: { save: jest.fn(async (r: RegistrationPayment) => r), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async (): Promise<RegistrationPayment[]> => opts.payments ?? []) }
   };
   const au = { churchId: "c1", personId: opts.auPersonId ?? "admin1", leaderGroupIds: opts.leaderGroupIds ?? [], checkAccess: () => opts.checkAccess ?? true };
   const controller = new RegistrationController();
@@ -430,5 +438,111 @@ describe("issue 1417 — staff Add Attendee and pay later", () => {
     const { controller } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1" }, promoted: { id: "r1", status: "pending", personId: "p2", totalAmount: 45, amountPaid: 0 } });
     await controller.promote("r1", { body: null } as express.Request, {} as express.Response);
     expect(send.mock.calls[0][3]).toBe("https://grace.b1.test/mobile/registrations");
+  });
+});
+
+describe("staff restore of a cancelled registration", () => {
+  const cancelled = (extra: Partial<Registration> = {}): Registration => ({ id: "r1", churchId: "c1", eventId: "e1", personId: "p2", status: "cancelled", cancelledDate: new Date(), totalAmount: 45, amountPaid: 0, ...extra });
+  const restore = (controller: RegistrationController) => controller.restore("r1", { body: null } as express.Request, {} as express.Response) as Promise<RegResult>;
+
+  it("restores to pending when a balance is due, church-scoped, with the event capacity", async () => {
+    const { controller, repos } = makeController({ existing: cancelled() });
+    const result = await restore(controller);
+    expect(result.status).toBe("pending");
+    expect(result.cancelledDate).toBeNull();
+    expect(repos.registration.load).toHaveBeenCalledWith("c1", "r1");
+    expect(repos.registration.restoreWithCapacityCheck).toHaveBeenCalledWith("c1", "r1", "e1", "pending", 50);
+  });
+
+  it("restores to confirmed when fully paid", async () => {
+    const { controller, repos } = makeController({ existing: cancelled({ amountPaid: 45 }) });
+    const result = await restore(controller);
+    expect(result.status).toBe("confirmed");
+    expect(repos.registration.restoreWithCapacityCheck.mock.calls[0][3]).toBe("confirmed");
+  });
+
+  it("refuses when the event is full", async () => {
+    const { controller } = makeController({ existing: cancelled(), capacityOk: false });
+    const result = await restore(controller);
+    expect(result.status).toBe(409);
+    expect(result.obj.code).toBe("event-full");
+  });
+
+  it("puts it back to cancelled when an attendee type is over capacity", async () => {
+    const { controller, repos } = makeController({ existing: cancelled(), types: [{ id: "t1", price: "45", capacity: 2, active: true }], savedMembers: [{ id: "m1", registrationTypeId: "t1" }], typeCount: 3 });
+    const result = await restore(controller);
+    expect(result.status).toBe(409);
+    expect(result.obj.code).toBe("type-full");
+    expect(repos.registration.save).toHaveBeenCalledWith(expect.objectContaining({ id: "r1", status: "cancelled" }));
+  });
+
+  it("keeps it when the attendee type still has room", async () => {
+    const { controller, repos } = makeController({ existing: cancelled(), types: [{ id: "t1", price: "45", capacity: 2, active: true }], savedMembers: [{ id: "m1", registrationTypeId: "t1" }], typeCount: 2 });
+    const result = await restore(controller);
+    expect(result.status).toBe("pending");
+    expect(repos.registration.save).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the person has registered again since", async () => {
+    const { controller, repos } = makeController({ existing: cancelled(), existingRegs: [cancelled(), { id: "r2", eventId: "e1", personId: "p2", status: "confirmed" }] });
+    const result = await restore(controller);
+    expect(result.status).toBe(409);
+    expect(repos.registration.restoreWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("requires Registrations Edit", async () => {
+    const { controller, repos } = makeController({ existing: cancelled({ personId: "p1" }), auPersonId: "p1", checkAccess: false });
+    const result = await restore(controller);
+    expect(result.status).toBe(401);
+    expect(repos.registration.restoreWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a registration outside the user's church", async () => {
+    const { controller, repos } = makeController({ existing: undefined });
+    const result = await restore(controller);
+    expect(result.status).toBe(404);
+    expect(repos.registration.load).toHaveBeenCalledWith("c1", "r1");
+    expect(repos.registration.restoreWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("rejects a registration that is not cancelled", async () => {
+    const { controller } = makeController({ existing: cancelled({ status: "confirmed" }) });
+    const result = await restore(controller);
+    expect(result.status).toBe(400);
+  });
+});
+
+describe("delete is blocked once a registration has payments", () => {
+  it("refuses with a message code and leaves the rows alone", async () => {
+    const { controller, repos } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1" }, payments: [{ id: "pay1", amount: 45 }] });
+    const result = (await controller.delete("r1", { body: null } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(409);
+    expect(result.obj.code).toBe("registration-has-payments");
+    expect(repos.registration.delete).not.toHaveBeenCalled();
+    expect(repos.registrationPayment.deleteForRegistration).not.toHaveBeenCalled();
+  });
+
+  it("still deletes a registration with no payments", async () => {
+    const { controller, repos } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1" } });
+    await controller.delete("r1", { body: null } as express.Request, {} as express.Response);
+    expect(repos.registration.delete).toHaveBeenCalledWith("c1", "r1");
+  });
+});
+
+describe("staff edit of a registration", () => {
+  const types = [{ id: "t1", price: "45.00", capacity: 6, active: true }, { id: "t2", price: "20.00", capacity: 1, active: true }];
+  const existing = (): Registration => ({ id: "r1", churchId: "c1", eventId: "e1", personId: "p2", status: "pending", totalAmount: 45, amountPaid: 0 });
+
+  it("recalculates the total when staff change types and add a person", async () => {
+    const savedMembers = [{ firstName: "A", lastName: "B", registrationTypeId: "t2" }, { firstName: "C", lastName: "D", registrationTypeId: "t1" }];
+    const { controller } = makeController({ types, existing: existing(), savedMembers });
+    const result = (await controller.edit("r1", { body: { members: savedMembers } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.totalAmount).toBe(65);
+  });
+
+  it("enforces attendee type capacity for staff", async () => {
+    const { controller } = makeController({ types, existing: existing(), typeOk: false });
+    const result = (await controller.edit("r1", { body: { members: [{ firstName: "A", lastName: "B", registrationTypeId: "t2" }] } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(409);
   });
 });

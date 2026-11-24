@@ -583,11 +583,67 @@ export class RegistrationController extends ContentBaseController {
     });
   }
 
+  @httpPost("/:id/restore")
+  public async restore(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const registration = await this.repos.registration.load(au.churchId, id);
+      if (!registration) return this.json({ error: "Registration not found" }, 404);
+      if (registration.status !== "cancelled") return this.json({ error: "Registration is not cancelled" }, 400);
+
+      if (registration.personId) {
+        const existingRegs = await this.repos.registration.loadForEvent(au.churchId, registration.eventId);
+        if (existingRegs.some((r: Registration) => r.id !== id && r.personId === registration.personId && r.status !== "cancelled")) return this.json({ error: "Already registered for this event", code: "already-registered" }, 409);
+      }
+
+      const event = await this.repos.event.load(au.churchId, registration.eventId);
+      const balance = RegistrationPricingHelper.num(registration.totalAmount) - RegistrationPricingHelper.num(registration.amountPaid);
+      const status = balance > 0 ? "pending" : "confirmed";
+      const restored = await this.repos.registration.restoreWithCapacityCheck(au.churchId, id, registration.eventId, status, event?.capacity ?? null);
+      if (!restored) return this.json({ error: "Event is at capacity", code: "event-full" }, 409);
+
+      const undo = async () => {
+        registration.status = "cancelled";
+        await this.repos.registration.save(registration);
+      };
+
+      // The members count toward type capacity again now that the registration is active.
+      const members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+      const types = await this.repos.registrationType.loadForEvent(au.churchId, registration.eventId);
+      for (const typeId of new Set(members.map((m: RegistrationMember) => m.registrationTypeId).filter(Boolean))) {
+        const type = types.find((t: RegistrationType) => t.id === typeId);
+        if (type?.capacity == null) continue;
+        if (Number(await this.repos.registrationMember.countActiveForType(au.churchId, typeId)) > Number(type.capacity)) {
+          await undo();
+          return this.json({ error: "Attendee type is at capacity", code: "type-full", registrationTypeId: typeId }, 409);
+        }
+      }
+
+      if (registration.couponId) {
+        const coupon = await this.repos.registrationCoupon.load(au.churchId, registration.couponId);
+        if (coupon?.maxUses != null && Number(await this.repos.registration.countActiveForCoupon(au.churchId, coupon.id)) > Number(coupon.maxUses)) {
+          await undo();
+          return this.json({ error: "Discount code has no uses left", code: "coupon-max-uses" }, 409);
+        }
+      }
+
+      registration.status = status;
+      registration.cancelledDate = null;
+      registration.members = members;
+      return registration;
+    });
+  }
+
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const registration = await this.repos.registration.load(au.churchId, id);
+      if (registration) {
+        // Deleting would erase the payment records; staff cancel a paid registration instead.
+        const payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
+        if (payments.length > 0) return this.json({ error: "This registration has payments. Cancel it instead of deleting it.", code: "registration-has-payments" }, 409);
+      }
       await this.deleteCascade(au.churchId, id);
       if (registration) {
         const event = await this.repos.event.load(au.churchId, registration.eventId);
