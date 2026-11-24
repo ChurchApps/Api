@@ -5,6 +5,7 @@ const publish = jest.fn();
 jest.mock("../../../../shared/events/InternalEventBus.js", () => ({ InternalEventBus: { publish: (...args: unknown[]) => publish(...args) } }));
 jest.mock("../../helpers/PlanHelper.js", () => ({ PlanHelper: { autoReplaceDeclined: jest.fn(), notifyLeadersOfResponse: jest.fn() } }));
 jest.mock("../../helpers/SignupDeadlineHelper.js", () => ({ SignupDeadlineHelper: {} }));
+jest.mock("../../helpers/ServingFeedHelper.js", () => ({ ServingFeedHelper: {} }));
 const verify = jest.fn();
 jest.mock("../../helpers/ReminderTokenHelper.js", () => ({ ReminderTokenHelper: { verify: (...args: unknown[]) => verify(...args) } }));
 import express from "express";

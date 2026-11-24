@@ -51,6 +51,8 @@ export interface MembershipModuleGateway {
   loadList(churchId: string, listId: string): Promise<{ id: string; name: string } | null>;
   loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]>;
   loadSetting(churchId: string, keyName: string): Promise<string | null>;
+  // Saves a church setting that is not public (public stays NULL).
+  saveSetting(churchId: string, keyName: string, value: string): Promise<void>;
   loadGroupsForCheckin(churchId: string, groupIds: string[]): Promise<CheckinGroup[]>;
   loadActiveGroupIds(churchId: string, ids: string[]): Promise<string[]>;
   loadHouseholdAdults(churchId: string, personIds: string[]): Promise<HouseholdAdult[]>;
@@ -378,6 +380,11 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .where("keyName", "=", keyName)
       .executeTakeFirst();
     return (row?.value as string) ?? null;
+  }
+
+  public async saveSetting(churchId: string, keyName: string, value: string): Promise<void> {
+    const repos = await this.repos();
+    await repos.setting.save({ churchId, keyName, value });
   }
 
   public async loadActiveGroupIds(churchId: string, ids: string[]): Promise<string[]> {

@@ -9,6 +9,7 @@ import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { ReminderTokenHelper } from "../helpers/ReminderTokenHelper.js";
 import { SignupDeadlineHelper } from "../helpers/SignupDeadlineHelper.js";
+import { ServingFeedHelper } from "../helpers/ServingFeedHelper.js";
 
 @controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
@@ -24,6 +25,49 @@ export class AssignmentController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.assignment.loadUpcomingByPersonId(au.churchId, au.personId);
     });
+  }
+
+  // The signed-in person's serving calendar link credentials; the client builds the webcal URL.
+  @httpGet("/my/calendar")
+  public async getMyCalendar(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return this.json({ error: "personId required" }, 400);
+      return await ServingFeedHelper.link(au.churchId, au.personId);
+    });
+  }
+
+  // "Reset link": a new nonce invalidates every link issued before it.
+  // authz-exempt: self-service; only ever resets the signed-in person's own link (au.personId)
+  @httpPost("/my/calendar/reset")
+  public async resetMyCalendar(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return this.json({ error: "personId required" }, 400);
+      return await ServingFeedHelper.link(au.churchId, au.personId, true);
+    });
+  }
+
+  // Personal serving ICS feed. The HMAC token from /my/calendar is the credential and is checked before any data loads.
+  @httpGet("/public/calendar")
+  public async calendarFeed(req: express.Request, res: express.Response): Promise<void> {
+    try {
+      // authz-exempt: churchId/personId are only trusted after the signed token verifies for exactly that pair
+      const result = await ServingFeedHelper.calendar(req.query.churchId, req.query.personId, req.query.token, await this.getRepos<Repos>());
+      if (!result) {
+        res.status(401).send("Invalid calendar link.");
+        return;
+      }
+      if (result.error || !result.value) {
+        console.error("[calendarFeed] ics failed:", result.error);
+        res.status(500).send("Error generating calendar.");
+        return;
+      }
+      res.set("Content-Type", "text/calendar");
+      res.set("Cache-Control", "private, max-age=900");
+      res.send(result.value);
+    } catch (e) {
+      console.error("[calendarFeed] failed:", e);
+      res.status(500).send("Error generating calendar.");
+    }
   }
 
   @httpGet("/monthCounts")

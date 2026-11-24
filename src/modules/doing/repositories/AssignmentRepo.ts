@@ -153,6 +153,22 @@ export class AssignmentRepo {
       .execute();
   }
 
+  // Calendar feed: the person's accepted, published assignments from 60 days back onward.
+  public async loadAcceptedForFeed(churchId: string, personId: string) {
+    return getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", (j) => j.onRef("p.id", "=", "a.positionId").onRef("p.churchId", "=", "a.churchId"))
+      .innerJoin("plans as pl", (j) => j.onRef("pl.id", "=", "p.planId").onRef("pl.churchId", "=", "a.churchId"))
+      .select(["a.id as assignmentId", "p.name as positionName", "p.categoryName", "pl.id as planId", "pl.name as planName", "pl.serviceDate"])
+      .where("a.churchId", "=", churchId)
+      .where("a.personId", "=", personId)
+      .where("a.status", "=", "Accepted")
+      .where("pl.serviceDate", ">=", sql<Date>`DATE_SUB(CURDATE(), INTERVAL 60 DAY)`)
+      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false)]))
+      .orderBy("pl.serviceDate")
+      .limit(500)
+      .execute();
+  }
+
   // Non-declined assignments per person for plans in the calendar month of the given date.
   public async loadMonthServeCounts(churchId: string, serviceDate: Date): Promise<{ personId: string; count: number }[]> {
     const rows = await getDb().selectFrom("assignments as a")
