@@ -96,6 +96,18 @@ export class DeliveryLogRepo {
     return query.orderBy("attemptTime", "desc").execute();
   }
 
+  // Rows carry the personId they were sent to, so failures match by person, not by the address on file today.
+  public async loadFailuresByPerson(churchId: string, personId: string, limit: number) {
+    return getDb().selectFrom("deliveryLogs")
+      .select(["attemptTime", "deliveryMethod", "deliveryAddress", "errorMessage"])
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .where("success", "=", false)
+      .orderBy("attemptTime", "desc")
+      .limit(limit)
+      .execute();
+  }
+
   public async loadLatestEmailEvent(churchId: string, personId: string) {
     return (await getDb().selectFrom("deliveryLogs").selectAll()
       .where("churchId", "=", churchId)
