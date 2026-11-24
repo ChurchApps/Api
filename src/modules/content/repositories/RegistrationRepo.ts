@@ -147,6 +147,15 @@ export class RegistrationRepo {
     return false;
   }
 
+  // Flips a cancelled registration back to active only while the event still has room.
+  public async restoreWithCapacityCheck(churchId: string, id: string, eventId: string, status: string, capacity: number | null): Promise<boolean> {
+    const cap = capacity === null || capacity === undefined ? Number.MAX_SAFE_INTEGER : capacity;
+    const result: MysqlWriteResult = await sql`UPDATE registrations SET status=${status}, cancelledDate=NULL
+      WHERE id=${id} AND churchId=${churchId} AND status='cancelled'
+      AND (SELECT cnt FROM (SELECT COUNT(*) AS cnt FROM registrations WHERE churchId=${churchId} AND eventId=${eventId} AND status IN ('pending','confirmed')) AS used) < ${cap}`.execute(getDb());
+    return result?.numAffectedRows > 0n || result?.affectedRows > 0;
+  }
+
   public async promoteFromWaitlist(churchId: string, eventId: string, capacity: number | null, registrationId?: string): Promise<Registration | null> {
     let query = getDb().selectFrom("registrations").selectAll()
       .where("churchId", "=", churchId)
