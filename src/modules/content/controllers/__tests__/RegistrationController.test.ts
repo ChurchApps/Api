@@ -7,11 +7,12 @@ jest.mock("../../helpers/index", () => ({
   RegistrationHelper: { sendConfirmationEmail: jest.fn(), sendCancellationEmail: jest.fn(), sendWaitlistAvailabilityEmail: jest.fn() },
   RegistrationPricingHelper: jest.requireActual("../../helpers/RegistrationPricingHelper").RegistrationPricingHelper
 }));
+const mockLoadHouseholdPeople = jest.fn(async (_churchId: string, _personIds: string[]) => [{ id: "p1", householdId: "h1" }, { id: "p1kid", householdId: "h1" }]);
 jest.mock("../../../../shared/modules/index", () => ({
   getMembershipModuleGateway: () => ({
     loadPerson: jest.fn(async () => ({ householdId: "h1", email: "person@example.com" })),
     loadChurch: jest.fn(async () => ({ name: "Grace", subDomain: "grace" })),
-    loadHouseholdPeople: jest.fn(async () => [{ id: "p1", householdId: "h1" }, { id: "p1kid", householdId: "h1" }]),
+    loadHouseholdPeople: (churchId: string, personIds: string[]) => mockLoadHouseholdPeople(churchId, personIds),
     getOrCreateGuestPerson: jest.fn(async () => ({ personId: "guest1", householdId: "gh1", email: "guest@example.com" }))
   })
 }));
@@ -55,6 +56,7 @@ interface ControllerOpts {
   checkAccess?: boolean;
   typeCount?: number;
   payments?: RegistrationPayment[];
+  registeredPersonIds?: string[];
 }
 
 const processCharge = GatewayService.processCharge as jest.Mock;
@@ -70,7 +72,8 @@ function makeController(opts: ControllerOpts = {}) {
       load: jest.fn(async () => opts.existing),
       countActiveForCoupon: jest.fn(async () => opts.couponUses ?? 0),
       promoteFromWaitlist: jest.fn(async () => opts.promoted ?? null),
-      restoreWithCapacityCheck: jest.fn(async (..._args: unknown[]) => opts.capacityOk ?? true)
+      restoreWithCapacityCheck: jest.fn(async (..._args: unknown[]) => opts.capacityOk ?? true),
+      loadRegisteredPersonIds: jest.fn(async (_churchId: string, _eventId: string, personIds: string[], _excludeId?: string) => (opts.registeredPersonIds ?? []).filter((id) => personIds.includes(id)))
     },
     registrationType: { loadForEvent: jest.fn(async () => opts.types ?? []) },
     registrationSelection: { loadForEvent: jest.fn(async () => opts.selections ?? []) },
@@ -544,5 +547,71 @@ describe("staff edit of a registration", () => {
     const { controller } = makeController({ types, existing: existing(), typeOk: false });
     const result = (await controller.edit("r1", { body: { members: [{ firstName: "A", lastName: "B", registrationTypeId: "t2" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(409);
+  });
+});
+
+describe("household members already registered", () => {
+  it("checks only the caller's own household, in the caller's church", async () => {
+    mockLoadHouseholdPeople.mockClear();
+    const { controller, repos } = makeController({ auPersonId: "p1", registeredPersonIds: ["p1kid", "stranger"] });
+    const result = await controller.getHouseholdRegisteredForEvent("e1", {} as express.Request, {} as express.Response);
+    expect(mockLoadHouseholdPeople).toHaveBeenCalledWith("c1", ["p1"]);
+    expect(repos.registration.loadRegisteredPersonIds).toHaveBeenCalledWith("c1", "e1", ["p1", "p1kid"]);
+    expect(result).toEqual({ personIds: ["p1kid"] });
+  });
+
+  it("returns nothing for a login with no person record", async () => {
+    const { controller, repos } = makeController({ auPersonId: "" });
+    const result = await controller.getHouseholdRegisteredForEvent("e1", {} as express.Request, {} as express.Response);
+    expect(result).toEqual({ personIds: [] });
+    expect(repos.registration.loadRegisteredPersonIds).not.toHaveBeenCalled();
+  });
+
+  it("refuses to register a household child who is already on an active registration", async () => {
+    const { controller, repos } = makeController({ auPersonId: "p1", checkAccess: false, registeredPersonIds: ["p1kid"] });
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", members: [{ firstName: "A", lastName: "B", personId: "p1" }, { firstName: "Kid", lastName: "B", personId: "p1kid" }] } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(409);
+    expect(result.obj).toMatchObject({ status: "already-registered", personIds: ["p1kid"] });
+    expect(repos.registration.loadRegisteredPersonIds).toHaveBeenCalledWith("c1", "e1", ["p1", "p1kid"]);
+    expect(repos.registration.atomicInsertWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("refuses a staff add of someone already registered", async () => {
+    const { controller, repos } = makeController({ auPersonId: "admin1", registeredPersonIds: ["p2"] });
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p2", members: [{ personId: "p2", firstName: "Sam", lastName: "Demo" }] } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(409);
+    expect(repos.registration.atomicInsertWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("registers household people who are not yet on a registration", async () => {
+    const { controller } = makeController({ auPersonId: "p1", checkAccess: false, registeredPersonIds: ["someoneElse"] });
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", members: [{ firstName: "A", lastName: "B", personId: "p1" }, { firstName: "Kid", lastName: "B", personId: "p1kid" }] } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe("confirmed");
+  });
+
+  it("refuses an edit that adds someone already on another registration, before touching members", async () => {
+    const { controller, repos } = makeController({ auPersonId: "p1", checkAccess: false, registeredPersonIds: ["p1kid"], existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", status: "confirmed" } });
+    const result = (await controller.edit("r1", { body: { members: [{ firstName: "A", lastName: "B", personId: "p1" }, { firstName: "Kid", lastName: "B", personId: "p1kid" }] } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(409);
+    expect(repos.registration.loadRegisteredPersonIds).toHaveBeenCalledWith("c1", "e1", ["p1", "p1kid"], "r1");
+    expect(repos.registrationMember.deleteForRegistration).not.toHaveBeenCalled();
+  });
+});
+
+describe("answering questions after signup", () => {
+  it("lets the registrant link a form submission without repricing the registration", async () => {
+    const types = [{ id: "t1", price: "60.00", active: true }];
+    const { controller, repos } = makeController({ types, auPersonId: "p1", checkAccess: false, savedMembers: [{ registrationTypeId: "t1" }], existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", totalAmount: 45, amountPaid: 45, status: "confirmed" } });
+    const result = (await controller.edit("r1", { body: { formSubmissionId: "fs1" } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.formSubmissionId).toBe("fs1");
+    expect(result.totalAmount).toBe(45);
+    expect(repos.registration.save).toHaveBeenCalledWith(expect.objectContaining({ id: "r1", formSubmissionId: "fs1", totalAmount: 45 }));
+  });
+
+  it("refuses to link answers to someone else's registration", async () => {
+    const { controller, repos } = makeController({ auPersonId: "p9", checkAccess: false, existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", status: "confirmed" } });
+    const result = (await controller.edit("r1", { body: { formSubmissionId: "fs1" } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(401);
+    expect(repos.registration.save).not.toHaveBeenCalled();
   });
 });

@@ -141,6 +141,10 @@ export class RegistrationController extends ContentBaseController {
         if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
       }
       if (RegistrationPricingHelper.membersMissingPaidType(activeTypes, members)) return this.json({ error: "Attendee type required" }, 400);
+      if (!data.guestInfo) {
+        const alreadyRegistered = await this.repos.registration.loadRegisteredPersonIds(churchId, data.eventId, this.linkedPersonIds(members, personId));
+        if (alreadyRegistered.length > 0) return this.json({ error: "Already registered for this event", status: "already-registered", personIds: alreadyRegistered }, 409);
+      }
 
       const selections = await this.repos.registrationSelection.loadForEvent(churchId, data.eventId);
       const activeSelections = selections.filter((s: RegistrationSelection) => s.active !== false);
@@ -400,6 +404,18 @@ export class RegistrationController extends ContentBaseController {
     });
   }
 
+  // Which of the caller's household members are already on an active registration for the event.
+  @httpGet("/event/:eventId/household")
+  public async getHouseholdRegisteredForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return { personIds: [] as string[] };
+      const household = await getMembershipModuleGateway().loadHouseholdPeople(au.churchId, [au.personId]);
+      const householdIds = [...new Set([au.personId, ...household.map((p) => p.id)])];
+      const personIds = await this.repos.registration.loadRegisteredPersonIds(au.churchId, eventId, householdIds);
+      return { personIds };
+    });
+  }
+
   @httpGet("/person/:personId")
   public async getForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
@@ -459,6 +475,10 @@ export class RegistrationController extends ContentBaseController {
           if (!RegistrationPricingHelper.isValidQuantity(c.quantity)) return this.json({ error: "Invalid quantity" }, 400);
         }
       }
+      if (members) {
+        const alreadyRegistered = await this.repos.registration.loadRegisteredPersonIds(au.churchId, registration.eventId, this.linkedPersonIds(members), id);
+        if (alreadyRegistered.length > 0) return this.json({ error: "Already registered for this event", status: "already-registered", personIds: alreadyRegistered }, 409);
+      }
 
       const oldMembers = members ? await this.repos.registrationMember.loadForRegistration(au.churchId, id) : [];
       const oldChoices = choices ? await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id) : [];
@@ -495,14 +515,17 @@ export class RegistrationController extends ContentBaseController {
 
       // Recompute totalAmount from the current members/choices; do NOT auto-charge or refund.
       // A changed total surfaces as balance-due in admin (overpayment is handled by staff).
-      const currentMembers = members || await this.repos.registrationMember.loadForRegistration(au.churchId, id);
-      const currentChoices = choices || await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
-      let total = RegistrationPricingHelper.computeTotal(activeTypes, activeSelections, currentMembers, currentChoices);
-      if (registration.couponId) {
-        const coupon = await this.repos.registrationCoupon.load(au.churchId, registration.couponId);
-        if (coupon?.minMembers == null || currentMembers.length >= coupon.minMembers) total = RegistrationPricingHelper.applyDiscount(total, coupon);
+      // Notes or answers alone keep the price the registrant signed up at.
+      if (members || choices) {
+        const currentMembers = members || await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+        const currentChoices = choices || await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
+        let total = RegistrationPricingHelper.computeTotal(activeTypes, activeSelections, currentMembers, currentChoices);
+        if (registration.couponId) {
+          const coupon = await this.repos.registrationCoupon.load(au.churchId, registration.couponId);
+          if (coupon?.minMembers == null || currentMembers.length >= coupon.minMembers) total = RegistrationPricingHelper.applyDiscount(total, coupon);
+        }
+        registration.totalAmount = total;
       }
-      registration.totalAmount = total;
       await this.repos.registration.save(registration);
 
       registration.members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
@@ -652,6 +675,10 @@ export class RegistrationController extends ContentBaseController {
       }
       return this.json({});
     });
+  }
+
+  private linkedPersonIds(members: RegisterMemberInput[], registrantPersonId?: string): string[] {
+    return [...new Set([registrantPersonId, ...members.map((m) => m.personId)].filter((id): id is string => !!id))];
   }
 
   // Attendees may only be linked to people in the registrant's household.

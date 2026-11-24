@@ -89,6 +89,29 @@ export class RegistrationRepo {
       .orderBy("registeredDate", "desc").execute();
   }
 
+  // Of the given people, those already on a non-cancelled registration for the event, as registrant or attendee.
+  public async loadRegisteredPersonIds(churchId: string, eventId: string, personIds: string[], excludeRegistrationId?: string): Promise<string[]> {
+    if (personIds.length === 0) return [];
+    let registrants = getDb().selectFrom("registrations").select("personId")
+      .where("churchId", "=", churchId)
+      .where("eventId", "=", eventId)
+      .where("status", "<>", "cancelled")
+      .where("personId", "in", personIds);
+    let attendees = getDb().selectFrom("registrationMembers as m")
+      .innerJoin("registrations as r", "r.id", "m.registrationId")
+      .select("m.personId")
+      .where("r.churchId", "=", churchId)
+      .where("r.eventId", "=", eventId)
+      .where("r.status", "<>", "cancelled")
+      .where("m.personId", "in", personIds);
+    if (excludeRegistrationId) {
+      registrants = registrants.where("id", "<>", excludeRegistrationId);
+      attendees = attendees.where("r.id", "<>", excludeRegistrationId);
+    }
+    const rows = [...await registrants.execute(), ...await attendees.execute()];
+    return [...new Set(rows.map((r) => r.personId).filter((id): id is string => !!id))];
+  }
+
   public async countActiveForEvent(churchId: string, eventId: string): Promise<number> {
     const result = await getDb().selectFrom("registrations")
       .select(sql<number>`COUNT(*)`.as("cnt"))
