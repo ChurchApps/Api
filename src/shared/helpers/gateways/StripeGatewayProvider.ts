@@ -7,7 +7,7 @@ import type { Customer, PaymentDetails } from "../../../modules/giving/models/in
 import {
   IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities, WebhookEventClassification, ReplayEvent,
   GatewayObject, GatewayPaymentRequest, GatewaySubscriptionUpdate, GivingRepos, StripeEventObject, StripeEventRecord, NormalizedPaymentMethod,
-  GatewayErrorMapping, GatewayAttachOptions
+  GatewayErrorMapping, GatewayAttachOptions, RefundOptions
 } from "./IGatewayProvider.js";
 
 // A charge awaiting 3DS carries what the client needs to finish authentication.
@@ -321,14 +321,19 @@ export class StripeGatewayProvider implements IGatewayProvider {
     }
   }
 
-  // ponytail: full refund only; a partial refund would take an amount and a "partially refunded" status.
-  async refundCharge(config: GatewayConfig, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }> {
+  async refundCharge(config: GatewayConfig, transactionId: string, options?: RefundOptions): Promise<{ success: boolean; refundId?: string; error?: string }> {
     const id = transactionId || "";
     // A donation's transactionId is whichever id the charge path stored, so pass the matching Stripe key.
-    const params = id.startsWith("ch_") ? { charge: id } : id.startsWith("pi_") ? { payment_intent: id } : null;
-    if (!params) return { success: false, error: "Only card and bank charges can be refunded" };
+    const target = id.startsWith("ch_") ? { charge: id } : id.startsWith("pi_") ? { payment_intent: id } : null;
+    if (!target) return { success: false, error: "Only card and bank charges can be refunded" };
+    const params: Stripe.RefundCreateParams = { ...target };
+    if (options?.amount !== undefined) {
+      const minor = StripeHelper.toMinorUnits(options.amount, options.currency || config.currency);
+      if (!(minor > 0)) return { success: false, error: "Refund amount must be greater than zero" };
+      params.amount = minor;
+    }
     try {
-      const refund = await StripeHelper.createRefund(config.privateKey, params);
+      const refund = await StripeHelper.createRefund(config.privateKey, params, options?.idempotencyKey);
       if (refund.status === "failed" || refund.status === "canceled") return { success: false, error: `Refund ${refund.status}` };
       return { success: true, refundId: refund.id };
     } catch (e) {

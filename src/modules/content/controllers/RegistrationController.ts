@@ -2,7 +2,7 @@ import { controller, httpPost, httpGet, httpPut, requestParam, httpDelete } from
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Event, Registration, RegistrationMember, RegistrationType, RegistrationSelection, RegistrationSelectionChoice, RegistrationCoupon, RegistrationPayment } from "../models/index.js";
-import { Permissions, RegistrationHelper, RegistrationPricingHelper } from "../helpers/index.js";
+import { Permissions, RegistrationHelper, RegistrationPaymentHelper, RegistrationPricingHelper } from "../helpers/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
@@ -46,6 +46,19 @@ interface EditRegistrationBody {
   members?: RegisterMemberInput[];
   selections?: RegisterSelectionInput[];
 }
+
+// Staff-keyed cash, check or other payment or refund; checkNumber is kept for checks only.
+interface OfflinePaymentBody {
+  amount?: number | string;
+  method?: string;
+  checkNumber?: string;
+}
+
+interface GatewayRefundBody {
+  amount?: number | string;
+}
+
+type PaymentResult = { registration: Registration; payments: RegistrationPayment[] };
 
 interface RegistrationChargeOutcome {
   ok: boolean;
@@ -427,7 +440,7 @@ export class RegistrationController extends ContentBaseController {
       if (!event) return this.json({ error: "Event not found" }, 404);
 
       const registrations: Registration[] = await this.repos.registration.loadForEvent(au.churchId, eventId);
-      const owing = registrations.filter((r) => (r.status === "pending" || r.status === "confirmed") && r.personId && this.balanceDue(r) > 0);
+      const owing = registrations.filter((r) => (r.status === "pending" || r.status === "confirmed") && r.personId && RegistrationPaymentHelper.balanceDue(r) > 0);
       if (owing.length === 0) return { sent: 0 };
 
       const church = await getMembershipModuleGateway().loadChurch(au.churchId);
@@ -441,7 +454,7 @@ export class RegistrationController extends ContentBaseController {
           if (!person?.email) continue;
           const total = RegistrationPricingHelper.num(reg.totalAmount);
           const paid = RegistrationPricingHelper.num(reg.amountPaid);
-          await RegistrationHelper.sendBalanceReminderEmail(person.email, church?.name || "Church", event, { total: money(total), paid: money(paid), balance: money(this.balanceDue(reg)) }, payUrl, church?.timeZone);
+          await RegistrationHelper.sendBalanceReminderEmail(person.email, church?.name || "Church", event, { total: money(total), paid: money(paid), balance: money(RegistrationPaymentHelper.balanceDue(reg)) }, payUrl, church?.timeZone);
           sent++;
         } catch (e) {
           console.error("Failed to send balance reminder email", e);
@@ -577,7 +590,7 @@ export class RegistrationController extends ContentBaseController {
       if (!isSelf && !au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       if (registration.status === "waitlisted") return this.json({ error: "Registration is waitlisted" }, 409);
 
-      const balance = this.balanceDue(registration);
+      const balance = RegistrationPaymentHelper.balanceDue(registration);
       if (balance <= 0) return this.json({ error: "No balance due" }, 400);
 
       let email: string = null;
@@ -592,9 +605,133 @@ export class RegistrationController extends ContentBaseController {
 
       await this.recordPayment(au.churchId, id, charge, balance, req.body?.type, registration.personId);
       registration.amountPaid = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.amountPaid) + balance);
-      if (registration.status === "pending") registration.status = "confirmed";
+      registration.status = RegistrationPaymentHelper.statusAfterPayment(registration, registration.amountPaid);
       await this.repos.registration.save(registration);
       return registration;
+    });
+  }
+
+  @httpPost("/:id/payments")
+  public async recordOfflinePayment(@requestParam("id") id: string, req: express.Request<{}, {}, OfflinePaymentBody>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const registration = await this.repos.registration.load(au.churchId, id);
+      if (!registration) return this.json({ error: "Registration not found" }, 404);
+      if (registration.status === "cancelled" || registration.status === "waitlisted") return this.json({ error: `Registration is ${registration.status}` }, 409);
+
+      const amount = RegistrationPaymentHelper.parseAmount(req.body?.amount);
+      if (amount === null) return this.json({ error: "Amount must be greater than zero" }, 400);
+      const method = RegistrationPaymentHelper.parseOfflineMethod(req.body?.method);
+      if (!method) return this.json({ error: "Method must be cash, check or other" }, 400);
+      // Overpayment is never recorded; an edited total that drops below what was paid is settled with a refund.
+      if (amount > RegistrationPaymentHelper.balanceDue(registration)) return this.json({ error: "Amount is more than the balance due" }, 400);
+
+      const payment: RegistrationPayment = {
+        churchId: au.churchId,
+        registrationId: id,
+        transactionId: RegistrationPaymentHelper.checkReference(method, req.body?.checkNumber),
+        method,
+        amount,
+        kind: "payment",
+        status: "succeeded",
+        personId: registration.personId || null
+      };
+      const payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
+      if (RegistrationPaymentHelper.hasRecentDuplicate(payments, payment)) return this.json({ error: "This payment was just recorded" }, 409);
+
+      const newPaid = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.amountPaid) + amount);
+      return this.applyLedgerRow(au.churchId, registration, payment, { amountPaid: newPaid, status: RegistrationPaymentHelper.statusAfterPayment(registration, newPaid) });
+    });
+  }
+
+  @httpPost("/:id/refunds")
+  public async recordOfflineRefund(@requestParam("id") id: string, req: express.Request<{}, {}, OfflinePaymentBody>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const registration = await this.repos.registration.load(au.churchId, id);
+      if (!registration) return this.json({ error: "Registration not found" }, 404);
+
+      const amount = RegistrationPaymentHelper.parseAmount(req.body?.amount);
+      if (amount === null) return this.json({ error: "Amount must be greater than zero" }, 400);
+      const method = RegistrationPaymentHelper.parseOfflineMethod(req.body?.method);
+      if (!method) return this.json({ error: "Method must be cash, check or other" }, 400);
+      if (amount > RegistrationPricingHelper.num(registration.amountPaid)) return this.json({ error: "Amount is more than has been paid" }, 400);
+
+      const refund: RegistrationPayment = {
+        churchId: au.churchId,
+        registrationId: id,
+        transactionId: RegistrationPaymentHelper.checkReference(method, req.body?.checkNumber),
+        method,
+        amount,
+        kind: "refund",
+        status: "succeeded",
+        personId: registration.personId || null
+      };
+      const payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
+      if (RegistrationPaymentHelper.hasRecentDuplicate(payments, refund)) return this.json({ error: "This refund was just recorded" }, 409);
+
+      // A refund gives money back; it never changes the registration's status.
+      const newPaid = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.amountPaid) - amount);
+      return this.applyLedgerRow(au.churchId, registration, refund, { amountPaid: newPaid, status: registration.status });
+    });
+  }
+
+  @httpPost("/payments/:paymentId/refund")
+  public async refundGatewayPayment(@requestParam("paymentId") paymentId: string, req: express.Request<{}, {}, GatewayRefundBody>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const payment = await this.repos.registrationPayment.load(au.churchId, paymentId);
+      if (!payment) return this.json({ error: "Payment not found" }, 404);
+      if (!RegistrationPaymentHelper.isGatewayPayment(payment)) return this.json({ error: "Only online payments can be refunded through the gateway" }, 400);
+      const registration = await this.repos.registration.load(au.churchId, payment.registrationId);
+      if (!registration) return this.json({ error: "Registration not found" }, 404);
+
+      const payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, registration.id);
+      const refundable = RegistrationPaymentHelper.refundableForPayment(payment, payments, registration.amountPaid);
+      const amount = RegistrationPaymentHelper.parseAmount(req.body?.amount);
+      if (amount === null) return this.json({ error: "Amount must be greater than zero" }, 400);
+      if (amount > refundable) return this.json({ error: "Amount is more than is left to refund on this payment" }, 400);
+
+      const gateway = await this.loadRefundGateway(au.churchId, payment.provider);
+      if (!gateway) return this.json({ error: "This payment's gateway does not support refunds" }, 400);
+
+      const refund: RegistrationPayment = {
+        churchId: au.churchId,
+        registrationId: registration.id,
+        provider: payment.provider,
+        transactionId: payment.transactionId,
+        method: payment.method,
+        amount,
+        currency: payment.currency,
+        personId: registration.personId || null
+      };
+      const reserved = await this.repos.registrationPayment.reservePendingRefund(refund, RegistrationPricingHelper.num(payment.amount), new Date(Date.now() - RegistrationPaymentHelper.PENDING_REFUND_BLOCK_MS));
+      if (!reserved) return this.json({ error: "Another refund on this registration is in progress, or the amount is no longer available" }, 409);
+
+      let result: { success: boolean; refundId?: string; error?: string };
+      try {
+        result = await GatewayService.refundDonation(gateway, payment.transactionId, { amount, currency: payment.currency || gateway.currency, idempotencyKey: `registration-refund-${refund.id}` });
+      } catch (e) {
+        result = { success: false, error: (e as { message?: string } | undefined)?.message };
+      }
+      if (!result?.success) {
+        await this.repos.registrationPayment.delete(au.churchId, refund.id);
+        return this.json({ error: result?.error || "Refund failed" }, 400);
+      }
+
+      refund.status = "succeeded";
+      await this.repos.registrationPayment.save(refund);
+      // The money has moved, so the paid total must follow even if another write raced this one.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const current = attempt === 0 ? registration : await this.repos.registration.load(au.churchId, registration.id);
+        if (!current) break;
+        const newPaid = Math.max(0, RegistrationPricingHelper.round(RegistrationPricingHelper.num(current.amountPaid) - amount));
+        if (await this.repos.registration.updatePaidIfUnchanged(au.churchId, current.id, current, { amountPaid: newPaid, status: current.status })) {
+          return this.paymentResult(au.churchId, { ...current, amountPaid: newPaid });
+        }
+      }
+      console.error(`Registration refund ${refund.id} succeeded at the gateway but amountPaid on ${registration.id} could not be updated`);
+      return this.json({ error: "The refund went through, but the paid total could not be updated. Reload and check the payments." }, 500);
     });
   }
 
@@ -818,10 +955,6 @@ export class RegistrationController extends ContentBaseController {
     await this.repos.registrationPayment.save(payment);
   }
 
-  private balanceDue(registration: Registration): number {
-    return RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.totalAmount) - RegistrationPricingHelper.num(registration.amountPaid));
-  }
-
   // The member site's My Registrations page, where a registrant pays a balance.
   private payUrl(church: { subDomain?: string } | null): string | undefined {
     return church?.subDomain ? AppUrlHelper.b1AppUrl(church.subDomain) + "/mobile/registrations" : undefined;
@@ -839,6 +972,28 @@ export class RegistrationController extends ContentBaseController {
     } catch {
       return "usd";
     }
+  }
+
+  // Writes the ledger row, then moves amountPaid/status only if nobody changed them since they were read;
+  // if they did, the row is removed again so the ledger and the paid total never disagree.
+  private async applyLedgerRow(churchId: string, registration: Registration, row: RegistrationPayment, next: Pick<Registration, "amountPaid" | "status">): Promise<unknown> {
+    await this.repos.registrationPayment.save(row);
+    const updated = await this.repos.registration.updatePaidIfUnchanged(churchId, registration.id, registration, next);
+    if (!updated) {
+      await this.repos.registrationPayment.delete(churchId, row.id);
+      return this.json({ error: "This registration changed while saving. Reload and try again." }, 409);
+    }
+    return this.paymentResult(churchId, { ...registration, ...next });
+  }
+
+  private async paymentResult(churchId: string, registration: Registration): Promise<PaymentResult> {
+    return { registration, payments: await this.repos.registrationPayment.loadForRegistration(churchId, registration.id) };
+  }
+
+  private async loadRefundGateway(churchId: string, provider: string) {
+    const givingRepos = await RepoManager.getRepos<Parameters<typeof GatewayService.prepareCharge>[2]>("giving");
+    const gateways = await givingRepos.gateway.loadAll(churchId);
+    return (gateways || []).find((g) => (g.provider || "").toLowerCase() === (provider || "").toLowerCase() && GatewayService.supportsRefund(g)) || null;
   }
 
   private async notifyPromotion(churchId: string, promoted: Registration, event: Event): Promise<void> {

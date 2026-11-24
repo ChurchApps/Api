@@ -337,6 +337,13 @@ export interface GatewayConfig {
   currency?: string;
 }
 
+export interface RefundOptions {
+  // Major units (e.g. dollars); omitted = refund whatever is left on the charge.
+  amount?: number;
+  currency?: string;
+  idempotencyKey?: string;
+}
+
 export interface IGatewayProvider {
   readonly name: string;
   readonly capabilities: ProviderCapabilities;
@@ -443,6 +450,6 @@ export interface IGatewayProvider {
   updateDonationStatus?(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: Repos): Promise<void>;
   // Re-charges a failed recurring payment; absent = the provider has no retry and the UI hides Retry.
   retryFailedPayment?(config: GatewayConfig, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }>;
-  // Full refund of a settled charge; absent = the provider has no refunds and the UI hides Refund.
-  refundCharge?(config: GatewayConfig, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }>;
+  // Refund of a settled charge (full unless options.amount is set); absent = the provider has no refunds and the UI hides Refund.
+  refundCharge?(config: GatewayConfig, transactionId: string, options?: RefundOptions): Promise<{ success: boolean; refundId?: string; error?: string }>;
 }
