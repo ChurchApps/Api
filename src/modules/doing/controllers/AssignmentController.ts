@@ -8,6 +8,7 @@ import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { ReminderTokenHelper } from "../helpers/ReminderTokenHelper.js";
+import { cleanDeclineReason } from "../helpers/DeclineReason.js";
 import { SignupDeadlineHelper } from "../helpers/SignupDeadlineHelper.js";
 import { ServingFeedHelper } from "../helpers/ServingFeedHelper.js";
 
@@ -128,13 +129,14 @@ export class AssignmentController extends DoingBaseController {
   }
 
   @httpPost("/decline/:id")
-  public async decline(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
+  public async decline(@requestParam("id") id: string, req: express.Request<{}, {}, { declineReason?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
       if (!assignment) return this.json({}, 404);
       if (assignment.personId !== au.personId) throw new Error("Invalid Assignment");
       else {
         assignment.status = "Declined";
+        assignment.declineReason = cleanDeclineReason(req.body?.declineReason);
         const result = await this.repos.assignment.save(assignment);
         await InternalEventBus.publish(au.churchId, "assignment.updated", result);
         try {
@@ -189,12 +191,16 @@ export class AssignmentController extends DoingBaseController {
       const target = payload.action === "accept" ? "Accepted" : "Declined";
       if (!apply && assignment.status !== target) {
         const label = target === "Accepted" ? "Accept" : "Decline";
-        const button = `<form method="post" action=""><button type="submit" style="background-color:#0288d1;border:0;border-radius:5px;color:white;cursor:pointer;font-size:16px;padding:10px 24px;">${label}</button></form>`;
+        const reasonField = target === "Declined"
+          ? `<label for="reason" style="display:block;margin-bottom:6px;color:#555;">Reason (optional)</label><input id="reason" name="reason" type="text" maxlength="255" style="box-sizing:border-box;width:100%;padding:10px;margin-bottom:16px;border:1px solid #ccc;border-radius:5px;font-size:16px;">`
+          : "";
+        const button = `<form method="post" action="">${reasonField}<button type="submit" style="background-color:#0288d1;border:0;border-radius:5px;color:white;cursor:pointer;font-size:16px;padding:10px 24px;">${label}</button></form>`;
         res.status(200).send(page(target === "Accepted" ? "Accept this serving request?" : "Decline this serving request?", "Tap the button below to confirm.", button));
         return;
       }
       if (assignment.status !== target) {
         assignment.status = target;
+        if (target === "Declined") assignment.declineReason = cleanDeclineReason(req.body?.reason);
         await repos.assignment.save(assignment);
         await InternalEventBus.publish(payload.churchId, "assignment.updated", assignment);
         if (target === "Declined") {

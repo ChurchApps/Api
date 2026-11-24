@@ -38,6 +38,7 @@ import { up as unify } from "../../../../../tools/migrations/doing/2026-06-07_un
 import { up as actions } from "../../../../../tools/migrations/doing/2026-06-08_workflow_automations.js";
 import { up as scheduling } from "../../../../../tools/migrations/doing/2026-06-11_auto_scheduling.js";
 import { up, down } from "../../../../../tools/migrations/doing/2026-10-22_assignment_confirmation_workflows.js";
+import { up as declineReason } from "../../../../../tools/migrations/doing/2026-11-24_assignment_decline_reason.js";
 import type { DoingDatabase } from "../../db/DatabaseTypes.js";
 import type { Repos } from "../Repos.js";
 
@@ -59,7 +60,9 @@ databaseTests("assignment confirmation migrations and repositories (MySQL 8)", (
     await sql`create database ${sql.id(database)}`.execute(server);
     db = new Kysely({ dialect: new MysqlDialect({ pool: createPool({ ...config, database }) }) });
     (KyselyPool.getDb as jest.Mock).mockReturnValue(db);
-    for (const migration of [initial, workflows, triggers, unify, actions, scheduling, up]) await migration(db);
+    for (const migration of [
+      initial, workflows, triggers, unify, actions, scheduling, up, declineReason
+    ]) await migration(db);
     await sql`insert into plans (id, churchId, name, serviceDate, prepared) values ('plan1', 'c1', 'Sample service', '2030-04-07', 0)`.execute(db);
     await sql`insert into positions (id, churchId, planId, name) values ('pos1', 'c1', 'plan1', 'Greeter')`.execute(db);
   }, 30000);

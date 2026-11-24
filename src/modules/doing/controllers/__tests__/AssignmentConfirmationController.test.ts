@@ -52,3 +52,35 @@ it("publishes administrative status changes and removals in the authenticated ch
   expect(publish).toHaveBeenCalledWith("c1", "assignment.updated", expect.objectContaining({ churchId: "c1", status: "Declined" }));
   await f.controller.delete("a1", req({}), f.response); expect(publish).toHaveBeenCalledWith("c1", "assignment.destroyed", { id: "a1" });
 });
+
+describe("decline reason", () => {
+  it("saves a trimmed, single-line reason capped at 255 characters", async () => {
+    const f = fixture();
+    await f.controller.decline("a1", req({ body: { declineReason: "  Out of town\r\nthat week " + "x".repeat(400) } }), res);
+    const saved = f.repos.assignment.save.mock.calls[0][0] as Assignment;
+    expect(saved.status).toBe("Declined");
+    expect(saved.declineReason).toMatch(/^Out of town that week x+$/);
+    expect(saved.declineReason.length).toBe(255);
+  });
+
+  it("stores no reason when the volunteer leaves it blank", async () => {
+    const f = fixture();
+    await f.controller.decline("a1", req({ body: { declineReason: "   " } }), res);
+    expect((f.repos.assignment.save.mock.calls[0][0] as Assignment).declineReason).toBeNull();
+  });
+
+  it("offers a reason field on the emailed decline page and saves it on submit", async () => {
+    verify.mockReturnValue({ assignmentId: "a1", churchId: "c1", action: "decline", request: { personId: "p1", positionId: "pos1", planId: "plan1", serviceDate: "2030-04-07" } });
+    const f = fixture();
+    await f.controller.respondConfirm(req({ query: { token: "synthetic" } }), f.response);
+    expect((f.response.send as jest.Mock).mock.calls[0][0]).toContain('name="reason"');
+    await f.controller.respondSubmit(req({ query: { token: "synthetic" }, body: { reason: " Sick " } }), f.response);
+    expect(f.repos.assignment.save).toHaveBeenCalledWith(expect.objectContaining({ status: "Declined", declineReason: "Sick" }));
+  });
+
+  it("does not offer a reason field on the accept page", async () => {
+    const f = fixture();
+    await f.controller.respondConfirm(req({ query: { token: "synthetic" } }), f.response);
+    expect((f.response.send as jest.Mock).mock.calls[0][0]).not.toContain('name="reason"');
+  });
+});

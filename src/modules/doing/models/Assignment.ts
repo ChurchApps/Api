@@ -7,4 +7,5 @@ export class Assignment {
   public notified?: Date;
   public autofillRunId?: string;
   public confirmationWorkflowId?: string | null;
+  public declineReason?: string | null;
 }

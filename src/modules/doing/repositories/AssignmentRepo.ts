@@ -4,11 +4,19 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Assignment } from "../models/index.js";
 import { getDb } from "../db/index.js";
 import { mysqlValue } from "./sqlValues.js";
+import { cleanDeclineReason } from "../helpers/DeclineReason.js";
 
 @injectable()
 export class AssignmentRepo {
   public async save(model: Assignment) {
     return model.id ? this.update(model) : this.create(model);
+  }
+
+  // A reason only belongs to a decline; undefined leaves the stored value alone (Kysely skips it).
+  private static declineReasonFor(model: Assignment): string | null | undefined {
+    if (model.status !== "Declined") return null;
+    if (model.declineReason === undefined) return undefined;
+    return cleanDeclineReason(model.declineReason);
   }
 
   // Issuance is an explicit command. Saves/imports cannot enroll an assignment.
@@ -28,12 +36,12 @@ export class AssignmentRepo {
 
   private async create(model: Assignment): Promise<Assignment> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("assignments").values({ id: model.id, churchId: model.churchId, positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified, autofillRunId: model.autofillRunId }).execute();
+    await getDb().insertInto("assignments").values({ id: model.id, churchId: model.churchId, positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified, autofillRunId: model.autofillRunId, declineReason: AssignmentRepo.declineReasonFor(model) }).execute();
     return model;
   }
 
   private async update(model: Assignment): Promise<Assignment> {
-    await getDb().updateTable("assignments").set({ positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified, autofillRunId: model.autofillRunId }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("assignments").set({ positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified, autofillRunId: model.autofillRunId, declineReason: AssignmentRepo.declineReasonFor(model) }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

@@ -812,6 +812,16 @@ describe("NotificationHelper.sendEmailNotification volunteer requests", () => {
     expect(content.replace(/<[^>]+>/g, "")).not.toMatch(/Teacher\.Please/);
     expect(content).toContain("<h4>Oct 25, 2026 - Session 1 - Teacher.</h4>");
   });
+
+  it("escapes a volunteer's decline reason in the leader email", async () => {
+    const notification = { id: "N2", churchId: "CHU1", personId: "PER1", contentType: "assignment", contentId: "P1", message: "Jane declined serving as Usher for Sunday AM. Reason: <img src=x onerror=alert(1)> & out of town" } as Notification;
+
+    await NotificationHelper.sendEmailNotification("leader@example.com", [notification]);
+
+    const content: string = sendTemplatedEmailMock.mock.calls[0][5];
+    expect(content).not.toContain("<img");
+    expect(content).toContain("Reason: &lt;img src=x onerror=alert(1)&gt; &amp; out of town");
+  });
 });
 
 describe("NotificationHelper.checkShouldNotify conversation message text", () => {
