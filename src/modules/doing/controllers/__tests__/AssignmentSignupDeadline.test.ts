@@ -5,6 +5,7 @@ jest.mock("../../../../shared/helpers/index", () => ({ PlanAuth: {} }));
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadChurch: async () => ({ id: "c1", timeZone: "America/Chicago" }) }) }));
 jest.mock("../../helpers/PlanHelper", () => ({ PlanHelper: {} }));
 jest.mock("../../helpers/ReminderTokenHelper", () => ({ ReminderTokenHelper: {} }));
+jest.mock("../../helpers/ServingFeedHelper", () => ({ ServingFeedHelper: {} }));
 
 import express from "express";
 import { AuthenticatedUser } from "@churchapps/apihelper";
