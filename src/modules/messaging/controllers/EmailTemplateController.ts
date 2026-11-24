@@ -8,6 +8,7 @@ import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalE
 import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
+import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 import type { MembershipRepos } from "../helpers/ForeignRepos.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -118,11 +119,13 @@ export class EmailTemplateController extends MessagingBaseController {
       if (!groupId && (!personIds || personIds.length === 0)) return this.json({ error: "groupId or personIds is required" }, 400);
 
       let churchName = "";
+      let appUrl = "";
       try {
         const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
         const churchRow = await membershipRepos.church.load(au.churchId, au.churchId);
         churchName = churchRow?.name || "";
-      } catch { /* church name is optional */ }
+        if (churchRow?.subDomain) appUrl = AppUrlHelper.b1AppUrl(churchRow.subDomain);
+      } catch { /* church name and site are optional */ }
       const church = { name: churchName };
 
       let members: GroupMemberEmailDetail[];
@@ -152,7 +155,7 @@ export class EmailTemplateController extends MessagingBaseController {
         const resolvedBody = MergeFieldHelper.resolve(htmlContent, person, church);
 
         try {
-          await TransactionalEmailHelper.sendTransactional(from, member.email, churchName || "B1", "", resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo);
+          await TransactionalEmailHelper.sendTransactional(from, member.email, churchName || "B1", appUrl, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo);
           successCount++;
           await ChurchEmailLimiter.settle(au.churchId, reserved[i], true);
         } catch (err) {
