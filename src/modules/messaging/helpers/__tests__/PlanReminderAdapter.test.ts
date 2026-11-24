@@ -4,6 +4,8 @@ jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({ RepoManag
 const buildPlanReminderEmails = jest.fn(async () => ({ P1: { subject: "s", html: "h" } }));
 jest.mock("../../../../shared/modules/DoingModuleGateway.js", () => ({ getDoingModuleGateway: () => ({ buildPlanReminderEmails }) }));
 
+jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({}) }));
+
 import { PlanReminderAdapter } from "../adapters/PlanReminderAdapter.js";
 
 describe("PlanReminderAdapter.loadScopeEntities", () => {

@@ -27,8 +27,8 @@ export interface ReminderAdapter<E extends ReminderEntity = ReminderEntity> {
   getOccurrences(entity: E, from: Date, to: Date): Promise<ReminderOccurrenceInfo[]>;
   loadRecipients(churchId: string, entity: E, occLocalISO: string, recipientMode: string): Promise<ReminderRecipient[]>;
   link(entity: E, occLocalISO: string): string;
-  renderMessage?(entity: E, occLocalISO: string, custom?: string): string;
-  buildEmails?(entity: E, occLocalISO: string, recipients: ReminderRecipient[], custom?: string): Promise<Record<string, { subject: string; html: string }> | null>;
+  renderMessage?(entity: E, occLocalISO: string, custom?: string, recipientMode?: string): string | Promise<string>;
+  buildEmails?(entity: E, occLocalISO: string, recipients: ReminderRecipient[], custom?: string, recipientMode?: string): Promise<Record<string, { subject: string; html: string }> | null>;
   // Scope inheritance (entityId null, scopeId set): concrete entities a scoped definition fans out to in the window (e.g., every plan of a planType).
   loadScopeEntities?(churchId: string, scopeId: string, from: Date, to: Date): Promise<E[]>;
 }

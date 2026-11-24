@@ -142,13 +142,14 @@ export class ReminderEngine {
       const entity = await adapter.loadEntity(occ.churchId!, occ.entityId!);
       if (!entity) { await this.repos.reminderOccurrence.markCancelled(occ.id!); return none; }
 
-      const recipients = await adapter.loadRecipients(occ.churchId!, entity, occ.occLocalISO!, def.recipientMode || "auto");
+      const recipientMode = def.recipientMode || "auto";
+      const recipients = await adapter.loadRecipients(occ.churchId!, entity, occ.occLocalISO!, recipientMode);
       const alreadySent = new Set(await this.repos.reminderSentLog.loadPersonIdsForOccurrence(occ.id!));
       const fresh = recipients.filter((r) => r.personId && !alreadySent.has(r.personId));
       let texts = { textsSent: 0, textsSkipped: 0 };
 
       if (fresh.length > 0) {
-        const message = adapter.renderMessage ? adapter.renderMessage(entity, occ.occLocalISO!, occ.message || undefined) : (occ.message || "You have a reminder");
+        const message = adapter.renderMessage ? await adapter.renderMessage(entity, occ.occLocalISO!, occ.message || undefined, recipientMode) : (occ.message || "You have a reminder");
         const link = adapter.link(entity, occ.occLocalISO!) || undefined;
         const options: CreateNotificationOptions = { category: occ.category, deliveryStartLevel: 1 };
         const channels: string[] = (def.channels || "").split(",").map((c: string) => c.trim());
@@ -156,7 +157,7 @@ export class ReminderEngine {
           options.emailImmediate = true;
           // Send now rows can be made at will, so their emails draw on ChurchEmailLimiter like workflow email (also on a timer retry).
           if (this.isSendNowKey(occ.occurrenceKey)) options.churchAuthored = true;
-          const emailByPerson = adapter.buildEmails ? await adapter.buildEmails(entity, occ.occLocalISO!, fresh, occ.message || undefined) : null;
+          const emailByPerson = adapter.buildEmails ? await adapter.buildEmails(entity, occ.occLocalISO!, fresh, occ.message || undefined, recipientMode) : null;
           if (emailByPerson) options.emailByPerson = emailByPerson;
         }
         await NotificationHelper.createNotifications(
