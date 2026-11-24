@@ -405,3 +405,40 @@ describe("PlanHelper.attachAssignees", () => {
     expect(loadByPlanId).not.toHaveBeenCalled();
   });
 });
+
+describe("PlanHelper.loadPickerContext", () => {
+  const serviceDate = new Date("2026-12-06T00:00:00Z");
+  const makeRepos = (position: Partial<Position> | null) => ({
+    position: { load: jest.fn(async () => position) },
+    plan: { load: jest.fn(async () => ({ id: "plan1", serviceDate })) },
+    assignment: {
+      loadLastServed: jest.fn(async () => [{ personId: "p2", serviceDate: new Date("2026-11-22") }]),
+      loadSameDayForPeople: jest.fn(async () => [{ personId: "p3", planId: "plan2", planName: "Evening", positionName: "Vocals" }])
+    }
+  });
+
+  beforeEach(() => loadGroupMemberPersonIdsMock.mockReset().mockResolvedValue(["p2", "p3"]));
+
+  it("reads last-served and same-day rows for the position's team, scoped to the church, in one query each", async () => {
+    const repos = makeRepos({ id: "pos1", planId: "plan1", groupId: "team1" });
+    const result = await PlanHelper.loadPickerContext("c1", "pos1", repos as unknown as Repos);
+    expect(repos.position.load).toHaveBeenCalledWith("c1", "pos1");
+    expect(repos.plan.load).toHaveBeenCalledWith("c1", "plan1");
+    expect(loadGroupMemberPersonIdsMock).toHaveBeenCalledWith("c1", "team1");
+    expect(repos.assignment.loadLastServed).toHaveBeenCalledTimes(1);
+    expect(repos.assignment.loadLastServed).toHaveBeenCalledWith("c1", { personIds: ["p2", "p3"], before: serviceDate });
+    expect(repos.assignment.loadSameDayForPeople).toHaveBeenCalledTimes(1);
+    expect(repos.assignment.loadSameDayForPeople).toHaveBeenCalledWith("c1", serviceDate, ["p2", "p3"], "pos1");
+    expect(result.sameDay).toEqual([{ personId: "p3", planId: "plan2", planName: "Evening", positionName: "Vocals" }]);
+    expect(result.lastServed).toHaveLength(1);
+  });
+
+  it("returns nothing for a position with no team or from another church", async () => {
+    for (const position of [{ id: "pos1", planId: "plan1" }, null]) {
+      const repos = makeRepos(position);
+      expect(await PlanHelper.loadPickerContext("c1", "pos1", repos as unknown as Repos)).toEqual({ lastServed: [], sameDay: [] });
+      expect(repos.assignment.loadLastServed).not.toHaveBeenCalled();
+    }
+    expect(loadGroupMemberPersonIdsMock).not.toHaveBeenCalled();
+  });
+});

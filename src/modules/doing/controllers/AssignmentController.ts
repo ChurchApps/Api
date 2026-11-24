@@ -35,6 +35,15 @@ export class AssignmentController extends DoingBaseController {
     });
   }
 
+  // Assign Position picker: when each team member last served and what else they serve that day.
+  @httpGet("/picker/:positionId")
+  public async getPickerContext(@requestParam("positionId") positionId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditPosition(au, positionId)) return this.json({}, 401);
+      return await PlanHelper.loadPickerContext(au.churchId, positionId, this.repos);
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {

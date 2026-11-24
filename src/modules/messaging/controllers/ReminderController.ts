@@ -10,6 +10,7 @@ import { TimezoneHelper } from "../helpers/TimezoneHelper.js";
 import { ensureRemindersReady } from "../helpers/ReminderBootstrap.js";
 import { ReminderDefinition, NotificationEntityMute } from "../models/index.js";
 import { ContentRepos, ForeignEventRow } from "../helpers/ForeignRepos.js";
+import { LEADER_GAPS_MODE } from "../helpers/adapters/PlanReminderAdapter.js";
 
 // Save body for a reminder definition; offsets and channels may arrive as arrays or as CSV strings.
 interface ReminderDefinitionBody {
@@ -110,10 +111,13 @@ export class ReminderController extends MessagingBaseController {
       const adapter = ReminderAdapterRegistry.get(entityType);
       if (!adapter) return this.json({}, 400);
       const body = req.body || {};
-      const existing = (await this.repos.reminderDefinition.loadForScope(au.churchId, entityType, scopeId)) as ReminderDefinition[];
-      if (this.addsSms(body.channels, existing[0]?.channels) && !au.checkAccess(Permissions.texting.send)) return this.json({ error: "Sending texts requires the Texting Send permission" }, 401);
+      // A scope holds one volunteer reminder and, beside it, at most one leader gap alert.
+      const isGapAlert = (mode?: string) => mode === LEADER_GAPS_MODE;
+      const current = ((await this.repos.reminderDefinition.loadForScope(au.churchId, entityType, scopeId)) as ReminderDefinition[])
+        .find((d) => isGapAlert(d.recipientMode) === isGapAlert(body.recipientMode));
+      if (this.addsSms(body.channels, current?.channels) && !au.checkAccess(Permissions.texting.send)) return this.json({ error: "Sending texts requires the Texting Send permission" }, 401);
       const def: ReminderDefinition = {
-        id: existing[0]?.id,
+        id: current?.id,
         churchId: au.churchId,
         entityType,
         entityId: undefined, // scope definition — inherited by every entity in the scope

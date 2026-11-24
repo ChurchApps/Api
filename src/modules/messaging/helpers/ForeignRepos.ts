@@ -91,6 +91,7 @@ export interface ContentRepos {
 export interface ForeignPlanRow {
   id?: string;
   churchId?: string;
+  ministryId?: string;
   name?: string;
   serviceDate?: Date;
 }

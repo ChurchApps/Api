@@ -95,15 +95,35 @@ export class AssignmentRepo {
       .execute();
   }
 
-  public async loadLastServed(churchId: string) {
-    return getDb().selectFrom("assignments as a")
+  // With `before`, only non-declined assignments on earlier plans count, so the picker never shows a future or declined date.
+  public async loadLastServed(churchId: string, options?: { personIds?: string[]; before?: Date }) {
+    if (options?.personIds && options.personIds.length === 0) return [];
+    let query = getDb().selectFrom("assignments as a")
       .innerJoin("positions as p", "p.id", "a.positionId")
       .innerJoin("plans as pl", "pl.id", "p.planId")
       .select(["a.personId", sql`max(pl.serviceDate)`.as("serviceDate")])
+      .where("a.churchId", "=", churchId);
+    if (options?.personIds) query = query.where("a.personId", "in", options.personIds);
+    if (options?.before) {
+      query = query.where(sql`DATE(pl.serviceDate)`, "<", sql`DATE(${options.before})`)
+        .where((eb) => eb.or([eb("a.status", "is", null), eb("a.status", "!=", "Declined")]));
+    }
+    return query.groupBy("a.personId").orderBy(sql`max(pl.serviceDate)`).execute();
+  }
+
+  // Non-declined assignments these people hold on any plan that day, other than the given position.
+  public async loadSameDayForPeople(churchId: string, serviceDate: Date, personIds: string[], excludePositionId?: string) {
+    if (personIds.length === 0) return [];
+    let query = getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", (j) => j.onRef("p.id", "=", "a.positionId").onRef("p.churchId", "=", "a.churchId"))
+      .innerJoin("plans as pl", (j) => j.onRef("pl.id", "=", "p.planId").onRef("pl.churchId", "=", "a.churchId"))
+      .select(["a.personId", "pl.id as planId", "pl.name as planName", "p.name as positionName"])
       .where("a.churchId", "=", churchId)
-      .groupBy("a.personId")
-      .orderBy(sql`max(pl.serviceDate)`)
-      .execute();
+      .where("a.personId", "in", personIds)
+      .where(sql`DATE(pl.serviceDate)`, "=", sql`DATE(${serviceDate})`)
+      .where((eb) => eb.or([eb("a.status", "is", null), eb("a.status", "!=", "Declined")]));
+    if (excludePositionId) query = query.where("a.positionId", "!=", excludePositionId);
+    return query.execute();
   }
 
   // Member-facing: penciled-in (prepared) plans stay hidden until published.

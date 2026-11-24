@@ -10,7 +10,7 @@ export class ReminderDefinition {
   public timeZone?: string; // IANA; null = inherit church.timeZone
   public message?: string;
   public channels?: string; // CSV: "push,email,in_app"
-  public recipientMode?: string; // auto|registrants|group|registrantsHoh|assignments|assignee
+  public recipientMode?: string; // auto|registrants|group|registrantsHoh|assignments|assignee|leaderGaps
   public enabled?: boolean;
   public dateCreated?: Date;
   public dateModified?: Date;

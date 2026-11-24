@@ -198,6 +198,23 @@ export class PlanHelper {
     return created;
   }
 
+  // Assign Position picker: when each team member last served before this plan, and what else they serve that day.
+  static async loadPickerContext(churchId: string, positionId: string, repositories?: Repos) {
+    const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
+    const empty = { lastServed: [] as { personId: string; serviceDate: unknown }[], sameDay: [] as { personId: string; planId: string; planName: string; positionName: string }[] };
+    const position = (await repos.position.load(churchId, positionId)) as Position;
+    if (!position?.groupId) return empty;
+    const plan = (await repos.plan.load(churchId, position.planId)) as Plan;
+    const serviceDate = plan?.serviceDate ? new Date(plan.serviceDate) : null;
+    if (!serviceDate) return empty;
+    const personIds = await getMembershipModuleGateway().loadGroupMemberPersonIds(churchId, position.groupId);
+    const [lastServed, sameDay] = await Promise.all([
+      repos.assignment.loadLastServed(churchId, { personIds, before: serviceDate }),
+      repos.assignment.loadSameDayForPeople(churchId, serviceDate, personIds, position.id)
+    ]);
+    return { lastServed, sameDay };
+  }
+
   static async notifyLeadersOfResponse(churchId: string, assignment: Assignment, repositories?: Repos): Promise<void> {
     try {
       const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
