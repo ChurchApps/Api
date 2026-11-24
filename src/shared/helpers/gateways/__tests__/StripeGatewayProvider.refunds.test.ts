@@ -53,6 +53,17 @@ describe("StripeGatewayProvider refunds", () => {
       expect(result.success).toBe(true);
     });
 
+    it("sends a partial amount in minor units with the idempotency key", async () => {
+      const result = await provider.refundCharge(config, "pi_1", { amount: 12.34, currency: "usd", idempotencyKey: "key1" });
+      expect(mockStripe.refunds.create).toHaveBeenCalledWith({ payment_intent: "pi_1", amount: 1234 }, { idempotencyKey: "key1" });
+      expect(result.success).toBe(true);
+    });
+
+    it("keeps zero-decimal currencies in whole units", async () => {
+      await provider.refundCharge(config, "pi_1", { amount: 500, currency: "jpy" });
+      expect(mockStripe.refunds.create).toHaveBeenCalledWith({ payment_intent: "pi_1", amount: 500 });
+    });
+
     it("refuses ids that are not charges", async () => {
       const result = await provider.refundCharge(config, "in_1");
       expect(result.success).toBe(false);

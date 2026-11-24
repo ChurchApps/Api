@@ -443,9 +443,13 @@ export class StripeHelper {
     await givingRepos.donation.updateStatus(churchId, transactionId, status);
   }
 
-  static async createRefund(secretKey: string, params: { charge: string } | { payment_intent: string }) {
+  static async createRefund(secretKey: string, params: Stripe.RefundCreateParams, idempotencyKey?: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    return await stripe.refunds.create(params);
+    return idempotencyKey ? await stripe.refunds.create(params, { idempotencyKey }) : await stripe.refunds.create(params);
+  }
+
+  static toMinorUnits(amount: number, currency?: string): number {
+    return STRIPE_ZERO_DECIMAL_CURRENCIES.has((currency || "").toLowerCase()) ? Math.round(amount) : Math.trunc(Math.round(amount * 100));
   }
 
   static async payInvoice(secretKey: string, invoiceId: string) {

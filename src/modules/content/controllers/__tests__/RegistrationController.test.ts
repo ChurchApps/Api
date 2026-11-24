@@ -8,7 +8,8 @@ jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { js
 jest.mock("../../helpers/index", () => ({
   Permissions: { registrations: { view: "regView", edit: "regEdit" } },
   RegistrationHelper: { sendConfirmationEmail: jest.fn(), sendCancellationEmail: jest.fn(), sendWaitlistAvailabilityEmail: jest.fn(), sendBalanceReminderEmail: jest.fn() },
-  RegistrationPricingHelper: jest.requireActual("../../helpers/RegistrationPricingHelper").RegistrationPricingHelper
+  RegistrationPricingHelper: jest.requireActual("../../helpers/RegistrationPricingHelper").RegistrationPricingHelper,
+  RegistrationPaymentHelper: jest.requireActual("../../helpers/RegistrationPaymentHelper").RegistrationPaymentHelper
 }));
 const mockLoadHouseholdPeople = jest.fn(async (_churchId: string, _personIds: string[]) => [{ id: "p1", householdId: "h1" }, { id: "p1kid", householdId: "h1" }]);
 jest.mock("../../../../shared/modules/index", () => ({

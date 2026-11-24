@@ -2,7 +2,7 @@ import { GatewayFactory, IGatewayProvider, GatewayConfig } from "./gateways/inde
 import type {
   ProviderCapabilities, WebhookEventClassification, ReplayEvent, SubscriptionResult, GatewayObject, GatewayPaymentRequest, GatewayPerson,
   GatewaySubscriptionUpdate, GatewayAttachBody, GatewayAttachOptions, LocalMethodRecord, NormalizedPaymentMethod, NormalizedSubscription,
-  GatewayPaymentMethodList, GatewaySubscriptionList, GatewayBankAccountOptions, GatewayErrorMapping, GatewayDonationLogResult, GatewayOrderRequest, GatewayPlanRequest
+  GatewayPaymentMethodList, GatewaySubscriptionList, GatewayBankAccountOptions, GatewayErrorMapping, GatewayDonationLogResult, GatewayOrderRequest, GatewayPlanRequest, RefundOptions
 } from "./gateways/index.js";
 import type Stripe from "stripe";
 import type express from "express";
@@ -199,10 +199,10 @@ export class GatewayService {
     return !!this.getProviderFromGateway(gateway).refundCharge;
   }
 
-  static async refundDonation(gateway: Gateway, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }> {
+  static async refundDonation(gateway: Gateway, transactionId: string, options?: RefundOptions): Promise<{ success: boolean; refundId?: string; error?: string }> {
     const provider = this.getProviderFromGateway(gateway);
     if (!provider.refundCharge) return { success: false, error: `${provider.name} does not support refunds` };
-    return await provider.refundCharge(this.getGatewayConfig(gateway), transactionId);
+    return await provider.refundCharge(this.getGatewayConfig(gateway), transactionId, options);
   }
 
   static async createCustomer(gateway: Gateway, email: string, name: string, options?: { personId?: string }): Promise<string | undefined> {

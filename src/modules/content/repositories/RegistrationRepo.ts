@@ -179,6 +179,18 @@ export class RegistrationRepo {
     return result?.numAffectedRows > 0n || result?.affectedRows > 0;
   }
 
+  // Compare-and-set so two payments or refunds recorded at once can't overwrite each other's amountPaid.
+  public async updatePaidIfUnchanged(churchId: string, id: string, expected: Pick<Registration, "amountPaid" | "status">, next: Pick<Registration, "amountPaid" | "status">): Promise<boolean> {
+    const result = await getDb().updateTable("registrations")
+      .set({ amountPaid: next.amountPaid, status: next.status })
+      .where("id", "=", id)
+      .where("churchId", "=", churchId)
+      .where("amountPaid", "=", Number(expected.amountPaid) || 0)
+      .where("status", "=", expected.status)
+      .executeTakeFirst();
+    return Number(result?.numUpdatedRows ?? 0) > 0;
+  }
+
   public async promoteFromWaitlist(churchId: string, eventId: string, capacity: number | null, registrationId?: string): Promise<Registration | null> {
     let query = getDb().selectFrom("registrations").selectAll()
       .where("churchId", "=", churchId)
