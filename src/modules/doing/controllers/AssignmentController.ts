@@ -3,12 +3,12 @@ import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Assignment, Plan, Position, Time } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
-import { PlanAuth } from "../../../shared/helpers/index.js";
+import { PlanAuth, Permissions } from "../../../shared/helpers/index.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { ReminderTokenHelper } from "../helpers/ReminderTokenHelper.js";
-import { cleanDeclineReason } from "../helpers/DeclineReason.js";
+import { cleanDeclineReason, formReason, redactDeclineReasons } from "../helpers/DeclineReason.js";
 import { SignupDeadlineHelper } from "../helpers/SignupDeadlineHelper.js";
 import { ServingFeedHelper } from "../helpers/ServingFeedHelper.js";
 
@@ -92,7 +92,9 @@ export class AssignmentController extends DoingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.assignment.load(au.churchId, id);
+      const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
+      if (!assignment) return assignment;
+      return redactDeclineReasons([assignment], au.personId, au.checkAccess(Permissions.plans.edit))[0];
     });
   }
 
@@ -101,14 +103,14 @@ export class AssignmentController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const planIdsString = req.query.planIds as string;
       const planIds = planIdsString.split(",");
-      return await this.repos.assignment.loadByPlanIds(au.churchId, planIds);
+      return redactDeclineReasons(await this.repos.assignment.loadByPlanIds(au.churchId, planIds) as Assignment[], au.personId, au.checkAccess(Permissions.plans.edit));
     });
   }
 
   @httpGet("/plan/:planId")
   public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.assignment.loadByPlanId(au.churchId, planId);
+      return redactDeclineReasons(await this.repos.assignment.loadByPlanId(au.churchId, planId) as Assignment[], au.personId, au.checkAccess(Permissions.plans.edit));
     });
   }
 
@@ -200,7 +202,7 @@ export class AssignmentController extends DoingBaseController {
       }
       if (assignment.status !== target) {
         assignment.status = target;
-        if (target === "Declined") assignment.declineReason = cleanDeclineReason(req.body?.reason);
+        if (target === "Declined") assignment.declineReason = cleanDeclineReason(formReason(req.body));
         await repos.assignment.save(assignment);
         await InternalEventBus.publish(payload.churchId, "assignment.updated", assignment);
         if (target === "Declined") {

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 jest.mock("../DoingBaseController.js", () => ({ DoingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
-jest.mock("../../../../shared/helpers/index.js", () => ({ PlanAuth: { canEditPosition: async () => true } }));
+jest.mock("../../../../shared/helpers/index.js", () => ({ PlanAuth: { canEditPosition: async () => true }, Permissions: { plans: { edit: { contentType: "Plans", action: "Edit" } } } }));
 const publish = jest.fn();
 jest.mock("../../../../shared/events/InternalEventBus.js", () => ({ InternalEventBus: { publish: (...args: unknown[]) => publish(...args) } }));
 jest.mock("../../helpers/PlanHelper.js", () => ({ PlanHelper: { autoReplaceDeclined: jest.fn(), notifyLeadersOfResponse: jest.fn() } }));
@@ -78,9 +78,40 @@ describe("decline reason", () => {
     expect(f.repos.assignment.save).toHaveBeenCalledWith(expect.objectContaining({ status: "Declined", declineReason: "Sick" }));
   });
 
+  it("reads the reason from the raw urlencoded body Lambda leaves as a string", async () => {
+    verify.mockReturnValue({ assignmentId: "a1", churchId: "c1", action: "decline", request: { personId: "p1", positionId: "pos1", planId: "plan1", serviceDate: "2030-04-07" } });
+    const f = fixture();
+    await f.controller.respondSubmit(req({ query: { token: "synthetic" }, body: "reason=Out+of+town%21" as unknown as Record<string, unknown> }), f.response);
+    expect(f.repos.assignment.save).toHaveBeenCalledWith(expect.objectContaining({ status: "Declined", declineReason: "Out of town!" }));
+  });
+
   it("does not offer a reason field on the accept page", async () => {
     const f = fixture();
     await f.controller.respondConfirm(req({ query: { token: "synthetic" } }), f.response);
     expect((f.response.send as jest.Mock).mock.calls[0][0]).not.toContain('name="reason"');
+  });
+});
+
+describe("decline reason visibility", () => {
+  const rows = [
+    { id: "a1", personId: "p1", status: "Declined", declineReason: "Mine" },
+    { id: "a2", personId: "p2", status: "Declined", declineReason: "Private to p2" }
+  ];
+  const asViewer = (f: ReturnType<typeof fixture>, canEditPlans: boolean) => {
+    f.controller.actionWrapper = async (_r, _s, action) => action({ churchId: "c1", personId: "p1", checkAccess: () => canEditPlans } as unknown as AuthenticatedUser);
+    (f.repos.assignment as Record<string, unknown>).loadByPlanId = jest.fn(async () => rows.map((r) => ({ ...r })));
+  };
+
+  it("hides other volunteers' reasons from a plan's assignment list for a member", async () => {
+    const f = fixture(); asViewer(f, false);
+    const result = await f.controller.getForPlan("plan1", req({}), res) as Assignment[];
+    expect(result.find((a) => a.id === "a1")?.declineReason).toBe("Mine");
+    expect(result.find((a) => a.id === "a2")?.declineReason).toBeNull();
+  });
+
+  it("shows every reason to a plan editor", async () => {
+    const f = fixture(); asViewer(f, true);
+    const result = await f.controller.getForPlan("plan1", req({}), res) as Assignment[];
+    expect(result.find((a) => a.id === "a2")?.declineReason).toBe("Private to p2");
   });
 });
