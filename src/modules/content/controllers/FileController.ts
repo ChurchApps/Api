@@ -18,10 +18,30 @@ import { PersonFileStorage, PERSON_CONTENT_TYPE, PERSON_MAX_TOTAL_BYTES } from "
 // Providers whose public URLs are short-lived; contentPath points at the stable /download route instead.
 const REDIRECT_PROVIDERS = ["googledrive", "dropbox", "onedrive"];
 
-// Arrangement audio: matches Planning Center's player-supported formats and keeps the free tier
-// from taking WAV-sized files (4-10x an equivalent MP3). Free-tier ceiling; adjust here if needed.
+// Arrangement audio: browser-playable compressed formats only, which keeps the free tier from taking
+// WAV-sized files (4-10x an equivalent MP3). Free-tier ceiling; adjust here if needed.
 const ARRANGEMENT_MAX_FILE_BYTES = 26214400;
 const ARRANGEMENT_ALLOWED_MIME_TYPES = ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/aac"];
+// A chord chart PDF beside the audio. It is sent inline, never presigned, so the bytes can be checked
+// before they are stored; 4 MB keeps the base64 body under the Lambda's 6 MB request limit.
+const ARRANGEMENT_PDF_MIME_TYPE = "application/pdf";
+const ARRANGEMENT_PDF_MAX_FILE_BYTES = 4194304;
+
+const arrangementUploadError = (fileType: string | undefined, size: number, fileName: string | undefined): string | null => {
+  if (fileType === ARRANGEMENT_PDF_MIME_TYPE) {
+    if (!/\.pdf$/i.test(fileName || "")) return "invalid_pdf";
+    return size > ARRANGEMENT_PDF_MAX_FILE_BYTES ? "pdf_too_large" : null;
+  }
+  if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(fileType || "")) return "unsupported_audio_format";
+  return size > ARRANGEMENT_MAX_FILE_BYTES ? "file_too_large" : null;
+};
+
+const arrangementPdfError = (fileContents: string | undefined): string | null => {
+  if (!fileContents) return "invalid_pdf";
+  const bytes = Buffer.from(fileContents.split(",").pop() || "", "base64");
+  if (bytes.subarray(0, 5).toString("latin1") !== "%PDF-") return "invalid_pdf";
+  return bytes.length > ARRANGEMENT_PDF_MAX_FILE_BYTES ? "pdf_too_large" : null;
+};
 
 // Group members upload to the public CDN; never let them serve active content from it.
 const ACTIVE_MIME_TYPES = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|text\/javascript|application\/(x-)?javascript|application\/ecmascript|text\/ecmascript)/i;
@@ -120,9 +140,9 @@ export class FileController extends ContentBaseController {
         return this.json({}, 401);
       } else {
         if (!isEditor) for (const f of req.body) f.fileType = safeMemberMimeType(f.fileType);
-        if (req.body[0].contentType === "arrangement") {
-          if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(req.body[0].fileType || "")) return this.json({ error: "unsupported_audio_format" }, 400);
-          if ((req.body[0].size || 0) > ARRANGEMENT_MAX_FILE_BYTES) return this.json({ error: "file_too_large" }, 400);
+        for (const f of req.body.filter((x) => x.contentType === "arrangement")) {
+          const error = arrangementUploadError(f.fileType, f.size || 0, f.fileName) || (f.fileType === ARRANGEMENT_PDF_MIME_TYPE ? arrangementPdfError(f.fileContents) : null);
+          if (error) return this.json({ error }, 400);
         }
         const storage = await StorageResolver.forChurch(this.repos.storageProvider, au.churchId);
         if (storage.name === "churchapps") {
@@ -171,8 +191,10 @@ export class FileController extends ContentBaseController {
       else {
         let size = req.body.size || 0;
         if (req.body.contentType === "arrangement") {
-          if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(req.body.mimeType || "")) return this.json({ error: "unsupported_audio_format" }, 400);
-          if (size > ARRANGEMENT_MAX_FILE_BYTES) return this.json({ error: "file_too_large" }, 400);
+          const error = arrangementUploadError(req.body.mimeType, size, req.body.fileName);
+          if (error) return this.json({ error }, 400);
+          // no presign: the client falls back to an inline upload that save() can inspect
+          if (req.body.mimeType === ARRANGEMENT_PDF_MIME_TYPE) return {};
           // an omitted size would otherwise fall through to the provider's generic upload cap
           size = size > 0 ? size : ARRANGEMENT_MAX_FILE_BYTES;
         }

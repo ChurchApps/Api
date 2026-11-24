@@ -211,6 +211,108 @@ describe("FileController arrangement audio guards", () => {
   });
 });
 
+describe("FileController arrangement chart PDFs", () => {
+  const pdfData = (text: string) => "data:application/pdf;base64," + Buffer.from(text).toString("base64");
+
+  beforeEach(() => {
+    (StorageResolver.forChurch as jest.Mock).mockReset();
+    (StorageResolver.publicUrl as jest.Mock).mockReturnValue("https://cdn.test/chart.pdf");
+  });
+
+  it("stores a real PDF on an arrangement and counts its decoded size", async () => {
+    const store = jest.fn(async () => "k");
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: { store } });
+    const { controller, repos } = makeWriteController();
+    const contents = pdfData("%PDF-1.7\n%chart");
+    await controller.save({ body: [{ contentType: "arrangement", contentId: "a1", fileType: "application/pdf", size: 1, fileName: "chart.pdf", fileContents: contents }] } as express.Request, {} as express.Response);
+    expect(repos.file.loadTotalBytes).toHaveBeenCalledWith("c1", "arrangement", "a1");
+    expect(store).toHaveBeenCalledWith("/c1/files/arrangement/a1/chart.pdf", "application/pdf", expect.any(Buffer));
+    expect(repos.file.save).toHaveBeenCalledWith(expect.objectContaining({ fileType: "application/pdf", size: 15 }));
+  });
+
+  it("rejects a file declared as PDF whose bytes are not a PDF", async () => {
+    const { controller, repos } = makeWriteController();
+    const result = await controller.save({ body: [{ contentType: "arrangement", contentId: "a1", fileType: "application/pdf", size: 20, fileName: "chart.pdf", fileContents: pdfData("<html><script>x</script>") }] } as express.Request, {} as express.Response);
+    expect(result).toEqual({ obj: { error: "invalid_pdf" }, status: 400 });
+    expect(StorageResolver.forChurch).not.toHaveBeenCalled();
+    expect(repos.file.save).not.toHaveBeenCalled();
+  });
+
+  it("rejects a PDF registered without inline bytes", async () => {
+    const { controller } = makeWriteController();
+    const result = await controller.save({ body: [{ contentType: "arrangement", contentId: "a1", fileType: "application/pdf", size: 20, fileName: "chart.pdf" }] } as express.Request, {} as express.Response);
+    expect(result).toEqual({ obj: { error: "invalid_pdf" }, status: 400 });
+  });
+
+  it("rejects a PDF without a .pdf name", async () => {
+    const { controller } = makeWriteController();
+    const result = await controller.save({ body: [{ contentType: "arrangement", contentId: "a1", fileType: "application/pdf", size: 20, fileName: "chart.html", fileContents: pdfData("%PDF-1.7") }] } as express.Request, {} as express.Response);
+    expect(result).toEqual({ obj: { error: "invalid_pdf" }, status: 400 });
+  });
+
+  it("rejects an oversized PDF by declared size", async () => {
+    const { controller } = makeWriteController();
+    const result = await controller.save({ body: [{ contentType: "arrangement", contentId: "a1", fileType: "application/pdf", size: 4194305, fileName: "chart.pdf", fileContents: pdfData("%PDF-1.7") }] } as express.Request, {} as express.Response);
+    expect(result).toEqual({ obj: { error: "pdf_too_large" }, status: 400 });
+  });
+
+  it("rejects an oversized PDF by decoded size when the declared size lies", async () => {
+    const { controller } = makeWriteController();
+    const big = "%PDF-1.7\n" + "x".repeat(4194304);
+    const result = await controller.save({ body: [{ contentType: "arrangement", contentId: "a1", fileType: "application/pdf", size: 10, fileName: "chart.pdf", fileContents: pdfData(big) }] } as express.Request, {} as express.Response);
+    expect(result).toEqual({ obj: { error: "pdf_too_large" }, status: 400 });
+    expect(StorageResolver.forChurch).not.toHaveBeenCalled();
+  });
+
+  it("checks every arrangement file in the batch, not only the first", async () => {
+    const { controller } = makeWriteController();
+    const result = await controller.save({
+      body: [
+        { contentType: "arrangement", contentId: "a1", fileType: "application/pdf", size: 10, fileName: "a.pdf", fileContents: pdfData("%PDF-1.7") },
+        { contentType: "arrangement", contentId: "a1", fileType: "application/pdf", size: 10, fileName: "b.pdf", fileContents: pdfData("GIF89a") }
+      ]
+    } as express.Request, {} as express.Response);
+    expect(result).toEqual({ obj: { error: "invalid_pdf" }, status: 400 });
+  });
+
+  it("declines to presign an arrangement PDF so it is sent inline", async () => {
+    const getUploadUrl = jest.fn(async () => ({ url: "https://s3.example/post" }));
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: { getUploadUrl } });
+    const { controller } = makeWriteController();
+    const result = await controller.getUploadUrl({ body: { contentType: "arrangement", contentId: "a1", fileName: "chart.pdf", mimeType: "application/pdf", size: 1000 } } as express.Request, {} as express.Response);
+    expect(result).toEqual({});
+    expect(getUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized PDF on getUploadUrl", async () => {
+    const { controller } = makeWriteController();
+    const result = await controller.getUploadUrl({ body: { contentType: "arrangement", contentId: "a1", fileName: "chart.pdf", mimeType: "application/pdf", size: 4194305 } } as express.Request, {} as express.Response);
+    expect(result).toEqual({ obj: { error: "pdf_too_large" }, status: 400 });
+  });
+
+  it("still rejects other document types on an arrangement", async () => {
+    const { controller } = makeWriteController();
+    const result = await controller.getUploadUrl({ body: { contentType: "arrangement", contentId: "a1", fileName: "chart.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 1000 } } as express.Request, {} as express.Response);
+    expect(result).toEqual({ obj: { error: "unsupported_audio_format" }, status: 400 });
+  });
+
+  it("still presigns arrangement audio as before", async () => {
+    const getUploadUrl = jest.fn(async () => ({ url: "https://s3.example/post" }));
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: { getUploadUrl } });
+    const { controller } = makeWriteController();
+    await controller.getUploadUrl({ body: { contentType: "arrangement", contentId: "a1", fileName: "mix.mp3", mimeType: "audio/mpeg", size: 1000 } } as express.Request, {} as express.Response);
+    expect(getUploadUrl).toHaveBeenCalledWith("/c1/files/arrangement/a1/mix.mp3", "audio/mpeg", 1000);
+  });
+
+  it("does not require PDF bytes for PDFs on other content types", async () => {
+    const getUploadUrl = jest.fn(async () => ({ url: "https://s3.example/post" }));
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: { getUploadUrl } });
+    const { controller } = makeWriteController();
+    await controller.getUploadUrl({ body: { contentType: "website", contentId: "", fileName: "bulletin.pdf", mimeType: "application/pdf", size: 1000 } } as express.Request, {} as express.Response);
+    expect(getUploadUrl).toHaveBeenCalled();
+  });
+});
+
 describe("FileController.save group-member authorization", () => {
   const groupAu = { churchId: "c1", checkAccess: () => false, groupIds: ["g1"] };
 
