@@ -14,7 +14,7 @@ const req = (body?: unknown) => ({ body } as express.Request);
 const res = {} as express.Response;
 const statusOf = (result: unknown) => (result as JsonResult).status;
 
-function setup<T extends SongDetailsController | SongDetailLinkController>(Ctrl: new () => T, opts: { exclusive?: boolean; serverAdmin?: boolean } = {}) {
+function setup<T extends SongDetailsController | SongDetailLinkController>(Ctrl: new () => T, opts: { exclusive?: boolean; serverAdmin?: boolean; noEdit?: boolean } = {}) {
   const repos = {
     songDetail: {
       isExclusiveTo: jest.fn(async () => opts.exclusive ?? false),
@@ -24,10 +24,11 @@ function setup<T extends SongDetailsController | SongDetailLinkController>(Ctrl:
     songDetailLink: {
       load: jest.fn(async () => ({ id: "l1", songDetailId: "sd1", service: "Spotify" })),
       save: jest.fn(async (l: SongDetailLink) => l),
-      delete: jest.fn()
+      delete: jest.fn(),
+      loadForChurchByService: jest.fn(async () => [{ id: "l1", songDetailId: "sd1", service: "CCLI", serviceKey: "22025" }])
     }
   };
-  const au = { churchId: "c1", checkAccess: (p: string) => p === "contentEdit" || (p === "serverAdmin" && !!opts.serverAdmin) };
+  const au = { churchId: "c1", checkAccess: (p: string) => (p === "contentEdit" && !opts.noEdit) || (p === "serverAdmin" && !!opts.serverAdmin) };
   const controller = new Ctrl();
   Object.assign(controller, {
     repos,
@@ -112,5 +113,20 @@ describe("SongDetailLinkController MusicBrainz key", () => {
     const result = await controller.save(req([{ songDetailId: "sd1", service: "MusicBrainz", serviceKey: key }]), res);
     expect((result as SongDetailLink[])[0].url).toBe("https://musicbrainz.org/recording/" + key);
     expect(repos.songDetailLink.save).toHaveBeenCalled();
+  });
+});
+
+describe("SongDetailLinkController.getForChurch", () => {
+  it("returns the church's links for one service", async () => {
+    const { controller, repos } = setup(SongDetailLinkController);
+    const result = await controller.getForChurch("CCLI", req(), res);
+    expect(repos.songDetailLink.loadForChurchByService).toHaveBeenCalledWith("c1", "CCLI");
+    expect(result).toEqual([expect.objectContaining({ serviceKey: "22025" })]);
+  });
+
+  it("refuses a user who cannot edit songs", async () => {
+    const { controller, repos } = setup(SongDetailLinkController, { noEdit: true });
+    expect(statusOf(await controller.getForChurch("CCLI", req(), res))).toBe(401);
+    expect(repos.songDetailLink.loadForChurchByService).not.toHaveBeenCalled();
   });
 });

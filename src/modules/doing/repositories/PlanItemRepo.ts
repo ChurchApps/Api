@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { PlanItem } from "../models/index.js";
 import { getDb } from "../db/index.js";
+import { mysqlValue } from "./sqlValues.js";
 
 @injectable()
 export class PlanItemRepo {
@@ -43,5 +44,19 @@ export class PlanItemRepo {
 
   public async loadForPlan(churchId: string, planId: string) {
     return getDb().selectFrom("planItems").selectAll().where("churchId", "=", churchId).where("planId", "=", planId).orderBy("sort").execute();
+  }
+
+  // Song items (arrangement keys) on the church's plans in a service date range, with each plan's date, for the song usage export.
+  public async loadSongsByDateRange(churchId: string, startDate: string, endDate: string) {
+    return getDb().selectFrom("planItems as pi")
+      .innerJoin("plans as p", (join) => join.onRef("p.id", "=", "pi.planId").onRef("p.churchId", "=", "pi.churchId"))
+      .select(["pi.id", "pi.planId", "pi.itemType", "pi.relatedId", "pi.label", "p.serviceDate", "p.name as planName"])
+      .where("pi.churchId", "=", churchId)
+      .where("pi.itemType", "in", ["arrangementKey", "song"])
+      .where("pi.relatedId", "is not", null)
+      .where("p.serviceDate", ">=", mysqlValue<Date>(startDate))
+      .where("p.serviceDate", "<=", mysqlValue<Date>(endDate + " 23:59:59"))
+      .orderBy("p.serviceDate")
+      .execute();
   }
 }

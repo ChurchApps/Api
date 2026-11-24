@@ -9,6 +9,15 @@ import { MusicBrainzHelper } from "../helpers/MusicBrainzHelper.js";
 export class SongDetailLinkController extends ContentBaseController {
   private static readonly MUSICBRAINZ_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+  // Declared before "/:id" so the id route does not swallow it.
+  @httpGet("/church/:service")
+  public async getForChurch(@requestParam("service") service: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      return await this.repos.songDetailLink.loadForChurchByService(au.churchId, service);
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {

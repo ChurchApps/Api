@@ -45,6 +45,17 @@ export class SongDetailLinkRepo {
       .orderBy("service").execute();
   }
 
+  // One service's links (e.g. CCLI) for every song in the church's library, for the song exports.
+  public async loadForChurchByService(churchId: string, service: string) {
+    return getDb().selectFrom("songDetailLinks as l")
+      .innerJoin("songs as s", "s.songDetailId", "l.songDetailId")
+      .selectAll("l")
+      .where("s.churchId", "=", churchId)
+      .where("l.service", "=", service)
+      .distinct()
+      .execute();
+  }
+
   public async loadByServiceAndKey(service: string, serviceKey: string) {
     return (await getDb().selectFrom("songDetailLinks").selectAll()
       .where("service", "=", service)
