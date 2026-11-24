@@ -6,6 +6,7 @@ import { getDb } from "../../db/index.js";
 import { SongRepo } from "../SongRepo.js";
 import { ArrangementRepo } from "../ArrangementRepo.js";
 import { SongDetailRepo } from "../SongDetailRepo.js";
+import { SongDetailLinkRepo } from "../SongDetailLinkRepo.js";
 
 // Records Kysely builder calls for assertion without DB execution.
 function recordingDb(results: { execute?: unknown; executeTakeFirst?: unknown } = {}) {
@@ -90,5 +91,18 @@ describe("SongDetailRepo.loadForChurch resolves identity from the song", () => {
     const joins = calls.filter((c) => c.method === "innerJoin");
     expect(joins.some((c) => c.args[0] === "songDetails as sd" && c.args[2] === "s.songDetailId")).toBe(true);
     expect(joins.some((c) => String(c.args[0]).startsWith("arrangements"))).toBe(false);
+  });
+});
+
+describe("SongDetailLinkRepo.loadForChurchByService", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("scopes the links to songs in the church's library", async () => {
+    const { proxy, calls } = recordingDb();
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new SongDetailLinkRepo().loadForChurchByService("c1", "CCLI");
+    expect(firstArg(calls, "innerJoin")).toBe("songs as s");
+    const wheres = calls.filter((c) => c.method === "where").map((c) => c.args);
+    expect(wheres).toEqual(expect.arrayContaining([["s.churchId", "=", "c1"], ["l.service", "=", "CCLI"]]));
   });
 });

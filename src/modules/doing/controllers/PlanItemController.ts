@@ -18,6 +18,18 @@ export class PlanItemController extends DoingBaseController {
     });
   }
 
+  // Declared before "/:id" so the id route does not swallow it.
+  @httpGet("/songs")
+  public async getSongsByDateRange(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit) && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const { startDate, endDate } = req.query as Record<string, string | undefined>;
+      const isDate = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
+      if (!isDate(startDate) || !isDate(endDate)) return this.json({ error: "startDate and endDate are required (YYYY-MM-DD)" }, 400);
+      return await this.repos.planItem.loadSongsByDateRange(au.churchId, startDate!, endDate!);
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
