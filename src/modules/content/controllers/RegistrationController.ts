@@ -614,10 +614,10 @@ export class RegistrationController extends ContentBaseController {
       if (!registration) return this.json({ error: "Registration not found" }, 404);
       if (registration.status !== "cancelled") return this.json({ error: "Registration is not cancelled" }, 400);
 
-      if (registration.personId) {
-        const existingRegs = await this.repos.registration.loadForEvent(au.churchId, registration.eventId);
-        if (existingRegs.some((r: Registration) => r.id !== id && r.personId === registration.personId && r.status !== "cancelled")) return this.json({ error: "Already registered for this event", code: "already-registered" }, 409);
-      }
+      // Neither the registrant nor anyone on it may have signed up again on another registration since.
+      const members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+      const alreadyRegistered = await this.repos.registration.loadRegisteredPersonIds(au.churchId, registration.eventId, this.linkedPersonIds(members, registration.personId), id);
+      if (alreadyRegistered.length > 0) return this.json({ error: "Already registered for this event", code: "already-registered", personIds: alreadyRegistered }, 409);
 
       const event = await this.repos.event.load(au.churchId, registration.eventId);
       const balance = RegistrationPricingHelper.num(registration.totalAmount) - RegistrationPricingHelper.num(registration.amountPaid);
@@ -631,7 +631,6 @@ export class RegistrationController extends ContentBaseController {
       };
 
       // The members count toward type capacity again now that the registration is active.
-      const members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
       const types = await this.repos.registrationType.loadForEvent(au.churchId, registration.eventId);
       for (const typeId of new Set(members.map((m: RegistrationMember) => m.registrationTypeId).filter(Boolean))) {
         const type = types.find((t: RegistrationType) => t.id === typeId);
@@ -677,7 +676,7 @@ export class RegistrationController extends ContentBaseController {
     });
   }
 
-  private linkedPersonIds(members: RegisterMemberInput[], registrantPersonId?: string): string[] {
+  private linkedPersonIds(members: { personId?: string }[], registrantPersonId?: string): string[] {
     return [...new Set([registrantPersonId, ...members.map((m) => m.personId)].filter((id): id is string => !!id))];
   }
 

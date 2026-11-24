@@ -487,9 +487,18 @@ describe("staff restore of a cancelled registration", () => {
   });
 
   it("refuses when the person has registered again since", async () => {
-    const { controller, repos } = makeController({ existing: cancelled(), existingRegs: [cancelled(), { id: "r2", eventId: "e1", personId: "p2", status: "confirmed" }] });
+    const { controller, repos } = makeController({ existing: cancelled(), registeredPersonIds: ["p2"] });
     const result = await restore(controller);
     expect(result.status).toBe(409);
+    expect(repos.registration.loadRegisteredPersonIds).toHaveBeenCalledWith("c1", "e1", ["p2"], "r1");
+    expect(repos.registration.restoreWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("refuses when an attendee on it has been registered again since", async () => {
+    const { controller, repos } = makeController({ existing: cancelled(), savedMembers: [{ id: "m1", personId: "p2kid", firstName: "K", lastName: "D" }], registeredPersonIds: ["p2kid"] });
+    const result = await restore(controller);
+    expect(result.status).toBe(409);
+    expect(repos.registration.loadRegisteredPersonIds).toHaveBeenCalledWith("c1", "e1", ["p2", "p2kid"], "r1");
     expect(repos.registration.restoreWithCapacityCheck).not.toHaveBeenCalled();
   });
 
