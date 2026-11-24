@@ -36,6 +36,7 @@ export class EventRepo {
       registrationCloseDate,
       tags: model.tags,
       formId: model.formId,
+      confirmationMessage: EventRepo.confirmationMessage(model) ?? null,
       approvalStatus: model.approvalStatus,
       requestedBy: model.requestedBy,
       resolvedBy: model.resolvedBy,
@@ -72,6 +73,8 @@ export class EventRepo {
       registrationCloseDate,
       tags: model.tags,
       formId: model.formId,
+      // Undefined leaves the stored message alone, so the calendar's event dialog (which never sends it) keeps it.
+      confirmationMessage: EventRepo.confirmationMessage(model),
       approvalStatus: model.approvalStatus,
       requestedBy: model.requestedBy,
       resolvedBy: model.resolvedBy,
@@ -83,6 +86,13 @@ export class EventRepo {
       notesPostRole: model.notesPostRole || null
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
+  }
+
+  // Blank clears the message; the column holds at most 2000 characters.
+  private static confirmationMessage(model: Event): string | null | undefined {
+    if (model.confirmationMessage === undefined) return undefined;
+    const message = (model.confirmationMessage || "").trim();
+    return message ? message.slice(0, 2000) : null;
   }
 
   public async delete(churchId: string, id: string) {
@@ -228,6 +238,7 @@ export class EventRepo {
       registrationCloseDate: row.registrationCloseDate,
       tags: row.tags,
       formId: row.formId,
+      confirmationMessage: row.confirmationMessage,
       approvalStatus: row.approvalStatus,
       requestedBy: row.requestedBy,
       resolvedBy: row.resolvedBy,

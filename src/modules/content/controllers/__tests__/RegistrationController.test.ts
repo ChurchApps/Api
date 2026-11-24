@@ -1,16 +1,19 @@
 import "reflect-metadata";
 import express from "express";
 
+const loadPersonMock = jest.fn(async (_churchId: string, _personId: string): Promise<{ householdId: string; email: string } | null> => ({ householdId: "h1", email: "person@example.com" }));
+// @churchapps/apihelper ships ESM that jest does not transform; a plain formatter stands in.
+jest.mock("@churchapps/apihelper", () => ({ CurrencyHelper: { formatCurrencyWithLocale: (n: number, currency: string) => (currency === "usd" ? "$" : currency.toUpperCase() + " ") + n.toFixed(2) } }));
 jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
   Permissions: { registrations: { view: "regView", edit: "regEdit" } },
-  RegistrationHelper: { sendConfirmationEmail: jest.fn(), sendCancellationEmail: jest.fn(), sendWaitlistAvailabilityEmail: jest.fn() },
+  RegistrationHelper: { sendConfirmationEmail: jest.fn(), sendCancellationEmail: jest.fn(), sendWaitlistAvailabilityEmail: jest.fn(), sendBalanceReminderEmail: jest.fn() },
   RegistrationPricingHelper: jest.requireActual("../../helpers/RegistrationPricingHelper").RegistrationPricingHelper
 }));
 const mockLoadHouseholdPeople = jest.fn(async (_churchId: string, _personIds: string[]) => [{ id: "p1", householdId: "h1" }, { id: "p1kid", householdId: "h1" }]);
 jest.mock("../../../../shared/modules/index", () => ({
   getMembershipModuleGateway: () => ({
-    loadPerson: jest.fn(async () => ({ householdId: "h1", email: "person@example.com" })),
+    loadPerson: (churchId: string, personId: string) => loadPersonMock(churchId, personId),
     loadChurch: jest.fn(async () => ({ name: "Grace", subDomain: "grace" })),
     loadHouseholdPeople: (churchId: string, personIds: string[]) => mockLoadHouseholdPeople(churchId, personIds),
     getOrCreateGuestPerson: jest.fn(async () => ({ personId: "guest1", householdId: "gh1", email: "guest@example.com" }))
@@ -24,6 +27,7 @@ jest.mock("../../helpers/AnonymousRateLimiter", () => ({ AnonymousRateLimiter: {
 jest.mock("../../../../shared/helpers/Environment", () => ({ Environment: { b1AdminRoot: "https://app.test", b1AppRoot: "https://{subdomain}.b1.test", supportEmail: "s@test" } }));
 
 import { RegistrationController } from "../RegistrationController.js";
+import { WebhookDispatcher } from "../../../../shared/webhooks/index.js";
 import { GatewayService } from "../../../../shared/helpers/GatewayService.js";
 import { RepoManager } from "../../../../shared/infrastructure/RepoManager.js";
 import { RegistrationHelper } from "../../helpers/index.js";
@@ -622,5 +626,86 @@ describe("answering questions after signup", () => {
     const result = (await controller.edit("r1", { body: { formSubmissionId: "fs1" } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(401);
     expect(repos.registration.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("cancel fires registration.cancelled", () => {
+  const emit = WebhookDispatcher.emit as jest.Mock;
+  beforeEach(() => emit.mockClear());
+
+  it("emits once, with the members, when a registration is cancelled", async () => {
+    const members = [{ id: "m1", firstName: "A", lastName: "B" }];
+    const { controller } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", status: "confirmed" }, savedMembers: members });
+    const result = (await controller.cancel("r1", { body: null } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe("cancelled");
+    const cancelled = emit.mock.calls.filter((c) => c[1] === "registration.cancelled");
+    expect(cancelled).toHaveLength(1);
+    expect(cancelled[0][0]).toBe("c1");
+    expect(cancelled[0][2]).toMatchObject({ id: "r1", eventId: "e1", personId: "p1", status: "cancelled", members });
+  });
+
+  it("does not emit when the registration was already cancelled", async () => {
+    const { controller, repos } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", status: "cancelled" } });
+    const result = (await controller.cancel("r1", { body: null } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(400);
+    expect(repos.registration.save).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
+  });
+});
+
+describe("balance reminders", () => {
+  const send = RegistrationHelper.sendBalanceReminderEmail as jest.Mock;
+  beforeEach(() => { send.mockClear(); loadPersonMock.mockClear(); });
+
+  const regs: Registration[] = [
+    { id: "owes", churchId: "c1", eventId: "e1", personId: "p1", status: "pending", totalAmount: "45.00" as unknown as number, amountPaid: "20.00" as unknown as number },
+    { id: "confirmedOwes", churchId: "c1", eventId: "e1", personId: "p2", status: "confirmed", totalAmount: 30, amountPaid: 0 },
+    { id: "paid", churchId: "c1", eventId: "e1", personId: "p3", status: "confirmed", totalAmount: 45, amountPaid: 45 },
+    { id: "free", churchId: "c1", eventId: "e1", personId: "p4", status: "confirmed", totalAmount: 0, amountPaid: 0 },
+    { id: "cancelled", churchId: "c1", eventId: "e1", personId: "p5", status: "cancelled", totalAmount: 45, amountPaid: 0 },
+    { id: "waitlisted", churchId: "c1", eventId: "e1", personId: "p6", status: "waitlisted", totalAmount: 45, amountPaid: 0 }
+  ];
+
+  it("emails each active registrant with a balance their total, paid, balance and pay link", async () => {
+    const { controller, repos } = makeController({ existingRegs: regs, event: { id: "e1", title: "Camp" } });
+    const result = (await controller.sendBalanceReminders("e1", { body: null } as express.Request, {} as express.Response)) as { sent: number };
+    expect(result).toEqual({ sent: 2 });
+    expect(repos.event.load).toHaveBeenCalledWith("c1", "e1");
+    expect(repos.registration.loadForEvent).toHaveBeenCalledWith("c1", "e1");
+    expect(loadPersonMock.mock.calls.map((c) => c[1])).toEqual(["p1", "p2"]);
+    expect(loadPersonMock.mock.calls.every((c) => c[0] === "c1")).toBe(true);
+    expect(send).toHaveBeenCalledTimes(2);
+    const [email, churchName, event, amounts, payUrl] = send.mock.calls[0];
+    expect(email).toBe("person@example.com");
+    expect(churchName).toBe("Grace");
+    expect(event.title).toBe("Camp");
+    expect(amounts).toEqual({ total: "$45.00", paid: "$20.00", balance: "$25.00" });
+    expect(payUrl).toBe("https://grace.b1.test/mobile/registrations");
+    expect(send.mock.calls[1][3]).toEqual({ total: "$30.00", paid: "$0.00", balance: "$30.00" });
+  });
+
+  it("does not count registrants without an email", async () => {
+    loadPersonMock.mockResolvedValueOnce({ householdId: "h1", email: "" });
+    const { controller } = makeController({ existingRegs: regs, event: { id: "e1", title: "Camp" } });
+    const result = (await controller.sendBalanceReminders("e1", { body: null } as express.Request, {} as express.Response)) as { sent: number };
+    expect(result).toEqual({ sent: 1 });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires Registrations Edit", async () => {
+    const { controller, repos } = makeController({ existingRegs: regs, checkAccess: false });
+    const result = (await controller.sendBalanceReminders("e1", { body: null } as express.Request, {} as express.Response)) as JsonResult;
+    expect(result.status).toBe(401);
+    expect(repos.registration.loadForEvent).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for an event outside the staff member's church", async () => {
+    const { controller, repos } = makeController({ existingRegs: regs });
+    repos.event.load.mockResolvedValueOnce(null);
+    const result = (await controller.sendBalanceReminders("other", { body: null } as express.Request, {} as express.Response)) as JsonResult;
+    expect(result.status).toBe(404);
+    expect(repos.event.load).toHaveBeenCalledWith("c1", "other");
+    expect(send).not.toHaveBeenCalled();
   });
 });

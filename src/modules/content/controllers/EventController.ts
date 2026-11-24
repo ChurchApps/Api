@@ -169,14 +169,14 @@ export class EventController extends ContentBaseController {
   @httpGet("/public/tag/:churchId/:tag")
   public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repos.event.loadByTag(churchId, tag);
+      return EventController.withoutPrivateFields(await this.repos.event.loadByTag(churchId, tag));
     });
   }
 
   @httpGet("/public/registerable/:churchId")
   public async getPublicRegisterable(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repos.event.loadRegistrationEnabled(churchId);
+      return EventController.withoutPrivateFields(await this.repos.event.loadRegistrationEnabled(churchId));
     });
   }
 
@@ -204,8 +204,13 @@ export class EventController extends ContentBaseController {
       if (!event) return null;
       const bookings = await this.repos.eventBooking.loadForEvent(churchId, id);
       const roomNames = bookings.filter((b) => b.roomId && b.status !== "rejected" && b.roomName).map((b) => b.roomName as string);
-      return { ...event, roomNames };
+      return { ...EventController.withoutPrivateFields([event])[0], roomNames };
     });
+  }
+
+  // Anonymous responses leave out the registration confirmation message: it is for registrants (often directions or a meeting link).
+  private static withoutPrivateFields(events: Event[]): Event[] {
+    return (events || []).map(({ confirmationMessage: _confirmationMessage, ...rest }) => rest);
   }
 
   private async loadPublicEvent(churchId: string, id: string): Promise<Event | null> {
@@ -221,7 +226,7 @@ export class EventController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const result = await this.repos.event.loadPublicForGroup(churchId, groupId);
       await CalendarHelper.addExceptionDates(result, this.repos);
-      return result;
+      return EventController.withoutPrivateFields(result);
     });
   }
 

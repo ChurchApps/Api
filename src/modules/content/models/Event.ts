@@ -18,6 +18,8 @@ export class Event {
   registrationCloseDate?: Date;
   tags?: string;
   formId?: string;
+  // Plain text added to the registration confirmation email.
+  confirmationMessage?: string;
   approvalStatus?: string;
   requestedBy?: string;
   resolvedBy?: string;

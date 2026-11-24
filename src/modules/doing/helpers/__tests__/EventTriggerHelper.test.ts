@@ -133,3 +133,20 @@ describe("EventTriggerHelper subscription.created", () => {
     expect(ExecutionHelper.startAndAttempt).toHaveBeenCalledWith(trigger, { type: "person", id: "p1", label: "Donald Clark" }, "subscription.created", expect.anything(), undefined);
   });
 });
+
+describe("EventTriggerHelper registration.cancelled", () => {
+  beforeEach(() => { jest.restoreAllMocks(); loadPersonMock.mockClear(); });
+
+  it("lists Event · Registration Cancelled with the same conditions as Registration Created", () => {
+    const created = EventTriggerHelper.fieldDefs().find(d => d.eventType === "registration.created");
+    const cancelled = EventTriggerHelper.fieldDefs().find(d => d.eventType === "registration.cancelled");
+    expect(cancelled.label).toBe("Event · Registration Cancelled");
+    expect(cancelled.recordType).toBe("registration");
+    expect(cancelled.fields.map(f => f.key)).toEqual(created.fields.map(f => f.key));
+  });
+
+  it("resolves the registrant as the subject with the event fact", async () => {
+    const result = await EventTriggerHelper["resolve"]("c1", "registration.cancelled", { id: "r1", personId: "p1", eventId: "e1" });
+    expect(result).toEqual([{ subject: { type: "person", id: "p1" }, facts: { "registration.eventId": "e1", "person.membershipStatus": "Visitor" } }]);
+  });
+});

@@ -157,6 +157,15 @@ const EVENT_DEFS: TriggerEventDef[] = [
     ]
   },
   {
+    eventType: "registration.cancelled",
+    label: "Event · Registration Cancelled",
+    recordType: "registration",
+    fields: [
+      { key: "registration.eventId", label: "Event", type: "select", optionsSource: "events" },
+      { key: "person.membershipStatus", label: "Registrant Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS }
+    ]
+  },
+  {
     eventType: "list.member.added",
     label: "List · Member Added",
     recordType: "list",
@@ -338,7 +347,8 @@ export class EventTriggerHelper {
         ];
       }
 
-      case "registration.created": {
+      case "registration.created":
+      case "registration.cancelled": {
         if (!payload.personId) return [];
         const person = await getMembershipModuleGateway().loadPerson(churchId, payload.personId);
         return [

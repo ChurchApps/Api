@@ -12,6 +12,7 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
 import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
+import { CurrencyHelper } from "@churchapps/apihelper";
 
 interface RegisterMemberInput { personId?: string; firstName: string; lastName: string; registrationTypeId?: string }
 interface RegisterSelectionInput { selectionId: string; quantity?: number; registrationMemberId?: string }
@@ -416,6 +417,40 @@ export class RegistrationController extends ContentBaseController {
     });
   }
 
+  // Emails each active registrant on the event who still owes money their total, paid, balance and the
+  // My Registrations pay link. Waitlisted registrations can't be paid yet, so they're skipped with cancelled ones.
+  @httpPost("/event/:eventId/balance-reminders")
+  public async sendBalanceReminders(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const event = await this.repos.event.load(au.churchId, eventId);
+      if (!event) return this.json({ error: "Event not found" }, 404);
+
+      const registrations: Registration[] = await this.repos.registration.loadForEvent(au.churchId, eventId);
+      const owing = registrations.filter((r) => (r.status === "pending" || r.status === "confirmed") && r.personId && this.balanceDue(r) > 0);
+      if (owing.length === 0) return { sent: 0 };
+
+      const church = await getMembershipModuleGateway().loadChurch(au.churchId);
+      const payUrl = this.payUrl(church);
+      const currency = await this.churchCurrency(au.churchId);
+      const money = (n: number) => CurrencyHelper.formatCurrencyWithLocale(n, currency);
+      let sent = 0;
+      for (const reg of owing) {
+        try {
+          const person = await getMembershipModuleGateway().loadPerson(au.churchId, reg.personId);
+          if (!person?.email) continue;
+          const total = RegistrationPricingHelper.num(reg.totalAmount);
+          const paid = RegistrationPricingHelper.num(reg.amountPaid);
+          await RegistrationHelper.sendBalanceReminderEmail(person.email, church?.name || "Church", event, { total: money(total), paid: money(paid), balance: money(this.balanceDue(reg)) }, payUrl, church?.timeZone);
+          sent++;
+        } catch (e) {
+          console.error("Failed to send balance reminder email", e);
+        }
+      }
+      return { sent };
+    });
+  }
+
   @httpGet("/person/:personId")
   public async getForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
@@ -542,7 +577,7 @@ export class RegistrationController extends ContentBaseController {
       if (!isSelf && !au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       if (registration.status === "waitlisted") return this.json({ error: "Registration is waitlisted" }, 409);
 
-      const balance = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.totalAmount) - RegistrationPricingHelper.num(registration.amountPaid));
+      const balance = this.balanceDue(registration);
       if (balance <= 0) return this.json({ error: "No balance due" }, 400);
 
       let email: string = null;
@@ -587,6 +622,8 @@ export class RegistrationController extends ContentBaseController {
       registration.status = "cancelled";
       registration.cancelledDate = new Date();
       const updated = await this.repos.registration.save(registration);
+      // Same shape as registration.created, fired only on the transition (an already-cancelled registration returned above).
+      await WebhookDispatcher.emit(au.churchId, "registration.cancelled", { ...updated, members: await this.repos.registrationMember.loadForRegistration(au.churchId, id) });
 
       const event = await this.repos.event.load(au.churchId, registration.eventId);
       try {
@@ -781,6 +818,29 @@ export class RegistrationController extends ContentBaseController {
     await this.repos.registrationPayment.save(payment);
   }
 
+  private balanceDue(registration: Registration): number {
+    return RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.totalAmount) - RegistrationPricingHelper.num(registration.amountPaid));
+  }
+
+  // The member site's My Registrations page, where a registrant pays a balance.
+  private payUrl(church: { subDomain?: string } | null): string | undefined {
+    return church?.subDomain ? AppUrlHelper.b1AppUrl(church.subDomain) + "/mobile/registrations" : undefined;
+  }
+
+  // The church currency: the first gateway's, else the church's "currency" setting, else usd (the apps' CurrencyHelper.loadCurrency rule).
+  private async churchCurrency(churchId: string): Promise<string> {
+    try {
+      const givingRepos = await RepoManager.getRepos<{ gateway: { loadAll(churchId: string): Promise<{ currency?: string }[]> } }>("giving");
+      const gateways = await givingRepos.gateway.loadAll(churchId);
+      if (Array.isArray(gateways) && gateways[0]?.currency) return gateways[0].currency.toLowerCase();
+      const membershipRepos = await RepoManager.getRepos<{ setting: { loadMulipleChurches(keyNames: string[], churchIds: string[]): Promise<{ value?: string }[]> } }>("membership");
+      const settings = await membershipRepos.setting.loadMulipleChurches(["currency"], [churchId]);
+      return (settings?.[0]?.value || "usd").toLowerCase();
+    } catch {
+      return "usd";
+    }
+  }
+
   private async notifyPromotion(churchId: string, promoted: Registration, event: Event): Promise<void> {
     try {
       if (!promoted.personId) return;
@@ -788,7 +848,7 @@ export class RegistrationController extends ContentBaseController {
       if (!person?.email) return;
       const church = await getMembershipModuleGateway().loadChurch(churchId);
       const priced = RegistrationPricingHelper.num(promoted.totalAmount) - RegistrationPricingHelper.num(promoted.amountPaid) > 0;
-      const payUrl = priced && church?.subDomain ? AppUrlHelper.b1AppUrl(church.subDomain) + "/mobile/registrations" : undefined;
+      const payUrl = priced ? this.payUrl(church) : undefined;
       await RegistrationHelper.sendWaitlistAvailabilityEmail(person.email, church?.name || "Church", event, payUrl);
     } catch (e) {
       console.error("Failed to send waitlist promotion email", e);
