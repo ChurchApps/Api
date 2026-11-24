@@ -35,6 +35,20 @@ export class DeliveryLogController extends MessagingBaseController {
     });
   }
 
+  // Recent failed sends for the person page. People editors only; the date, channel, address and error, never the message.
+  @httpGet("/person/:personId/failures")
+  public async loadFailuresByPerson(
+    @requestParam("personId") personId: string,
+      req: express.Request<{}, {}, null>,
+      res: express.Response
+  ): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json([], 401);
+      const rows = await this.repos.deliveryLog.loadFailuresByPerson(au.churchId, personId, 25);
+      return rows.map((r) => ({ attemptTime: r.attemptTime, deliveryMethod: r.deliveryMethod, deliveryAddress: r.deliveryAddress, errorMessage: r.errorMessage }));
+    });
+  }
+
   @httpGet("/person/:personId")
   public async loadByPerson(
     @requestParam("personId") personId: string,

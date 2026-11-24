@@ -30,6 +30,18 @@ describe("DeliveryLogRepo church-authored counts", () => {
   });
 });
 
+describe("DeliveryLogRepo.loadFailuresByPerson", () => {
+  it("selects only failed rows for one person in the church, newest first, limited, without message content", async () => {
+    const { db, queries } = capturingDb([]);
+    getDb.mockReturnValue(db);
+    await new DeliveryLogRepo().loadFailuresByPerson("c1", "p1", 25);
+    expect(queries).toHaveLength(1);
+    const { sql, parameters } = queries[0];
+    expect(sql).toBe("select `attemptTime`, `deliveryMethod`, `deliveryAddress`, `errorMessage` from `deliveryLogs` where `churchId` = ? and `personId` = ? and `success` = ? order by `attemptTime` desc limit ?");
+    expect(parameters).toEqual(["c1", "p1", false, 25]);
+  });
+});
+
 function contentTypes(parameters: readonly unknown[]): string[] {
   return parameters.filter((p): p is string => p === "email" || p === "formFollowUp" || p === "invite" || p === "workflowEmail");
 }
