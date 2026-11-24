@@ -16,6 +16,7 @@ export interface ForeignPersonRow {
 
 export interface ForeignChurchRow {
   name?: string;
+  subDomain?: string;
   registrationDate?: Date | string;
   city?: string;
   state?: string;
