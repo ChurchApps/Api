@@ -35,6 +35,7 @@ interface RegisterRequest {
   captchaPass?: string;
   paymentMethodId?: string;
   currency?: string;
+  payLater?: boolean;
 }
 
 // Payment fields shared by POST /register and POST /:id/pay.
@@ -183,6 +184,11 @@ export class RegistrationController extends ContentBaseController {
         couponId = coupon.id;
       }
 
+      // Staff adds and churches with no online giving already skip the charge; otherwise a member may
+      // skip it only when the event allows paying later.
+      const takesPayment = total > 0 && !staffAdd && await this.hasGateway(churchId);
+      if (takesPayment && data.payLater && !event.allowPayLater) return this.json({ error: "Pay later is not available for this event" }, 400);
+
       const registration: Registration = {
         churchId,
         eventId: data.eventId,
@@ -230,21 +236,23 @@ export class RegistrationController extends ContentBaseController {
         return this.json({ error: "Selection is at capacity", status: "selection-full", selectionId: choiceResult.fullSelectionId }, 409);
       }
 
-      // Charge when priced; free registrations are already confirmed. Staff adds and churches with no
-      // online giving stay pending with a balance due, paid later from /mobile/registrations or in person.
-      if (total > 0 && !staffAdd && await this.hasGateway(churchId)) {
+      // Charge when priced; free registrations are already confirmed. Staff adds, churches with no online
+      // giving and pay-later signups stay pending with a balance due, paid later from /mobile/registrations
+      // or in person. A type with a deposit charges only the deposit and leaves the rest as that balance.
+      if (takesPayment && !data.payLater) {
         if (!au?.id && !CaptchaPass.verify(req, churchId)) {
           await this.deleteCascade(churchId, registration.id);
           return this.json({ error: "Captcha verification required" }, 403);
         }
-        const charge = await this.processRegistrationCharge(churchId, total, data, { personId, email, name });
+        const dueNow = RegistrationPricingHelper.computeDueNow(activeTypes, activeSelections, members, choices, total);
+        const charge = await this.processRegistrationCharge(churchId, dueNow, data, { personId, email, name });
         if (!charge.ok) {
           await this.deleteCascade(churchId, registration.id);
           return this.json({ error: charge.error || "Payment failed" }, 400);
         }
         if (charge.requiresAction) return redact({ ...registration, members: memberResult.members, payment: charge.data });
-        await this.recordPayment(churchId, registration.id, charge, total, data.type, personId);
-        registration.amountPaid = total;
+        await this.recordPayment(churchId, registration.id, charge, dueNow, data.type, personId);
+        registration.amountPaid = dueNow;
         registration.status = "confirmed";
         await this.repos.registration.save(registration);
       }
@@ -272,7 +280,7 @@ export class RegistrationController extends ContentBaseController {
       return rows.map((r) => {
         const capacity = r.capacity == null ? null : Number(r.capacity);
         const used = Number(r.used) || 0;
-        return { ...r, price: r.price == null ? null : Number(r.price), remainingCapacity: capacity == null ? null : Math.max(0, capacity - used) };
+        return { ...r, price: r.price == null ? null : Number(r.price), depositAmount: r.depositAmount == null ? null : Number(r.depositAmount), remainingCapacity: capacity == null ? null : Math.max(0, capacity - used) };
       });
     });
   }
@@ -281,6 +289,7 @@ export class RegistrationController extends ContentBaseController {
   public async saveType(req: express.Request<{}, {}, RegistrationType[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      if (req.body.some((t) => !RegistrationPricingHelper.isValidDeposit(t))) return this.json({ error: "Deposit must be more than 0 and no more than the price" }, 400);
       const result: RegistrationType[] = [];
       for (const t of req.body) {
         t.churchId = au.churchId;
@@ -753,8 +762,11 @@ export class RegistrationController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
-      if (registration.personId !== au.personId && !au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const isStaff = au.checkAccess(Permissions.registrations.edit);
+      if (registration.personId !== au.personId && !isStaff) return this.json({}, 401);
       if (registration.status === "cancelled") return this.json({ error: "Already cancelled" }, 400);
+      const event = await this.repos.event.load(au.churchId, registration.eventId);
+      if (!isStaff && event?.allowSelfCancel === false) return this.json({ error: "This event does not allow cancelling online. Please contact the church." }, 403);
 
       registration.status = "cancelled";
       registration.cancelledDate = new Date();
@@ -762,7 +774,6 @@ export class RegistrationController extends ContentBaseController {
       // Same shape as registration.created, fired only on the transition (an already-cancelled registration returned above).
       await WebhookDispatcher.emit(au.churchId, "registration.cancelled", { ...updated, members: await this.repos.registrationMember.loadForRegistration(au.churchId, id) });
 
-      const event = await this.repos.event.load(au.churchId, registration.eventId);
       try {
         const person = registration.personId ? await getMembershipModuleGateway().loadPerson(au.churchId, registration.personId) : null;
         if (person?.email) {

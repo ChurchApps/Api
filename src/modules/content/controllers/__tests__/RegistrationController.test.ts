@@ -710,3 +710,101 @@ describe("balance reminders", () => {
     expect(send).not.toHaveBeenCalled();
   });
 });
+
+describe("member self-cancel setting", () => {
+  const existing = { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", status: "confirmed" };
+
+  it("refuses a member's own cancel when the event turns self-cancel off", async () => {
+    const { controller, repos } = makeController({ existing, auPersonId: "p1", checkAccess: false, event: { id: "e1", registrationEnabled: true, allowSelfCancel: false } });
+    const result = (await controller.cancel("r1", { body: null } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(403);
+    expect(repos.registration.save).not.toHaveBeenCalled();
+  });
+
+  it("still lets staff cancel when self-cancel is off", async () => {
+    const { controller, repos } = makeController({ existing: { ...existing }, auPersonId: "admin1", checkAccess: true, event: { id: "e1", registrationEnabled: true, allowSelfCancel: false } });
+    const result = (await controller.cancel("r1", { body: null } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe("cancelled");
+    expect(repos.registration.save).toHaveBeenCalled();
+  });
+
+  it("lets a member cancel when the setting is on or the event predates it", async () => {
+    for (const event of [{ id: "e1", allowSelfCancel: true }, { id: "e1" }]) {
+      const { controller } = makeController({ existing: { ...existing }, auPersonId: "p1", checkAccess: false, event });
+      const result = (await controller.cancel("r1", { body: null } as express.Request, {} as express.Response)) as RegResult;
+      expect(result.status).toBe("cancelled");
+    }
+  });
+});
+
+describe("pay later setting", () => {
+  const types = [{ id: "t1", price: "45.00", active: true }];
+  const body = { churchId: "c1", eventId: "e1", personId: "p1", payLater: true, members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] };
+
+  it("saves a pay-later registration with the full balance due when the event allows it", async () => {
+    const { controller } = makeController({ types, auPersonId: "p1", checkAccess: false, event: { id: "e1", registrationEnabled: true, allowPayLater: true } });
+    const result = (await controller.register({ body } as express.Request, {} as express.Response)) as RegResult;
+    expect(processCharge).not.toHaveBeenCalled();
+    expect(result.status).toBe("pending");
+    expect(result.totalAmount).toBe(45);
+    expect(result.amountPaid).toBe(0);
+  });
+
+  it("refuses pay later when the church has a gateway and the event does not allow it", async () => {
+    const { controller, repos } = makeController({ types, auPersonId: "p1", checkAccess: false, event: { id: "e1", registrationEnabled: true } });
+    const result = (await controller.register({ body } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.status).toBe(400);
+    expect(processCharge).not.toHaveBeenCalled();
+    expect(repos.registration.atomicInsertWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("accepts pay later without the setting when the church has no gateway", async () => {
+    (RepoManager.getRepos as jest.Mock).mockResolvedValueOnce({ gateway: { loadAll: jest.fn(async (): Promise<{ id: string; provider: string }[]> => []) } });
+    const { controller } = makeController({ types, auPersonId: "p1", checkAccess: false, event: { id: "e1", registrationEnabled: true } });
+    const result = (await controller.register({ body } as express.Request, {} as express.Response)) as RegResult;
+    expect(processCharge).not.toHaveBeenCalled();
+    expect(result.status).toBe("pending");
+  });
+});
+
+describe("attendee type deposits", () => {
+  const types = [{ id: "camper", price: "300.00", depositAmount: "50.00", active: true }, { id: "leader", price: "100.00", active: true }];
+  const selections = [{ id: "shirt", price: 15, active: true }];
+  const member = (registrationTypeId: string) => ({ firstName: "A", lastName: "B", registrationTypeId });
+
+  it("charges each deposit attendee's deposit plus full price for the rest, ignoring a client amount, and leaves a balance", async () => {
+    processCharge.mockResolvedValue({ success: true, transactionId: "tx9", data: { id: "tx9", status: "succeeded" } });
+    const { controller, repos } = makeController({ types, selections, auPersonId: "p1" });
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", amount: 1, members: [member("camper"), member("camper"), member("leader")], selections: [{ selectionId: "shirt", quantity: 2 }] } } as express.Request, {} as express.Response)) as RegResult;
+    // 2 x 50 deposit + 100 leader + 2 x 15 shirts
+    expect(processCharge.mock.calls[0][1].amount).toBe(230);
+    expect((repos.registrationPayment.save.mock.calls[0] as RegistrationPayment[])[0].amount).toBe(230);
+    expect(result.totalAmount).toBe(730);
+    expect(result.amountPaid).toBe(230);
+  });
+
+  it("never charges more than the discounted total", async () => {
+    processCharge.mockResolvedValue({ success: true, transactionId: "tx10", data: { id: "tx10", status: "succeeded" } });
+    const coupon = { id: "cp1", discountType: "amount", value: 280, active: true };
+    const { controller } = makeController({ types, coupon, auPersonId: "p1" });
+    await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", couponCode: "X", members: [member("camper")] } } as express.Request, {} as express.Response);
+    expect(processCharge.mock.calls[0][1].amount).toBe(20);
+  });
+
+  it("lets the member pay the remaining balance after a deposit", async () => {
+    processCharge.mockResolvedValue({ success: true, transactionId: "tx11", data: { id: "tx11", status: "succeeded" } });
+    const { controller } = makeController({ existing: { id: "r1", churchId: "c1", personId: "p1", totalAmount: 300, amountPaid: 50, status: "confirmed" }, auPersonId: "p1" });
+    const result = (await controller.pay("r1", { body: { provider: "stripe", token: "tok" } } as express.Request, {} as express.Response)) as RegResult;
+    expect(processCharge.mock.calls[0][1].amount).toBe(250);
+    expect(result.amountPaid).toBe(300);
+  });
+
+  it("rejects saving a deposit above the type price", async () => {
+    const { controller, repos } = makeController();
+    const save = jest.fn();
+    Object.assign(repos, { registrationType: { ...repos.registrationType, save } });
+    const result = (await controller.saveType({ body: [{ name: "Camper", price: 100, depositAmount: 150 }] } as express.Request, {} as express.Response)) as unknown as JsonResult;
+    expect(result.status).toBe(400);
+    expect(save).not.toHaveBeenCalled();
+  });
+});

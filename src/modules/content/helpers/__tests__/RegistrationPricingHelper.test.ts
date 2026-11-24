@@ -98,3 +98,34 @@ describe("RegistrationPricingHelper.validateCoupon", () => {
     expect(RegistrationPricingHelper.validateCoupon({ ...base, maxUses: 2 }, 1, 1, now).valid).toBe(true);
   });
 });
+
+describe("RegistrationPricingHelper deposits", () => {
+  const depositTypes = [
+    { id: "d1", price: "300.00", depositAmount: "50.00" },
+    { id: "d2", price: "100.00", depositAmount: "100.00" },
+    { id: "d3", price: "100.00", depositAmount: null }
+  ] as unknown as RegistrationType[];
+
+  it("uses a deposit only when it is below the price", () => {
+    expect(RegistrationPricingHelper.depositFor(depositTypes[0])).toBe(50);
+    expect(RegistrationPricingHelper.depositFor(depositTypes[1])).toBeNull();
+    expect(RegistrationPricingHelper.depositFor(depositTypes[2])).toBeNull();
+  });
+
+  it("charges deposits per attendee and full price for other types and add-ons", () => {
+    const members = [{ registrationTypeId: "d1" }, { registrationTypeId: "d1" }, { registrationTypeId: "d3" }];
+    const total = RegistrationPricingHelper.computeTotal(depositTypes, selections, members, [{ selectionId: "s1", quantity: 1 }]);
+    expect(total).toBe(712);
+    expect(RegistrationPricingHelper.computeDueNow(depositTypes, selections, members, [{ selectionId: "s1", quantity: 1 }], total)).toBe(212);
+  });
+
+  it("caps the amount due now at the discounted total", () => {
+    expect(RegistrationPricingHelper.computeDueNow(depositTypes, [], [{ registrationTypeId: "d1" }], [], 30)).toBe(30);
+  });
+
+  it("accepts an empty deposit or one from above zero up to the price", () => {
+    const valid = (depositAmount: unknown) => RegistrationPricingHelper.isValidDeposit({ price: 100, depositAmount } as unknown as RegistrationType);
+    for (const d of [undefined, null, "", 25, "100.00"]) expect(valid(d)).toBe(true);
+    for (const d of [0, -5, 100.01, "abc"]) expect(valid(d)).toBe(false);
+  });
+});

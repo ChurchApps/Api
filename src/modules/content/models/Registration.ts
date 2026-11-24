@@ -33,6 +33,7 @@ export class RegistrationType {
   name?: string;
   description?: string;
   price?: number;
+  depositAmount?: number;
   capacity?: number;
   minAgeYears?: number;
   maxAgeYears?: number;

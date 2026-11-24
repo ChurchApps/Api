@@ -1717,6 +1717,29 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-24_registration_payment_options": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "allowSelfCancel",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "allowPayLater",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "registrationTypes",
+     "column": "depositAmount",
+     "present": true
+    }
+   ],
+   "schemaChanges": 3
   }
  },
  "giving": {

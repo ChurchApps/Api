@@ -14,6 +14,8 @@ export class Event {
   registrationEnabled?: boolean;
   capacity?: number;
   waitlistEnabled?: boolean;
+  allowSelfCancel?: boolean;
+  allowPayLater?: boolean;
   registrationOpenDate?: Date;
   registrationCloseDate?: Date;
   tags?: string;
