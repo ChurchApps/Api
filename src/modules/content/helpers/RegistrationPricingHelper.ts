@@ -52,6 +52,38 @@ export class RegistrationPricingHelper {
     return this.round(total);
   }
 
+  // The per-attendee deposit for a type, or null when the type takes its full price at checkout.
+  static depositFor(type: RegistrationType): number | null {
+    if (type.depositAmount === undefined || type.depositAmount === null) return null;
+    const deposit = this.num(type.depositAmount);
+    if (deposit <= 0 || deposit >= this.num(type.price)) return null;
+    return deposit;
+  }
+
+  // Staff may leave the deposit empty; when set it must be above zero and no more than the price.
+  static isValidDeposit(type: RegistrationType): boolean {
+    const raw = type.depositAmount as unknown;
+    if (raw === undefined || raw === null || raw === "") return true;
+    const deposit = Number(raw);
+    return Number.isFinite(deposit) && deposit > 0 && deposit <= this.num(type.price);
+  }
+
+  // What checkout charges: each attendee's deposit where the type has one, full price for everything
+  // else (add-ons included), never more than the already-discounted total.
+  static computeDueNow(
+    types: RegistrationType[],
+    selections: RegistrationSelection[],
+    members: { registrationTypeId?: string }[],
+    choices: { selectionId?: string; quantity?: number }[],
+    total: number
+  ): number {
+    const depositPriced = types.map((t) => {
+      const deposit = this.depositFor(t);
+      return deposit === null ? t : { ...t, price: deposit };
+    });
+    return this.round(Math.min(total, this.computeTotal(depositPriced, selections, members, choices)));
+  }
+
   static validateCoupon(coupon: RegistrationCoupon | null | undefined, memberCount: number, usesCount: number, now: Date = new Date()): CouponValidation {
     if (!coupon || !coupon.id) return { valid: false, reason: "not-found" };
     if (coupon.active === false) return { valid: false, reason: "inactive" };
