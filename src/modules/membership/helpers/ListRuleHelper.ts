@@ -24,6 +24,21 @@ export class ListRuleHelper {
     return this.evaluate(churchId, list.rules, list.householdInclusion, repos, visited, list.createdByPersonId);
   }
 
+  // True when the rules (or any list they reference) filter on giving. Revealing who gave needs donation view.
+  public static async usesGiving(churchId: string, rules: ListRuleGroup | undefined, repos: Repos, visitedListIds: Set<string> = new Set<string>()): Promise<boolean> {
+    if (!rules) return false;
+    for (const c of rules.conditions ?? []) {
+      if (c.provider === "giving") return true;
+      if (c.provider === "list" && c.entityId && !visitedListIds.has(c.entityId)) {
+        visitedListIds.add(c.entityId);
+        const list = await repos.list.load(churchId, c.entityId);
+        if (list?.rules && await this.usesGiving(churchId, list.rules, repos, visitedListIds)) return true;
+      }
+    }
+    for (const g of rules.groups ?? []) if (await this.usesGiving(churchId, g, repos, visitedListIds)) return true;
+    return false;
+  }
+
   public static async evaluate(churchId: string, rules: ListRuleGroup, householdInclusion: string | undefined, repos: Repos, visitedListIds?: Set<string>, viewerPersonId?: string): Promise<string[]> {
     const ctx: EvalContext = { churchId, repos, visitedListIds: visitedListIds ?? new Set<string>(), viewerPersonId };
     let ids = await this.evaluateGroup(rules, ctx);
