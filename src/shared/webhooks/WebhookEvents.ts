@@ -10,7 +10,7 @@ export const WEBHOOK_EVENTS: Record<string, string[]> = {
   session: ["session.created"],
   formSubmission: ["form.submission.created"],
   event: ["event.created", "event.updated", "event.destroyed"],
-  registration: ["registration.created"],
+  registration: ["registration.created", "registration.cancelled"],
   list: ["list.member.added", "list.member.removed"]
 };
 

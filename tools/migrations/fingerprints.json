@@ -1706,6 +1706,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-24_event_confirmation_message": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "confirmationMessage",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "giving": {

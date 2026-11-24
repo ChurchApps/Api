@@ -20,6 +20,11 @@ describe("WebhookEvents catalog", () => {
     });
   });
 
+  it("includes registration.created and registration.cancelled", () => {
+    expect(isValidWebhookEvent("registration.created")).toBe(true);
+    expect(isValidWebhookEvent("registration.cancelled")).toBe(true);
+  });
+
   it("rejects unknown events", () => {
     expect(isValidWebhookEvent("donation.refunded")).toBe(false);
   });
