@@ -4,9 +4,10 @@ import { Playlist, Sermon, Setting } from "../models/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { YouTubeHelper, Environment, VimeoHelper, OpenAiHelper } from "../helpers/index.js";
-import { FileStorageHelper } from "@churchapps/apihelper";
+import { FileStorageHelper, EnvironmentBase } from "@churchapps/apihelper";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
+import { PersonFileStorage } from "../helpers/PersonFileStorage.js";
 
 interface TvFeedSermonNode { id: string; name: string; description: string; image: string; apiUrl: string }
 interface TvFeedPlaylistNode { id: string; name: string; description: string; image: string; children: TvFeedSermonNode[] }
@@ -269,6 +270,28 @@ export class SermonController extends ContentBaseController {
       if (!image) image = (await getMembershipModuleGateway().loadSetting(churchId, "logoLight")) || "";
       res.set("Content-Type", "application/rss+xml");
       res.send(this.buildPodcastRss(sermons, siteUrl, values.podcastTitle || church?.name || "Sermons", church?.name || "", image));
+    });
+  }
+
+  // Download links point here rather than relaying the bytes through B1App, whose request time limit cut long
+  // sermons off. Uploaded files get a signed link that saves under the sermon title; other hosts get a plain redirect.
+  @httpGet("/public/download/:churchId/:sermonId")
+  public async download(@requestParam("churchId") churchId: string, @requestParam("sermonId") sermonId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const sermon = await this.repos.sermon.loadById(sermonId, churchId);
+      const published = sermon && (!sermon.publishDate || new Date(sermon.publishDate).getTime() <= Date.now());
+      const url = published ? this.getEnclosureUrl(sermon) : "";
+      if (!/^https?:\/\//i.test(url)) return this.json({}, 404);
+      res.set("Cache-Control", "private, no-store");
+      const root = (Environment.contentRoot || "").replace(/\/$/, "");
+      const base = url.split("?")[0];
+      if (EnvironmentBase.fileStore === "S3" && /^https?:\/\//i.test(root) && base.startsWith(root + "/")) {
+        const key = base.substring(root.length);
+        const ext = (key.match(/\.[A-Za-z0-9]{1,5}$/) || [""])[0];
+        res.redirect(302, await PersonFileStorage.s3DownloadUrl(key, (sermon.title || "sermon") + ext));
+        return;
+      }
+      res.redirect(302, url);
     });
   }
 

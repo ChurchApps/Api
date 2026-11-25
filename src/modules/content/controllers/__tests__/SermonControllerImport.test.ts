@@ -9,6 +9,7 @@ jest.mock("../../helpers/index", () => ({
   Environment: {}
 }));
 jest.mock("@churchapps/apihelper", () => ({ FileStorageHelper: {} }));
+jest.mock("../../helpers/PersonFileStorage", () => ({ PersonFileStorage: {} }));
 jest.mock("../../helpers/AnonymousRateLimiter", () => ({ AnonymousRateLimiter: { consume: jest.fn(async () => true), ipBucket: jest.fn() } }));
 jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { streamingServices: { edit: "streamingEdit" } } }));
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({}) }));
