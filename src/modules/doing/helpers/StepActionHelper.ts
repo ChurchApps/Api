@@ -297,6 +297,6 @@ export class StepActionHelper {
   private static async setField(task: Task, config: StepActionConfig): Promise<void> {
     if (task.associatedWithType !== "person" || !task.associatedWithId || !config.field) return;
     await getMembershipModuleGateway().setPersonField(task.churchId || "", task.associatedWithId, config.field, config.value ?? "");
-    this.appendHistory(task, `Set ${config.field}`);
+    this.appendHistory(task, `Set ${config.fieldLabel || config.field}`);
   }
 }
