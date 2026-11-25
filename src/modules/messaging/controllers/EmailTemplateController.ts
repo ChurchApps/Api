@@ -1,5 +1,6 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import type { AuthenticatedUser } from "@churchapps/apihelper";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { EmailTemplate } from "../models/index.js";
 import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
@@ -87,6 +88,17 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
+  @httpPost("/preview")
+  public async previewPeople(req: express.Request<{}, {}, { personIds?: string[] }>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
+      const personIds = req.body?.personIds || [];
+      const members = personIds.length ? await this.getPersonEmailDetails(au.churchId, personIds) : [];
+      const eligibleCount = members.filter(m => m.email && m.email.trim() !== "").length;
+      return { totalMembers: members.length, eligibleCount, noEmailCount: members.length - eligibleCount };
+    });
+  }
+
   @httpGet("/:id")
   public async getOne(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
@@ -111,21 +123,24 @@ export class EmailTemplateController extends MessagingBaseController {
   }
 
   @httpPost("/send")
-  public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<unknown> {
+  public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[]; sendCopy?: boolean }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
-      const { subject, htmlContent, groupId, personIds } = req.body;
+      const { subject, htmlContent, groupId, personIds, sendCopy } = req.body;
       if (!subject || !htmlContent) return this.json({ error: "subject and htmlContent are required" }, 400);
       if (!groupId && (!personIds || personIds.length === 0)) return this.json({ error: "groupId or personIds is required" }, 400);
 
       let churchName = "";
       let appUrl = "";
+      let logoUrl: string | undefined;
       try {
         const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
         const churchRow = await membershipRepos.church.load(au.churchId, au.churchId);
         churchName = churchRow?.name || "";
         if (churchRow?.subDomain) appUrl = AppUrlHelper.b1AppUrl(churchRow.subDomain);
-      } catch { /* church name and site are optional */ }
+        const settings: { value?: string }[] = await membershipRepos.setting.loadMulipleChurches(["logoLight"], [au.churchId]);
+        logoUrl = TransactionalEmailHelper.logoUrl(settings?.[0]?.value);
+      } catch { /* church name, site and logo are optional */ }
       const church = { name: churchName };
 
       let members: GroupMemberEmailDetail[];
@@ -155,7 +170,7 @@ export class EmailTemplateController extends MessagingBaseController {
         const resolvedBody = MergeFieldHelper.resolve(htmlContent, person, church);
 
         try {
-          await TransactionalEmailHelper.sendTransactional(from, member.email, churchName || "B1", appUrl, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo);
+          await TransactionalEmailHelper.sendTransactional(from, member.email, churchName || "B1", appUrl, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo, logoUrl);
           successCount++;
           await ChurchEmailLimiter.settle(au.churchId, reserved[i], true);
         } catch (err) {
@@ -164,13 +179,16 @@ export class EmailTemplateController extends MessagingBaseController {
         }
       }
 
+      const copySent = sendCopy && successCount > 0 ? await this.sendCopyToSender(au, subject, htmlContent, church, from, logoUrl) : undefined;
+
       const noEmailCount = members.length - eligible.length;
       return {
         totalMembers: members.length,
         recipientCount: eligible.length,
         successCount,
         failCount,
-        noEmailCount
+        noEmailCount,
+        copySent
       };
     });
   }
@@ -182,6 +200,22 @@ export class EmailTemplateController extends MessagingBaseController {
       await this.repos.emailTemplate.delete(au.churchId, id);
       return this.json({});
     });
+  }
+
+  // The copy goes through the same limiter as the send, with merge fields filled in for the sender.
+  private async sendCopyToSender(au: AuthenticatedUser, subject: string, htmlContent: string, church: { name: string }, from: string, logoUrl?: string): Promise<boolean> {
+    if (!au.email) return false;
+    const reserved = await ChurchEmailLimiter.reserve(au.churchId, "email", [{ address: au.email, personId: au.personId }]);
+    if (!reserved) return false;
+    const sender = { firstName: au.firstName || "", lastName: au.lastName || "", displayName: [au.firstName, au.lastName].filter(Boolean).join(" "), email: au.email };
+    try {
+      await TransactionalEmailHelper.sendTransactional(from, au.email, church.name || "B1", "", MergeFieldHelper.resolve(subject, sender, church), MergeFieldHelper.resolve(htmlContent, sender, church), "ChurchEmailTemplate.html", undefined, logoUrl);
+      await ChurchEmailLimiter.settle(au.churchId, reserved[0], true);
+      return true;
+    } catch (err) {
+      await ChurchEmailLimiter.settle(au.churchId, reserved[0], false, (err as Error)?.message || "Send failed");
+      return false;
+    }
   }
 
   private async getGroupMemberEmailDetails(churchId: string, groupId: string): Promise<GroupMemberEmailDetail[]> {

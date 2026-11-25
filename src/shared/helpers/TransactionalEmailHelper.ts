@@ -12,6 +12,11 @@ export class TransactionalEmailHelper {
     return `"${display}" <${address}>`;
   }
 
+  // A church's logoLight setting, when it is safe to put in an email (https only, so mail clients don't block it).
+  static logoUrl(stored?: string | null): string | undefined {
+    return typeof stored === "string" && /^https:\/\//i.test(stored) ? stored : undefined;
+  }
+
   static sendTransactional(
     from: string,
     to: string,

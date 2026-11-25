@@ -41,6 +41,7 @@ export interface ForeignGroupMemberRow {
 }
 
 export interface MembershipRepos {
+  setting: { loadMulipleChurches(keyNames: string[], churchIds: string[]): Promise<{ keyName?: string; value?: string }[]> };
   person: {
     loadByIds(churchId: string, ids: string[]): Promise<ForeignPersonRow[]>;
     loadByIdsOnly(ids: string[]): Promise<ForeignPersonRow[]>;

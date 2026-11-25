@@ -56,3 +56,12 @@ describe("TransactionalEmailHelper.fromAddress", () => {
     expect(TransactionalEmailHelper.fromAddress("Grace Church", "noreply@example.org")).toBe('"Grace Church" <noreply@example.org>');
   });
 });
+
+describe("TransactionalEmailHelper.logoUrl", () => {
+  it("keeps an https logo and drops anything else", () => {
+    expect(TransactionalEmailHelper.logoUrl("https://cdn.x.org/logo.png")).toBe("https://cdn.x.org/logo.png");
+    expect(TransactionalEmailHelper.logoUrl("http://cdn.x.org/logo.png")).toBeUndefined();
+    expect(TransactionalEmailHelper.logoUrl("")).toBeUndefined();
+    expect(TransactionalEmailHelper.logoUrl(null)).toBeUndefined();
+  });
+});
