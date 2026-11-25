@@ -3,6 +3,7 @@ import express from "express";
 jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({ YouTubeHelper: {}, VimeoHelper: {}, OpenAiHelper: {}, Environment: {} }));
 jest.mock("@churchapps/apihelper", () => ({ FileStorageHelper: {} }));
+jest.mock("../../helpers/PersonFileStorage", () => ({ PersonFileStorage: {} }));
 jest.mock("../../helpers/AnonymousRateLimiter", () => ({ AnonymousRateLimiter: {} }));
 jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { streamingServices: { edit: "streamingEdit" } } }));
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({}) }));
