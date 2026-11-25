@@ -411,28 +411,28 @@ describe("FormSubmissionController.save captcha", () => {
 
   it("refuses a signed-out submission without a captcha pass", async () => {
     const { controller, repos } = formSubmissionController({ au: { checkAccess: () => false } });
-    const result: any = await (controller as any).save({ body: [{ formId: "f1" }] }, {});
+    const result = (await controller.save(saveRequest([{ formId: "f1" }]), res)) as SaveResult;
     expect(result.status).toBe(403);
     expect(repos.formSubmission.save).not.toHaveBeenCalled();
   });
 
   it("refuses a pass issued for another church", async () => {
     const { controller, repos } = formSubmissionController({ au: { checkAccess: () => false } });
-    const result: any = await (controller as any).save({ body: [{ formId: "f1", captchaPass: CaptchaPass.create("c2") }] }, {});
+    const result = (await controller.save(saveRequest([{ formId: "f1", captchaPass: CaptchaPass.create("c2") } as FormSubmission]), res)) as SaveResult;
     expect(result.status).toBe(403);
     expect(repos.formSubmission.save).not.toHaveBeenCalled();
   });
 
   it("accepts a signed-out submission with a valid pass and doesn't store the pass", async () => {
     const { controller, repos } = formSubmissionController({ au: { checkAccess: () => false } });
-    await (controller as any).save({ body: [{ formId: "f1", captchaPass: CaptchaPass.create("c1") }] }, {});
+    await controller.save(saveRequest([{ formId: "f1", captchaPass: CaptchaPass.create("c1") } as FormSubmission]), res);
     expect(repos.formSubmission.save).toHaveBeenCalledTimes(1);
     expect(repos.formSubmission.save.mock.calls[0][0].captchaPass).toBeUndefined();
   });
 
   it("doesn't ask signed-in submitters for a pass", async () => {
     const { controller, repos } = formSubmissionController({ auChurchId: "c1", auId: "u1" });
-    await (controller as any).save({ body: [{ formId: "f1" }] }, {});
+    await controller.save(saveRequest([{ formId: "f1" }]), res);
     expect(repos.formSubmission.save).toHaveBeenCalledTimes(1);
   });
 });

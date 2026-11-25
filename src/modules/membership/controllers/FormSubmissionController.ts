@@ -134,7 +134,7 @@ export class FormSubmissionController extends MembershipBaseController {
         }
         const results: (FormSubmission | { error: string })[] = [];
         for (const formSubmission of req.body) {
-          delete (formSubmission as any).captchaPass;
+          delete (formSubmission as { captchaPass?: unknown }).captchaPass;
           const { formId } = formSubmission;
 
           const formAccess = await this.repos.form.access(formId);
