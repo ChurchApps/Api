@@ -2,7 +2,11 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
-import { Question } from "../models/index.js";
+import { Question, QuestionCondition } from "../models/index.js";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
+
+// A questions row as stored (showIf is the JSON string the repo wrote), or a model being read back after save.
+type QuestionRow = MembershipDatabase["questions"] | Question;
 
 @injectable()
 export class QuestionRepo {
@@ -25,6 +29,7 @@ export class QuestionRepo {
       sort: question.sort,
       required: question.required,
       choices,
+      showIf: QuestionRepo.serializeShowIf(question.showIf),
       removed: false
     }).execute();
     return question;
@@ -41,7 +46,8 @@ export class QuestionRepo {
       placeholder: question.placeholder,
       sort: question.sort,
       required: question.required,
-      choices
+      choices,
+      showIf: QuestionRepo.serializeShowIf(question.showIf)
     }).where("id", "=", question.id).where("churchId", "=", question.churchId).execute();
     return question;
   }
@@ -117,7 +123,7 @@ export class QuestionRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: Question): Question {
+  protected rowToModel(row: QuestionRow): Question {
     const result: Question = {
       id: row.id,
       churchId: row.churchId,
@@ -130,7 +136,8 @@ export class QuestionRepo {
       required: row.required,
       sort: row.sort,
       // Question.choices is typed as a string, but clients get the parsed array.
-      choices: QuestionRepo.parseChoices(row.choices) as string
+      choices: QuestionRepo.parseChoices(row.choices) as string,
+      showIf: QuestionRepo.parseShowIf(row.showIf)
     };
     return result;
   }
@@ -141,6 +148,21 @@ export class QuestionRepo {
       try { return JSON.stringify(JSON.parse(choices)); } catch { /* plain text, encode as-is */ }
     }
     return JSON.stringify(choices);
+  }
+
+  private static serializeShowIf(showIf: QuestionCondition | null | undefined) {
+    if (!showIf?.questionId) return null;
+    return JSON.stringify({ questionId: showIf.questionId, value: showIf.value || "" });
+  }
+
+  private static parseShowIf(raw: unknown): QuestionCondition | null {
+    if (!raw) return null;
+    try {
+      const value = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return value?.questionId ? { questionId: value.questionId, value: value.value || "" } : null;
+    } catch {
+      return null;
+    }
   }
 
   // Forms copied before the duplicate fix (#1097) hold choices JSON-encoded twice, so one
@@ -160,12 +182,12 @@ export class QuestionRepo {
     return Array.isArray(value) ? value : [];
   }
 
-  public convertToModel(_churchId: string, data: Question) {
+  public convertToModel(_churchId: string, data: QuestionRow) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: Question[]) {
+  public convertAllToModel(_churchId: string, data: QuestionRow[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

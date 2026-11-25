@@ -2,7 +2,10 @@ import "reflect-metadata";
 jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({ Permissions: { forms: { admin: "formsAdmin", edit: "formsEdit" } } }));
 jest.mock("../../db/index.js", () => ({ getDb: jest.fn() }));
-jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "genQ" } }));
+jest.mock("@churchapps/apihelper", () => {
+  let n = 0;
+  return { UniqueIdHelper: { shortId: () => "genQ" + (++n) } };
+});
 
 import express from "express";
 import { FormController } from "../FormController.js";
@@ -83,5 +86,31 @@ describe("FormController.duplicate choices round-trip (issue 1097)", () => {
     const model = questionRepo.convertToModel("c1", copied);
     expect(Array.isArray(model.choices)).toBe(true);
     expect(model.choices).toEqual(choices);
+  });
+
+  it("points a copied question's condition at the copy of its trigger question", async () => {
+    const rows: QuestionRow[] = [
+      { id: "q1", churchId: "c1", formId: "f1", title: "Attending?", fieldType: "Yes/No", sort: 1, removed: 0, showIf: null },
+      { id: "q2", churchId: "c1", formId: "f1", title: "Guests", fieldType: "Whole Number", sort: 2, removed: 0, showIf: JSON.stringify({ questionId: "q1", value: "True" }) }
+    ];
+    (getDb as jest.Mock).mockReturnValue(fakeDb(rows));
+
+    const questionRepo = new QuestionRepo();
+    const controller = new FormController();
+    const au = { churchId: "c1", id: "u1", personId: "p1", checkAccess: () => true };
+    Object.assign(controller, {
+      repos: {
+        form: { load: jest.fn(async () => ({ id: "f1", churchId: "c1", name: "RSVP" })), save: jest.fn(async (f: Form) => ({ ...f, id: "f2" })) },
+        question: questionRepo
+      },
+      actionWrapper: (_req: express.Request, _res: express.Response, action: (user: typeof au) => unknown) => action(au),
+      formAccess: jest.fn(async () => true)
+    });
+
+    await controller.duplicate("f1", {} as express.Request<{}, {}, null>, {} as express.Response);
+
+    const [trigger, dependent] = rows.filter((r) => r.formId === "f2");
+    expect(trigger.showIf).toBeNull();
+    expect(questionRepo.convertToModel("c1", dependent).showIf).toEqual({ questionId: trigger.id, value: "True" });
   });
 });
