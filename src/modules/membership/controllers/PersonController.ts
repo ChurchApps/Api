@@ -581,6 +581,8 @@ export class PersonController extends MembershipBaseController {
             person.conversationId = existing.conversationId;
             person.donorNumber = existing.donorNumber;
             person.importKey = existing.importKey;
+            // Admin-only safety flag (B1 Admin > Personal Details): a self-save must not clear it.
+            person.disablePrivateMessages = existing.disablePrivateMessages;
           }
           const isNew = !person.id;
           if (isNew && !person.householdId) {
@@ -770,10 +772,10 @@ export class PersonController extends MembershipBaseController {
   }
 
   // Stamps the derived allowDirectMessages flag so clients never do age math or fetch settings.
-  // sources must carry birthDate/householdRole (raw rows for basic models, the models themselves otherwise).
+  // sources must carry birthDate/householdRole/disablePrivateMessages (raw rows for basic models, the models themselves otherwise).
+  // The per-person "Disable private messages" flag applies even when the minimum-age rule is Off.
   private async appendAllowDirectMessages(models: Person[], sources: (MessagingSafetyPerson & { id?: string })[], au: AuthenticatedUser): Promise<Person[]> {
     const minimumAge = await this.getMessagingMinimumAge(au.churchId);
-    if (minimumAge <= 0) return models;
     const viewer = au.personId ? await this.repos.person.load(au.churchId, au.personId) : null;
     const viewerRestricted = MessagingSafetyHelper.isRestricted(viewer as MessagingSafetyPerson, minimumAge);
     const byId = new Map<string, MessagingSafetyPerson>();

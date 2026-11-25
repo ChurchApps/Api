@@ -125,6 +125,7 @@ export class PersonRepo {
       campusId: person.campusId,
       conversationId: person.conversationId,
       optedOut: person.optedOut,
+      disablePrivateMessages: person.disablePrivateMessages,
       nametagNotes: person.nametagNotes,
       donorNumber: person.donorNumber,
       importKey: person.importKey,
@@ -168,6 +169,7 @@ export class PersonRepo {
       campusId: person.campusId,
       conversationId: person.conversationId,
       optedOut: person.optedOut,
+      disablePrivateMessages: person.disablePrivateMessages,
       nametagNotes: person.nametagNotes,
       donorNumber: person.donorNumber,
       importKey: person.importKey
@@ -563,6 +565,7 @@ export class PersonRepo {
       importKey: row.importKey,
       optedOut: row.optedOut,
       smsOptedOut: row.smsOptedOut,
+      disablePrivateMessages: row.disablePrivateMessages,
       conversationId: row.conversationId
     };
     if (result.photo === undefined) result.photo = PersonHelper.getPhotoPath(row.churchId, result);
