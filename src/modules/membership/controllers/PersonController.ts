@@ -581,6 +581,8 @@ export class PersonController extends MembershipBaseController {
             person.conversationId = existing.conversationId;
             person.donorNumber = existing.donorNumber;
             person.importKey = existing.importKey;
+            // Admin-only safety flag (B1 Admin > Personal Details): a self-save must not clear it.
+            person.disablePrivateMessages = existing.disablePrivateMessages;
           }
           const isNew = !person.id;
           if (isNew && !person.householdId) {

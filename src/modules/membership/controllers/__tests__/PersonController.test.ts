@@ -45,6 +45,7 @@ interface PersonRow {
   conversationId?: string;
   donorNumber?: string;
   importKey?: string;
+  disablePrivateMessages?: boolean;
 }
 
 interface SettingRow { keyName: string; value: string; public?: number }
@@ -192,6 +193,22 @@ describe("PersonController.save authorization", () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: existing });
     await controller.save(saveReq([{ id: "p1", campusId: "cam2", conversationId: "victimConv", donorNumber: "7", importKey: "x" }]) as express.Request, res);
     expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ campusId: "cam1", conversationId: "conv1", donorNumber: "42", importKey: "imp1" }));
+  });
+
+  it("keeps an admin's Disable private messages flag when a member edits themselves (#1680)", async () => {
+    for (const sent of [false, null, undefined]) {
+      const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: { id: "p1", disablePrivateMessages: true } });
+      const body: Person = { id: "p1" };
+      if (sent !== undefined) (body as unknown as Record<string, unknown>).disablePrivateMessages = sent;
+      await controller.save(saveReq([body]) as express.Request, res);
+      expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ disablePrivateMessages: true }));
+    }
+  });
+
+  it("lets people.edit set and clear Disable private messages", async () => {
+    const { controller, repos } = personController({ access: ["peopleEdit"], person: { id: "p2", disablePrivateMessages: true } });
+    await controller.save(saveReq([{ id: "p2", disablePrivateMessages: false }]) as express.Request, res);
+    expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ disablePrivateMessages: false }));
   });
 
   it("blocks editSelf when body[0].id does not match the caller's personId", async () => {
