@@ -7,17 +7,19 @@ import { ArrayHelper } from "@churchapps/apihelper";
 import { TreeHelper } from "../helpers/TreeHelper.js";
 import * as churchappsHelpers from "@churchapps/helpers";
 
+type ElementAnswersValidator = { validateElementAnswers?: (elementType: string, answers: unknown) => string[] };
+
 @controller("/content/elements")
 export class ElementController extends ContentBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.element.load(au.churchId, id);
     });
   }
 
   @httpPost("/duplicate/:id")
-  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -33,7 +35,7 @@ export class ElementController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Element[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Element[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -60,11 +62,12 @@ export class ElementController extends ContentBaseController {
   // Rejects unparseable answersJSON (it would break tree loads) and, once the installed
   // @churchapps/helpers ships validateElementAnswers (>=1.7), type-level schema violations.
   private validateAnswers(elements: Element[]): string[] {
-    const validate = (churchappsHelpers as any).validateElementAnswers;
+    const validate = (churchappsHelpers as ElementAnswersValidator).validateElementAnswers;
     const errors: string[] = [];
     elements.forEach((element, index) => {
-      ["stylesJSON", "animationsJSON"].forEach((field) => {
-        const value = (element as any)[field];
+      const jsonFields: ("stylesJSON" | "animationsJSON")[] = ["stylesJSON", "animationsJSON"];
+      jsonFields.forEach((field) => {
+        const value = element[field];
         if (!value) return;
         try { JSON.parse(value); } catch { errors.push("elements[" + index + "]: " + field + " is not valid JSON"); }
       });
@@ -84,7 +87,7 @@ export class ElementController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -99,7 +102,7 @@ export class ElementController extends ContentBaseController {
     for (const element of elements) {
       if (element.elementType === "carousel" && element.answersJSON) {
         element.answers = JSON.parse(element.answersJSON);
-        const slidesNumber = parseInt(element.answers.slides, 0);
+        const slidesNumber = parseInt(element.answers.slides as string, 0);
         const slides: number[] = [];
         for (let i = 0; i < slidesNumber; i++) {
           slides.push(i);
@@ -137,9 +140,9 @@ export class ElementController extends ContentBaseController {
   }
 
   // Tolerates comma strings, arrays (older saves round-tripped `[]` back into answersJSON), and missing values.
-  private parseNumberList(value: any): number[] {
+  private parseNumberList(value: unknown): number[] {
     if (typeof value === "string" && value.length > 0) return value.split(",").map((c: string) => parseInt(c, 0)).filter((n: number) => !isNaN(n));
-    if (Array.isArray(value)) return value.map((c: any) => parseInt(c, 0)).filter((n: number) => !isNaN(n));
+    if (Array.isArray(value)) return value.map((c: unknown) => parseInt(c as string, 0)).filter((n: number) => !isNaN(n));
     return [];
   }
 
@@ -196,7 +199,7 @@ export class ElementController extends ContentBaseController {
     // Add new columns
     if (cols.length > children.length) {
       for (let i = children.length; i < cols.length; i++) {
-        const answers: any = { size: cols[i] };
+        const answers: Record<string, unknown> = { size: cols[i] };
         if (mobileSizes.length > i) answers.mobileSize = mobileSizes[i];
         if (mobileOrder.length > i) answers.mobileOrder = mobileOrder[i];
         const column: Element = {

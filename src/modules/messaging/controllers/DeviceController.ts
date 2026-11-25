@@ -10,7 +10,7 @@ import { DevicePairRateLimiter } from "../helpers/DevicePairRateLimiter.js";
 export class DeviceController extends MessagingBaseController {
   // authz-exempt: self-service device registration — lookup and new device churchId are forced to au.churchId from the JWT
   @httpPost("/enroll")
-  public async enroll(req: express.Request<{}, {}, Device>, res: express.Response): Promise<any> {
+  public async enroll(req: express.Request<{}, {}, Device>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Look up existing device by fcmToken and churchId (for mobile app registration)
       let result = await this.repos.device.loadByFcmToken(au.churchId, req.body.fcmToken);
@@ -70,7 +70,7 @@ export class DeviceController extends MessagingBaseController {
   }
 
   @httpPost("/enrollAnon")
-  public async enrollAnon(req: express.Request<{}, {}, Device>, res: express.Response): Promise<any> {
+  public async enrollAnon(req: express.Request<{}, {}, Device>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const pairingCode = await this.generateUniquePairingCode();
       const secret = crypto.randomBytes(16).toString("hex");
@@ -99,7 +99,7 @@ export class DeviceController extends MessagingBaseController {
   }
 
   @httpGet("/status/:deviceId")
-  public async status(@requestParam("deviceId") deviceId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async status(@requestParam("deviceId") deviceId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const device = await this.repos.device.loadByDeviceId(deviceId);
       if (!device) return { paired: false };
@@ -138,35 +138,35 @@ export class DeviceController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId")
-  public async loadByChurch(@requestParam("churchId") _churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
+  public async loadByChurch(@requestParam("churchId") _churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const data = await this.repos.device.loadByChurchId(au.churchId);
-      return this.repos.device.convertAllToModel(au.churchId, data as any[]);
-    }) as any;
+      return this.repos.device.convertAllToModel(au.churchId, data);
+    });
   }
 
   @httpGet("/:churchId/person/:personId")
-  public async loadByPerson(@requestParam("churchId") _churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
+  public async loadByPerson(@requestParam("churchId") _churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (personId !== au.personId && !au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const data = await this.repos.device.loadByPersonId(au.churchId, personId);
-      return this.repos.device.convertAllToModel(au.churchId, data as any[]);
-    }) as any;
+      return this.repos.device.convertAllToModel(au.churchId, data);
+    });
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device> {
+  public async loadById(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.device.loadById(au.churchId, id);
       if (data?.personId !== au.personId && !au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       return this.repos.device.convertToModel(au.churchId, data);
-    }) as any;
+    });
   }
 
   // authz-exempt: self-service device registration — every device's churchId is forced to au.churchId from the JWT before save
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Device[]>, res: express.Response): Promise<Device[]> {
+  public async save(req: express.Request<{}, {}, Device[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const ownerById = new Map<string, string>();
       for (const device of req.body) {
@@ -184,19 +184,19 @@ export class DeviceController extends MessagingBaseController {
         device.lastActiveDate = new Date();
         if (!device.registrationDate) device.registrationDate = new Date();
         promises.push(this.repos.device.save(device));
-      }) as any;
+      });
       const result = await Promise.all(promises);
-      return this.repos.device.convertAllToModel(au.churchId, result as any[]);
-    }) as any;
+      return this.repos.device.convertAllToModel(au.churchId, result);
+    });
   }
 
   @httpDelete("/:churchId/:id")
-  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existing = await this.repos.device.loadById(au.churchId, id);
       if (existing?.personId !== au.personId && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.device.delete(au.churchId, id);
       return this.json({});
-    }) as any;
+    });
   }
 }

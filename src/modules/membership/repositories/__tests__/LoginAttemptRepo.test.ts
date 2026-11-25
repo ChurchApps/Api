@@ -3,22 +3,28 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "la_gen" } }));
 
 import { Kysely, MysqlDialect } from "kysely";
+import type { CompiledQuery, MysqlPool } from "kysely";
 import { getDb } from "../../db/index.js";
 import { LoginAttemptRepo } from "../LoginAttemptRepo.js";
 
-function recordingDb(opts: { executeTakeFirst?: any } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+interface Call {
+  method: string;
+  args: unknown[];
+}
+
+function recordingDb(opts: { executeTakeFirst?: unknown } = {}) {
+  const calls: Call[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => [];
       if (prop === "executeTakeFirst") return async () => opts.executeTakeFirst ?? null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
-const whereCalls = (calls: any[]) => calls.filter((c) => c.method === "where");
+const whereCalls = (calls: Call[]) => calls.filter((c) => c.method === "where");
 
 describe("LoginAttemptRepo.loadCount", () => {
   afterEach(() => jest.restoreAllMocks());
@@ -47,10 +53,10 @@ describe("LoginAttemptRepo.increment", () => {
 
   it("issues one upsert that rolls the window over when the row has expired", async () => {
     // Real MySQL compiler, no connection: capture the statement instead of running it.
-    const mysql = new Kysely<any>({ dialect: new MysqlDialect({ pool: {} as any }) });
+    const mysql = new Kysely<never>({ dialect: new MysqlDialect({ pool: {} as MysqlPool }) });
     const executor = mysql.getExecutor();
-    let compiled: any = null;
-    jest.spyOn(executor as any, "executeQuery").mockImplementation(async (query: any) => { compiled = query; return { rows: [] }; });
+    let compiled: CompiledQuery | null = null;
+    jest.spyOn(executor, "executeQuery").mockImplementation(async (query) => { compiled = query; return { rows: [] }; });
     (getDb as jest.Mock).mockReturnValue({ getExecutor: () => executor });
 
     await new LoginAttemptRepo().increment("account|a@b.c", 900);

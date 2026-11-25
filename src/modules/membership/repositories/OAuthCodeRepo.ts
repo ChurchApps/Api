@@ -23,8 +23,8 @@ export class OAuthCodeRepo {
       scopes: authCode.scopes,
       codeChallenge: authCode.codeChallenge,
       codeChallengeMethod: authCode.codeChallengeMethod,
-      expiresAt: expiresAt as any,
-      createdAt: sql`NOW()` as any
+      expiresAt: sql<Date>`${expiresAt}`,
+      createdAt: sql<Date>`NOW()`
     }).execute();
     return authCode;
   }
@@ -37,7 +37,7 @@ export class OAuthCodeRepo {
       userChurchId: authCode.userChurchId,
       redirectUri: authCode.redirectUri,
       scopes: authCode.scopes,
-      expiresAt: expiresAt as any
+      expiresAt: sql<Date>`${expiresAt}`
     }).where("id", "=", authCode.id).execute();
     return authCode;
   }
@@ -64,9 +64,9 @@ export class OAuthCodeRepo {
   }
 
   public async deleteExpired() {
-    await getDb().deleteFrom("oAuthCodes").where("expiresAt", "<", sql`NOW()` as any).execute();
+    await getDb().deleteFrom("oAuthCodes").where("expiresAt", "<", sql<Date>`NOW()`).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: OAuthCode) { return data; }
+  public convertAllToModel(_churchId: string, data: OAuthCode[]) { return data || []; }
 }

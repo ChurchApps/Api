@@ -187,6 +187,18 @@ export interface Submission {
   submittedAt?: Date;
 }
 
+/** Asset-type fields as submitted; free-form JSON, with the song fields the server reads by name typed. */
+export interface SubmissionDetail {
+  writer?: string;
+  chordPro?: string;
+  scripture?: string;
+  songKey?: string;
+  bpm?: number;
+  proAnswer?: string;
+  masterLicense?: string;
+  [key: string]: unknown;
+}
+
 export interface SubmissionPayload {
   type?: string;
   name?: string;
@@ -198,8 +210,9 @@ export interface SubmissionPayload {
   attestationVersion?: string;
   attestedAt?: string;
   publisherChurchId?: string;
-  detail?: Record<string, any>;
-  qualityDetail?: any;
+  detail?: SubmissionDetail;
+  /** QualityHelper's breakdown: stored parsed, but older rows may hold the JSON string. */
+  qualityDetail?: string | Record<string, unknown>;
 }
 
 export interface AssetFile {

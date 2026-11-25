@@ -28,6 +28,16 @@ export interface ScoreInput {
   fileRoles?: string[];
 }
 
+/** The model's JSON reply (shape requested in SYSTEM_PROMPT); fields may be missing or non-numeric. */
+export interface LlmScoreDetail {
+  coherence?: unknown;
+  depth?: unknown;
+  craft?: unknown;
+  authenticity?: unknown;
+  notes?: string;
+  [key: string]: unknown;
+}
+
 export class QualityHelper {
   private static apiKey(): string {
     return Environment.openAiApiKey || process.env.OPENAI_API_KEY || "";
@@ -68,7 +78,7 @@ export class QualityHelper {
     return pts;
   }
 
-  public static async llmScore(song: ScoreInput): Promise<{ llm: number; detail: any }> {
+  public static async llmScore(song: ScoreInput): Promise<{ llm: number; detail: LlmScoreDetail }> {
     const lyrics = (song.chordPro || "").slice(0, 6000); // chords stay in: wrong-key chords are a quality signal
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -85,9 +95,9 @@ export class QualityHelper {
       })
     });
     if (!res.ok) throw new Error(`OpenAI returned ${res.status}`);
-    const body: any = await res.json();
-    const d = JSON.parse(body?.choices?.[0]?.message?.content || "{}");
-    const clamp = (n: any) => Math.max(0, Math.min(15, Number(n) || 0));
+    const body = await res.json() as { choices?: { message?: { content?: string } }[] };
+    const d = JSON.parse(body?.choices?.[0]?.message?.content || "{}") as LlmScoreDetail;
+    const clamp = (n: unknown) => Math.max(0, Math.min(15, Number(n) || 0));
     const llm = Math.round(clamp(d.coherence) + clamp(d.depth) + clamp(d.craft) + clamp(d.authenticity));
     return { llm, detail: d };
   }

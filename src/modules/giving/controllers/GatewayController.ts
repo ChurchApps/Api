@@ -5,14 +5,15 @@ import { Gateway } from "../models/index.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { GatewayInput } from "./types.js";
 
 @controller("/giving/gateways")
 export class GatewayController extends GivingBaseController {
   @httpGet("/churchId/:churchId")
-  public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      const rows = this.repos.gateway.convertAllToModel(churchId, (await this.repos.gateway.loadAll(churchId)) as any[]);
-      return rows.map((g: any) => ({
+      const rows = this.repos.gateway.convertAllToModel(churchId, await this.repos.gateway.loadAll(churchId));
+      return rows.map((g) => ({
         id: g.id,
         provider: g.provider,
         publicKey: g.publicKey,
@@ -25,16 +26,16 @@ export class GatewayController extends GivingBaseController {
   }
 
   @httpGet("/configured/:churchId")
-  public async isConfigured(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async isConfigured(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-      const hasConfiguredGateway = gateways.length > 0 && gateways.some((g: any) => g.privateKey && g.privateKey.trim() !== "");
+      const gateways: Gateway[] = await this.repos.gateway.loadAll(churchId);
+      const hasConfiguredGateway = gateways.length > 0 && gateways.some((g) => g.privateKey && g.privateKey.trim() !== "");
       return { configured: hasConfiguredGateway };
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
@@ -44,16 +45,16 @@ export class GatewayController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateways: Gateway[] = await this.repos.gateway.loadAll(au.churchId);
       if (au.checkAccess(Permissions.settings.edit)) return this.repos.gateway.convertAllToModel(au.churchId, gateways);
       return gateways.map(gateway => GivingBaseController.toPublicGateway(gateway));
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Gateway[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Gateway[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
@@ -106,16 +107,16 @@ export class GatewayController extends GivingBaseController {
             })
           );
 
-          return this.repos.gateway.convertAllToModel(au.churchId, savedGateways as any[]);
-        } catch (error: any) {
-          return this.json({ message: error?.message || "Failed to save gateway configuration" }, 400);
+          return this.repos.gateway.convertAllToModel(au.churchId, savedGateways);
+        } catch (error) {
+          return this.json({ message: (error as Error | null)?.message || "Failed to save gateway configuration" }, 400);
         }
       }
     });
   }
 
   @httpPatch("/:id")
-  public async update(@requestParam("id") id: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async update(@requestParam("id") id: string, req: express.Request<{}, {}, GatewayInput>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
@@ -133,7 +134,7 @@ export class GatewayController extends GivingBaseController {
           const environment = this.normalizeEnvironment(req.body.environment ?? existing.environment);
 
           const updatedGateway: Gateway = {
-            ...(existing as any),
+            ...existing,
             ...req.body,
             provider,
             settings: validatedSettings,
@@ -153,20 +154,20 @@ export class GatewayController extends GivingBaseController {
 
           await this.repos.gateway.save(updatedGateway);
           const refreshed = await this.repos.gateway.load(au.churchId, id);
-          return this.repos.gateway.convertToModel(au.churchId, refreshed as any);
-        } catch (error: any) {
-          return this.json({ message: error?.message || "Failed to update gateway" }, 400);
+          return this.repos.gateway.convertToModel(au.churchId, refreshed);
+        } catch (error) {
+          return this.json({ message: (error as Error | null)?.message || "Failed to update gateway" }, 400);
         }
       }
     });
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
-        const gateway = (await this.repos.gateway.load(au.churchId, id)) as any;
+        const gateway = (await this.repos.gateway.load(au.churchId, id)) as Gateway | null;
         if (gateway) {
           await GatewayService.deleteWebhooks(gateway, au.churchId);
         }
@@ -188,8 +189,8 @@ export class GatewayController extends GivingBaseController {
           return parsed as Record<string, unknown>;
         }
         throw new Error("Gateway settings must be a JSON object");
-      } catch (error: any) {
-        if (error?.message === "Gateway settings must be a JSON object") {
+      } catch (error) {
+        if ((error as Error | null)?.message === "Gateway settings must be a JSON object") {
           throw error;
         }
         throw new Error("Gateway settings must be valid JSON");
@@ -225,7 +226,7 @@ export class GatewayController extends GivingBaseController {
       return null;
     }
 
-    const validatedSettings = GatewayService.validateSettings({ provider, settings: normalizedSettings } as any);
+    const validatedSettings = GatewayService.validateSettings({ provider, settings: normalizedSettings });
     if (!validatedSettings) {
       throw new Error(`Invalid settings for provider ${provider}`);
     }

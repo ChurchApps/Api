@@ -4,11 +4,13 @@ import { ContentBaseController } from "./ContentBaseController.js";
 import Pexels from "pexels";
 import { Environment } from "../helpers/index.js";
 
+interface StockPhoto { description: string; url: string; photographer: string; photographerUrl: string; large: string; thumbnail: string }
+
 @controller("/content/stock")
 export class StockController extends ContentBaseController {
   // authz-exempt: open to any authenticated user — Pexels stock-photo search, no church data touched
   @httpPost("/search")
-  public async getUploadUrl(req: express.Request<{}, {}, { term: string }>, res: express.Response): Promise<any> {
+  public async getUploadUrl(req: express.Request<{}, {}, { term: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({}, 401);
       const key = Environment.pexelsKey;
@@ -17,7 +19,7 @@ export class StockController extends ContentBaseController {
         query: req.body.term,
         per_page: 50
       })) as Pexels.PhotosWithTotalResults;
-      const result: any[] = [];
+      const result: StockPhoto[] = [];
       response.photos.forEach((p) => {
         result.push({
           description: p.alt,

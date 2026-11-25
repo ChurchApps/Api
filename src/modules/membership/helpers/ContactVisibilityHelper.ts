@@ -1,5 +1,5 @@
-import { Permissions } from "./index.js";
-import type { Person } from "../models/index.js";
+import { Permissions, type IPermission } from "./index.js";
+import type { ContactInfo, Person } from "../models/index.js";
 import type { Repos } from "../repositories/index.js";
 
 // Church-wide default (settings.addressVisibility / phoneVisibility / emailVisibility) or a
@@ -21,7 +21,7 @@ interface ViewerAu {
   membershipStatus?: string;
   groupIds?: string[];
   leaderGroupIds?: string[];
-  checkAccess: (perm: any) => boolean;
+  checkAccess: (perm: IPermission) => boolean;
 }
 
 const ADDRESS_FIELDS = ["address1", "address2", "city", "state", "zip"] as const;
@@ -31,8 +31,8 @@ const EMAIL_FIELDS = ["email"] as const;
 // Single implementation of the per-field contact visibility rules, batched so list endpoints
 // cost three queries (church defaults, person prefs, target group memberships) regardless of size.
 export class ContactVisibilityHelper {
-  public static normalizeLevel(value: any): ContactVisibilityLevel {
-    return (CONTACT_VISIBILITY_LEVELS as readonly string[]).includes(value) ? (value as ContactVisibilityLevel) : "members";
+  public static normalizeLevel(value: unknown): ContactVisibilityLevel {
+    return (CONTACT_VISIBILITY_LEVELS as readonly unknown[]).includes(value) ? (value as ContactVisibilityLevel) : "members";
   }
 
   public static canSee(level: ContactVisibilityLevel, viewer: ContactVisibilityViewer): boolean {
@@ -86,7 +86,7 @@ export class ContactVisibilityHelper {
     const viewerLeads = new Set(au.leaderGroupIds || []);
     // The token's groups are fixed at sign-in, so a group joined or a leader role granted since then is read live.
     if (needsGroups && au.personId) {
-      const live = (await repos.groupMember.loadForPerson(au.churchId, au.personId)) as any[];
+      const live = (await repos.groupMember.loadForPerson(au.churchId, au.personId));
       live?.forEach((gm) => {
         viewerGroups.add(gm.groupId);
         if (gm.leader) viewerLeads.add(gm.groupId);
@@ -106,7 +106,7 @@ export class ContactVisibilityHelper {
         sharesGroup: targetGroups.some((g) => viewerGroups.has(g)),
         leadsGroup: targetGroups.some((g) => viewerLeads.has(g))
       };
-      const contactInfo: any = { ...(p.contactInfo || {}) };
+      const contactInfo: ContactInfo = { ...(p.contactInfo || {}) };
       if (!this.canSee(levels.address, viewer)) ADDRESS_FIELDS.forEach((f) => { contactInfo[f] = undefined; });
       if (!this.canSee(levels.phone, viewer)) PHONE_FIELDS.forEach((f) => { contactInfo[f] = undefined; });
       if (!this.canSee(levels.email, viewer)) EMAIL_FIELDS.forEach((f) => { contactInfo[f] = undefined; });
@@ -115,9 +115,9 @@ export class ContactVisibilityHelper {
   }
 
   private static async loadChurchDefaults(churchId: string, repos: Repos) {
-    const rows = repos.setting.convertAllToModel(churchId, (await repos.setting.loadPublicSettings(churchId)) as any[]);
-    const settings: any = {};
-    rows?.forEach((s: any) => { settings[s.keyName] = s.value; });
+    const rows = repos.setting.convertAllToModel(churchId, await repos.setting.loadPublicSettings(churchId));
+    const settings: Record<string, string> = {};
+    rows?.forEach((s) => { settings[s.keyName] = s.value; });
     return {
       address: settings.addressVisibility || "members",
       phone: settings.phoneVisibility || "members",
@@ -128,7 +128,7 @@ export class ContactVisibilityHelper {
   private static async loadPersonPrefs(churchId: string, personIds: string[], repos: Repos) {
     const result = new Map<string, { address?: string; phoneNumber?: string; email?: string }>();
     if (personIds.length === 0) return result;
-    const rows = (await repos.visibilityPreference.loadForPeople(churchId, personIds)) as any[];
+    const rows = (await repos.visibilityPreference.loadForPeople(churchId, personIds));
     rows?.forEach((r) => { if (r?.personId) result.set(r.personId, r); });
     return result;
   }
@@ -136,7 +136,7 @@ export class ContactVisibilityHelper {
   private static async loadTargetGroups(churchId: string, personIds: string[], repos: Repos) {
     const result = new Map<string, string[]>();
     if (personIds.length === 0) return result;
-    const rows = (await repos.groupMember.loadForPeople(personIds)) as any[];
+    const rows = (await repos.groupMember.loadForPeople(personIds));
     rows?.forEach((r) => {
       if (r.churchId && r.churchId !== churchId) return;
       if (!result.has(r.personId)) result.set(r.personId, []);

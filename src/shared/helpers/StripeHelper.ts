@@ -21,6 +21,9 @@ const STRIPE_ZERO_DECIMAL_CURRENCIES = new Set([
   "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"
 ]);
 
+// Paused gifts resume on the same method, so they count too.
+const LIVE_SUBSCRIPTION_STATUSES = new Set<string>(["active", "trialing", "past_due", "unpaid", "paused"]);
+
 export class StripeHelper {
   static donate = async (secretKey: string, payment: PaymentDetails) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
@@ -116,6 +119,29 @@ export class StripeHelper {
   static getCustomerSubscriptions = async (secretKey: string, customerId: string) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.subscriptions.list({ customer: customerId });
+  };
+
+  // Live subscriptions charged to the method, including ones that fall back to the customer's default.
+  static getActiveSubscriptionIdsUsingMethod = async (secretKey: string, customerId: string, paymentMethodId: string): Promise<string[]> => {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    const subs = await stripe.subscriptions.list({ customer: customerId, limit: 100 });
+    const live = subs.data.filter((s) => LIVE_SUBSCRIPTION_STATUSES.has(s.status));
+    const idOf = (ref: string | { id: string } | null | undefined) => (typeof ref === "string" ? ref : ref?.id) || null;
+    let customerDefaults: (string | null)[] | null = null;
+    const ids: string[] = [];
+    for (const sub of live) {
+      const own = idOf(sub.default_payment_method) || idOf(sub.default_source);
+      if (own) {
+        if (own === paymentMethodId) ids.push(sub.id);
+        continue;
+      }
+      if (!customerDefaults) {
+        const customer = await stripe.customers.retrieve(customerId);
+        customerDefaults = customer.deleted ? [] : [idOf((customer as Stripe.Customer).invoice_settings?.default_payment_method), idOf((customer as Stripe.Customer).default_source)];
+      }
+      if (customerDefaults.includes(paymentMethodId)) ids.push(sub.id);
+    }
+    return ids;
   };
 
   static getCharge = async (secretKey: string, chargeId: string) => {
@@ -297,6 +323,7 @@ export class StripeHelper {
     "charge.succeeded",  // Keep for backward compatibility during migration
     "charge.failed",     // Keep for backward compatibility during migration
     "charge.refunded",   // Refunds started from the Stripe dashboard reconcile back to the donation
+    "charge.dispute.closed",  // A lost dispute marks the donation refunded
     "customer.subscription.deleted"
   ];
 
@@ -416,9 +443,13 @@ export class StripeHelper {
     await givingRepos.donation.updateStatus(churchId, transactionId, status);
   }
 
-  static async createRefund(secretKey: string, params: { charge: string } | { payment_intent: string }) {
+  static async createRefund(secretKey: string, params: Stripe.RefundCreateParams, idempotencyKey?: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    return await stripe.refunds.create(params);
+    return idempotencyKey ? await stripe.refunds.create(params, { idempotencyKey }) : await stripe.refunds.create(params);
+  }
+
+  static toMinorUnits(amount: number, currency?: string): number {
+    return STRIPE_ZERO_DECIMAL_CURRENCIES.has((currency || "").toLowerCase()) ? Math.round(amount) : Math.trunc(Math.round(amount * 100));
   }
 
   static async payInvoice(secretKey: string, invoiceId: string) {

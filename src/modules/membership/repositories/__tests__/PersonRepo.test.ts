@@ -3,29 +3,35 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "per_gen" } }));
 jest.mock("../../helpers/index.js", () => ({
   __esModule: true,
-  PersonHelper: { getPhotoPath: (_c: string, p: any) => (p.photoUpdated ? "photo/" + p.id : ""), getDisplayNameFromPerson: (p: any) => p.name?.first + " " + p.name?.last },
-  DateHelper: { toMysqlDate: (d: any) => d ?? null, toMysqlDateOnly: (d: any) => d ?? null }
+  PersonHelper: {
+    getPhotoPath: (_c: string, p: Person) => (p.photoUpdated ? "photo/" + p.id : ""),
+    getDisplayNameFromPerson: (p: Person) => p.name?.first + " " + p.name?.last
+  },
+  DateHelper: { toMysqlDate: (d: Date | string | null | undefined) => d ?? null, toMysqlDateOnly: (d: Date | string | null | undefined) => d ?? null }
 }));
 jest.mock("../../../../shared/helpers/index.js", () => ({
   __esModule: true,
-  CollectionHelper: { convertAll: (data: any, convert: (row: any) => any) => (Array.isArray(data) ? data.map(convert) : []) }
+  CollectionHelper: { convertAll: <T>(data: unknown, convert: (row: unknown) => T) => (Array.isArray(data) ? data.map(convert) : []) }
 }));
 
 import { getDb } from "../../db/index.js";
 import { PersonRepo } from "../PersonRepo.js";
+import type { Person } from "../../models/index.js";
 
-function recordingDb(results: any[] = []) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+interface Call { method: string; args: unknown[] }
+
+function recordingDb(results: unknown[] = []) {
+  const calls: Call[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => results;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
-const whereCalls = (calls: any[]) => calls.filter((c) => c.method === "where");
+const whereCalls = (calls: Call[]) => calls.filter((c) => c.method === "where");
 
 describe("PersonRepo.search term handling", () => {
   it("wraps a single-word term in % wildcards", async () => {
@@ -138,7 +144,7 @@ describe("PersonRepo model conversion", () => {
   });
 
   it("convertAllToModel returns [] for non-array input", () => {
-    expect(new PersonRepo().convertAllToModel("c1", null as any)).toEqual([]);
+    expect(new PersonRepo().convertAllToModel("c1", null)).toEqual([]);
   });
 
   it("convertToModelWithPermissions strips conversationId when canEdit is false, keeps it when true", () => {
@@ -215,8 +221,8 @@ describe("PersonRepo.findPossibleDuplicates", () => {
 });
 
 describe("PersonRepo dateAdded stamp", () => {
-  const person = () => ({ churchId: "c1", name: { first: "Ann", last: "Lee" }, contactInfo: {} } as any);
-  const valuesOf = (calls: any[], method: string) => calls.find((c) => c.method === method)?.args[0];
+  const person = (): Person => ({ churchId: "c1", name: { first: "Ann", last: "Lee" }, contactInfo: {} });
+  const valuesOf = (calls: Call[], method: string) => calls.find((c) => c.method === method)?.args[0] as Record<string, unknown>;
 
   it("stamps dateAdded on insert and ignores a client-supplied value", async () => {
     const { proxy, calls } = recordingDb([]);
@@ -227,7 +233,7 @@ describe("PersonRepo dateAdded stamp", () => {
     await new PersonRepo().save(p);
     const values = valuesOf(calls, "values");
     expect(values.dateAdded).toBeInstanceOf(Date);
-    expect(values.dateAdded.getTime()).toBeGreaterThanOrEqual(before);
+    expect((values.dateAdded as Date).getTime()).toBeGreaterThanOrEqual(before);
   });
 
   it("never writes dateAdded on update", async () => {
@@ -257,16 +263,16 @@ describe("PersonRepo.loadRecent ordering", () => {
     const dateIdx = orders.findIndex((c) => c.args[0] === "dateAdded" && c.args[1] === "desc");
     expect(dateIdx).toBeGreaterThan(0);
     expect(orders[0].args[0]).not.toBe("id");
-    expect(result.map((r: any) => r.id)).toEqual(["z1", "a1"]);
+    expect(result.map((r) => r.id)).toEqual(["z1", "a1"]);
   });
 });
 
 describe("PersonRepo.findPossibleDuplicatePairs", () => {
-  function rawDb(rows: any[]) {
-    const queries: any[] = [];
+  function rawDb(rows: Record<string, unknown>[]) {
+    const queries: unknown[] = [];
     const executor = {
-      transformQuery: (node: any) => node,
-      compileQuery: (node: any) => { queries.push(node); return { sql: "", parameters: [], query: node }; },
+      transformQuery: (node: unknown) => node,
+      compileQuery: (node: unknown) => { queries.push(node); return { sql: "", parameters: [] as unknown[], query: node }; },
       executeQuery: async () => ({ rows })
     };
     return { db: { getExecutor: () => executor }, queries };

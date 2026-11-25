@@ -9,11 +9,12 @@ jest.mock("@churchapps/apihelper", () => ({
 const sendTemplatedEmailMock = jest.fn().mockResolvedValue(true);
 const sendPersonTextMock = jest.fn().mockResolvedValue({ ok: true });
 const addGroupMemberMock = jest.fn().mockResolvedValue(undefined);
+const setPersonFieldMock = jest.fn().mockResolvedValue(undefined);
 const loadPersonMock = jest.fn().mockResolvedValue({ email: "p@example.com" });
 const loadChurchMock = jest.fn().mockResolvedValue({ name: "Demo Church" });
 const recordAttendanceMock = jest.fn().mockResolvedValue(1);
 jest.mock("../../../../shared/modules/index.js", () => ({
-  getMembershipModuleGateway: () => ({ loadPerson: loadPersonMock, loadChurch: loadChurchMock, addGroupMember: addGroupMemberMock, setPersonField: jest.fn() }),
+  getMembershipModuleGateway: () => ({ loadPerson: loadPersonMock, loadChurch: loadChurchMock, addGroupMember: addGroupMemberMock, setPersonField: setPersonFieldMock }),
   getMessagingModuleGateway: () => ({ sendTemplatedEmail: sendTemplatedEmailMock, sendPersonText: sendPersonTextMock }),
   getAttendanceModuleGateway: () => ({ recordAttendance: recordAttendanceMock })
 }));
@@ -25,7 +26,7 @@ jest.mock("../../../../shared/helpers/NotificationService.js", () => ({ Notifica
 
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { b1AdminRoot: "https://admin.test" } }));
 
-const donationExtrasMock = jest.fn(async (_c: string, event: any) => (event?.donationId ? { amount: "$50.00", fund: "General Fund" } : {}));
+const donationExtrasMock = jest.fn(async (_c: string, event: EventContext | undefined) => (event?.donationId ? { amount: "$50.00", fund: "General Fund" } : {}));
 jest.mock("../DonationMergeHelper.js", () => ({ DonationMergeHelper: { extras: donationExtrasMock } }));
 
 jest.mock("../ConjunctionHelper.js", () => ({ ConjunctionHelper: { personMatchesStepRoute: jest.fn().mockResolvedValue(false) } }));
@@ -36,14 +37,21 @@ jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { 
 jest.mock("../../repositories/index.js", () => ({ Repos: class {} }));
 
 import { WorkflowHelper } from "../WorkflowHelper.js";
+import type { Repos } from "../../repositories/Repos.js";
+import type { Task, Workflow, WorkflowStepAction, WorkflowStepRoute } from "../../models/index.js";
+import type { HistoryEntry } from "../CardData.js";
+import type { EventContext } from "../EventContext.js";
+
+type FakeRepos = { [K in keyof Repos]?: { [M in keyof Repos[K]]?: Repos[K][M] extends (...args: infer A) => unknown ? (...args: A) => unknown : Repos[K][M] } };
+const asRepos = (fake: FakeRepos) => fake as Repos;
 
 interface FakeStep { id: string; workflowId: string; sort: number; name: string }
 
-function buildRepos(steps: FakeStep[], actionsByStep: Record<string, any[]>, routesByStep: Record<string, any[]> = {}) {
+function buildRepos(steps: FakeStep[], actionsByStep: Record<string, WorkflowStepAction[]>, routesByStep: Record<string, WorkflowStepRoute[]> = {}) {
   const stepsById: Record<string, FakeStep> = {};
   steps.forEach((s) => { stepsById[s.id] = s; });
   return {
-    workflow: { load: jest.fn(async () => null) },
+    workflow: { load: jest.fn(async (): Promise<Workflow | null> => null) },
     workflowStepAction: { loadForStep: jest.fn(async (_c: string, stepId: string) => actionsByStep[stepId] || []) },
     workflowStep: {
       load: jest.fn(async (_c: string, id: string) => stepsById[id] || null),
@@ -52,10 +60,10 @@ function buildRepos(steps: FakeStep[], actionsByStep: Record<string, any[]>, rou
     workflowStepRoute: { loadForStep: jest.fn(async (_c: string, stepId: string) => routesByStep[stepId] || []) },
     task: {
       loadMaxSortForStep: jest.fn(async () => 1),
-      save: jest.fn(async (t: any) => t),
-      loadSnoozedDueAllChurches: jest.fn(async () => [])
+      save: jest.fn(async (t: Task) => t),
+      loadSnoozedDueAllChurches: jest.fn(async (): Promise<Task[]> => [])
     }
-  } as any;
+  };
 }
 
 describe("WorkflowHelper on-enter actions", () => {
@@ -69,13 +77,13 @@ describe("WorkflowHelper on-enter actions", () => {
 
   it("runs a step's on-enter action and rests the card on that step", async () => {
     const repos = buildRepos(steps, { stepACT: [{ actionType: "addNote", config: JSON.stringify({ note: "hello" }) }] });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(task.stepId).toBe("stepACT"); // rests for a human; no auto-advance
     const data = JSON.parse(task.data);
-    expect(data.history.map((h: any) => h.message)).toContain("Note: hello");
+    expect(data.history.map((h: HistoryEntry) => h.message)).toContain("Note: hello");
   });
 
   it("runs on-enter actions and advances when an onEnter 'always' route is present", async () => {
@@ -84,20 +92,20 @@ describe("WorkflowHelper on-enter actions", () => {
       { stepACT: [{ actionType: "addNote", config: JSON.stringify({ note: "passing through" }) }] },
       { stepACT: [{ id: "r1", trigger: "onEnter", kind: "always", targetStepId: "stepB" }] }
     );
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(task.stepId).toBe("stepB"); // the always route advanced it after the action ran
-    expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("Note: passing through");
+    expect(JSON.parse(task.data).history.map((h: HistoryEntry) => h.message)).toContain("Note: passing through");
   });
 
   it("notifies the step's default assignee once when a card lands on them", async () => {
     const withDefault = steps.map((s) => (s.id === "stepACT" ? { ...s, defaultAssignToType: "person", defaultAssignToId: "p9", defaultAssignToLabel: "Donald Clark" } : s));
-    const repos = buildRepos(withDefault as any, {});
-    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", title: "Pat", associatedWithType: "person", associatedWithId: "p1" };
+    const repos = buildRepos(withDefault, {});
+    const task: Task = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", title: "Pat", associatedWithType: "person", associatedWithId: "p1" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(task.assignedToId).toBe("p9");
     expect(notifyMock).toHaveBeenCalledTimes(1);
@@ -106,10 +114,10 @@ describe("WorkflowHelper on-enter actions", () => {
 
   it("does not re-notify when the card already has an assignee", async () => {
     const withDefault = steps.map((s) => (s.id === "stepACT" ? { ...s, defaultAssignToType: "person", defaultAssignToId: "p9" } : s));
-    const repos = buildRepos(withDefault as any, {});
-    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", assignedToType: "person", assignedToId: "p5" };
+    const repos = buildRepos(withDefault, {});
+    const task: Task = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", assignedToType: "person", assignedToId: "p5" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(task.assignedToId).toBe("p5");
     expect(notifyMock).not.toHaveBeenCalled();
@@ -124,9 +132,9 @@ describe("WorkflowHelper on-enter actions", () => {
         { id: "r2", trigger: "onEnter", kind: "always", targetStepId: "stepB" }
       ]
     });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(task.stepId).toBe("stepB");
     expect(repos.task.save).toHaveBeenCalled();
@@ -134,9 +142,9 @@ describe("WorkflowHelper on-enter actions", () => {
 
   it("does NOT run on-enter actions on a manual (suppressed) move", async () => {
     const repos = buildRepos(steps, { stepACT: [{ actionType: "addNote", config: JSON.stringify({ note: "should not run" }) }] });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos, true); // manual move
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos), true); // manual move
 
     expect(task.stepId).toBe("stepACT");
     expect(task.data).toBeUndefined(); // no action ran, no history written
@@ -144,9 +152,9 @@ describe("WorkflowHelper on-enter actions", () => {
 
   it("parks the card on a delay action and saves a resume cursor", async () => {
     const repos = buildRepos(steps, { stepACT: [{ actionType: "delay", config: JSON.stringify({ days: 3 }) }] });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(task.stepId).toBe("stepACT"); // rests on the step while parked
     expect(task.snoozedUntil).toBeInstanceOf(Date);
@@ -162,14 +170,14 @@ describe("WorkflowHelper on-enter actions", () => {
         { actionType: "sendEmail", sort: 3, config: JSON.stringify({ templateId: "t2" }) }
       ]
     });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Pat" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Pat" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
     expect(sendTemplatedEmailMock).toHaveBeenCalledTimes(1); // first email sent on entry
     expect(JSON.parse(task.data).actionCursor).toEqual({ stepId: "stepACT", index: 2 });
 
     repos.task.loadSnoozedDueAllChurches = jest.fn(async () => [task]);
-    const count = await WorkflowHelper.processSnoozed(repos);
+    const count = await WorkflowHelper.processSnoozed(asRepos(repos));
 
     expect(count).toBe(1);
     expect(sendTemplatedEmailMock).toHaveBeenCalledTimes(2); // reminder sent after the wait
@@ -180,10 +188,10 @@ describe("WorkflowHelper on-enter actions", () => {
 
   it("notifies the assignee when an ordinary human snooze ends (no cursor)", async () => {
     const repos = buildRepos(steps, {});
-    const card: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", snoozedUntil: new Date(Date.now() - 1000), assignedToType: "person", assignedToId: "p1", title: "Follow up" };
+    const card: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", snoozedUntil: new Date(Date.now() - 1000), assignedToType: "person", assignedToId: "p1", title: "Follow up" };
     repos.task.loadSnoozedDueAllChurches = jest.fn(async () => [card]);
 
-    const count = await WorkflowHelper.processSnoozed(repos);
+    const count = await WorkflowHelper.processSnoozed(asRepos(repos));
 
     expect(count).toBe(1);
     expect(notifyMock).toHaveBeenCalled();
@@ -191,21 +199,54 @@ describe("WorkflowHelper on-enter actions", () => {
 
   it("clears the snooze with null so the saved card is not picked up again", async () => {
     const repos = buildRepos(steps, {});
-    const card: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", snoozedUntil: new Date(Date.now() - 1000), title: "Follow up" };
+    const card: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", snoozedUntil: new Date(Date.now() - 1000), title: "Follow up" };
     repos.task.loadSnoozedDueAllChurches = jest.fn(async () => [card]);
 
-    await WorkflowHelper.processSnoozed(repos);
+    await WorkflowHelper.processSnoozed(asRepos(repos));
 
     expect(repos.task.save).toHaveBeenCalledWith(expect.objectContaining({ snoozedUntil: null }));
   });
 
   it("runs a non-delay action (addToGroup) then rests", async () => {
     const repos = buildRepos(steps, { stepACT: [{ actionType: "addToGroup", config: JSON.stringify({ groupId: "g1", groupLabel: "Greeters" }) }] });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(addGroupMemberMock).toHaveBeenCalledWith("c1", "g1", "p1");
+    expect(task.stepId).toBe("stepACT");
+  });
+
+  it("sets a built-in person field", async () => {
+    const repos = buildRepos(steps, { stepACT: [{ actionType: "setField", config: JSON.stringify({ field: "membershipStatus", value: "Member" }) }] });
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
+
+    expect(setPersonFieldMock).toHaveBeenCalledWith("c1", "p1", "membershipStatus", "Member");
+    expect(JSON.parse(task.data).history.map((h: HistoryEntry) => h.message)).toContain("Set membershipStatus");
+  });
+
+  it("sets a custom person field and names it on the card", async () => {
+    const repos = buildRepos(steps, { stepACT: [{ actionType: "setField", config: JSON.stringify({ field: "personField_f1", fieldLabel: "Baptized", value: "True" }) }] });
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
+
+    expect(setPersonFieldMock).toHaveBeenCalledWith("c1", "p1", "personField_f1", "True");
+    expect(JSON.parse(task.data).history.map((h: HistoryEntry) => h.message)).toContain("Set Baptized");
+  });
+
+  it("records a field the gateway rejects on the card and keeps the card moving", async () => {
+    setPersonFieldMock.mockRejectedValueOnce(new Error("Invalid person field: personField_gone"));
+    const repos = buildRepos(steps, { stepACT: [{ actionType: "setField", config: JSON.stringify({ field: "personField_gone", fieldLabel: "Old field", value: "x" }) }] });
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
+
+    const messages = JSON.parse(task.data).history.map((h: HistoryEntry) => h.message);
+    expect(messages).toContain("Action setField failed: Invalid person field: personField_gone");
+    expect(messages).not.toContain("Set Old field");
     expect(task.stepId).toBe("stepACT");
   });
 });
@@ -221,9 +262,9 @@ describe("WorkflowHelper notifyPerson action", () => {
   it("emails and notifies the chosen person with the card's person, workflow, step and message", async () => {
     const repos = buildRepos(steps, { stepN: [{ actionType: "notifyPerson", config: JSON.stringify({ personId: "p9", personLabel: "Pastor", message: "Please call" }) }] });
     repos.workflow.load = jest.fn(async () => ({ id: "wf1", name: "Lapsed Givers" }));
-    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", title: "Check in", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+    const task: Task = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", title: "Check in", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
 
-    await WorkflowHelper.moveToStep(task, "stepN", repos);
+    await WorkflowHelper.moveToStep(task, "stepN", asRepos(repos));
 
     expect(notifyMock).toHaveBeenCalledTimes(1);
     expect(notifyMock).toHaveBeenCalledWith(
@@ -236,23 +277,23 @@ describe("WorkflowHelper notifyPerson action", () => {
       undefined,
       expect.objectContaining({ emailImmediate: true })
     );
-    expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("Notified Pastor");
+    expect(JSON.parse(task.data).history.map((h: HistoryEntry) => h.message)).toContain("Notified Pastor");
   });
 
   it("counts the email against the church email allowance, since it carries the church's message", async () => {
     const repos = buildRepos(steps, { stepN: [{ actionType: "notifyPerson", config: JSON.stringify({ personId: "p9", message: "Please call" }) }] });
-    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+    const task: Task = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
 
-    await WorkflowHelper.moveToStep(task, "stepN", repos);
+    await WorkflowHelper.moveToStep(task, "stepN", asRepos(repos));
 
     expect(notifyMock).toHaveBeenCalledWith(["p9"], "c1", "task", "t1", expect.any(String), expect.any(String), undefined, expect.objectContaining({ emailImmediate: true, churchAuthored: true }));
   });
 
   it("does nothing when no person is picked", async () => {
     const repos = buildRepos(steps, { stepN: [{ actionType: "notifyPerson", config: JSON.stringify({ message: "Please call" }) }] });
-    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+    const task: Task = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
 
-    await WorkflowHelper.moveToStep(task, "stepN", repos);
+    await WorkflowHelper.moveToStep(task, "stepN", asRepos(repos));
 
     expect(notifyMock).not.toHaveBeenCalled();
   });
@@ -266,15 +307,15 @@ describe("WorkflowHelper sendText action", () => {
     { id: "stepACT", workflowId: "wf1", sort: 2, name: "Auto" }
   ];
   const textAction = { actionType: "sendText", config: JSON.stringify({ message: "Hi {{firstName}}, welcome to {{churchName}}!" }) };
-  const newTask = (): any => ({ churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" });
-  const historyOf = (task: any): string[] => JSON.parse(task.data || "{}").history?.map((h: any) => h.message) || [];
+  const newTask = (): Task => ({ churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" });
+  const historyOf = (task: Task): string[] => JSON.parse(task.data || "{}").history?.map((h: HistoryEntry) => h.message) || [];
 
   it("sends the step's message to the person's mobile phone", async () => {
     loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", lastName: "Clark", mobilePhone: " 555-0100 " });
     const repos = buildRepos(steps, { stepACT: [textAction] });
     const task = newTask();
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(sendPersonTextMock).toHaveBeenCalledWith(
       "c1",
@@ -291,7 +332,7 @@ describe("WorkflowHelper sendText action", () => {
     loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", lastName: "Clark", mobilePhone: "555-0100", donorNumber: "1042" });
     const repos = buildRepos(steps, { stepACT: [textAction] });
 
-    await WorkflowHelper.moveToStep(newTask(), "stepACT", repos);
+    await WorkflowHelper.moveToStep(newTask(), "stepACT", asRepos(repos));
 
     expect(sendPersonTextMock.mock.calls[0][2]).toEqual(expect.objectContaining({ donorNumber: "1042" }));
   });
@@ -301,7 +342,7 @@ describe("WorkflowHelper sendText action", () => {
     const repos = buildRepos(steps, { stepACT: [textAction] });
     const task = newTask();
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(sendPersonTextMock).not.toHaveBeenCalled();
     expect(historyOf(task)).toContain("Text skipped: opted out");
@@ -312,7 +353,7 @@ describe("WorkflowHelper sendText action", () => {
     const repos = buildRepos(steps, { stepACT: [textAction] });
     const task = newTask();
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(sendPersonTextMock).not.toHaveBeenCalled();
     expect(historyOf(task)).not.toContain("Text sent");
@@ -325,7 +366,7 @@ describe("WorkflowHelper sendText action", () => {
     const repos = buildRepos(steps, { stepACT: [textAction, { actionType: "addNote", config: JSON.stringify({ note: "after" }) }] });
     const task = newTask();
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(historyOf(task)).toContain("Action sendText failed: no_provider");
     expect(historyOf(task)).toContain("Note: after");
@@ -343,9 +384,9 @@ describe("WorkflowHelper sendEmail action", () => {
   it("passes the person's first and last name so {{firstName}} resolves", async () => {
     loadPersonMock.mockResolvedValueOnce({ id: "p1", email: "donald@example.com", firstName: "Donald", lastName: "Clark" });
     const repos = buildRepos(steps, { stepACT: [{ actionType: "sendEmail", config: JSON.stringify({ templateId: "t1" }) }] });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(sendTemplatedEmailMock).toHaveBeenCalledWith(
       "c1",
@@ -361,9 +402,9 @@ describe("WorkflowHelper sendEmail action", () => {
   it("passes the person's donor number so {{donorNumber}} resolves", async () => {
     loadPersonMock.mockResolvedValueOnce({ id: "p1", email: "donald@example.com", firstName: "Donald", lastName: "Clark", donorNumber: "1042" });
     const repos = buildRepos(steps, { stepACT: [{ actionType: "sendEmail", config: JSON.stringify({ templateId: "t1" }) }] });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(sendTemplatedEmailMock.mock.calls[0][3]).toEqual(expect.objectContaining({ donorNumber: "1042" }));
   });
@@ -373,7 +414,7 @@ describe("WorkflowHelper sendEmail action", () => {
     const repos = buildRepos([{ id: "stepACT", workflowId: "wf1", sort: 1, name: "Auto" }], { stepACT: [{ actionType: "sendEmail", config: JSON.stringify({ templateId: "t1" }) }] });
     const event = { type: "donation.created", donationId: "d1", amount: 50, currency: "usd", method: "Check" };
 
-    const card = await WorkflowHelper.addToWorkflow("c1", "wf1", { type: "person", id: "p1", label: "Donald Clark" }, { type: "system", label: "Trigger" }, "t1", repos, undefined, 0, event);
+    const card = await WorkflowHelper.addToWorkflow("c1", "wf1", { type: "person", id: "p1", label: "Donald Clark" }, { type: "system", label: "Trigger" }, "t1", asRepos(repos), undefined, 0, event);
 
     expect(JSON.parse(card?.data || "{}").event).toEqual(event);
     expect(donationExtrasMock).toHaveBeenCalledWith("c1", event, "html");
@@ -401,29 +442,29 @@ describe("WorkflowHelper recordAttendance action", () => {
   it("records the person's attendance at the time the card was created", async () => {
     const repos = buildRepos(steps, { stepACT: [action] });
     const created = new Date("2026-10-25T23:50:00Z");
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", dateCreated: created };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", dateCreated: created };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(recordAttendanceMock).toHaveBeenCalledWith("c1", "p1", "g1", created);
-    expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("Attendance recorded: Sunday Night Service");
+    expect(JSON.parse(task.data).history.map((h: HistoryEntry) => h.message)).toContain("Attendance recorded: Sunday Night Service");
   });
 
   it("notes on the card when no scheduled service is in progress", async () => {
     recordAttendanceMock.mockResolvedValueOnce(0);
     const repos = buildRepos(steps, { stepACT: [action] });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
-    expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("No scheduled service in progress — attendance not recorded");
+    expect(JSON.parse(task.data).history.map((h: HistoryEntry) => h.message)).toContain("No scheduled service in progress — attendance not recorded");
   });
 
   it("skips a card that is not about a person", async () => {
     const repos = buildRepos(steps, { stepACT: [action] });
-    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "group", associatedWithId: "g9" };
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "group", associatedWithId: "g9" };
 
-    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(recordAttendanceMock).not.toHaveBeenCalled();
   });

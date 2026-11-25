@@ -1,5 +1,6 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { ScheduledNotification } from "../models/index.js";
 import { ScheduledNotificationHelper } from "../helpers/ScheduledNotificationHelper.js";
@@ -10,6 +11,19 @@ const MESSAGE_MAX = 240;
 const URL_MAX = 500;
 const IMMEDIATE_LEAD_MS = 60 * 1000; // a send time within a minute goes out now
 
+// The POST body as the client sends it; every field is validated below before use.
+interface ScheduledNotificationBody {
+  id?: string;
+  audience?: string;
+  groupId?: string;
+  title?: string;
+  message?: string;
+  link?: string;
+  imageUrl?: string;
+  sendAt?: string;
+  timeZone?: string;
+}
+
 // Scheduled push notifications (ChurchAppsSupport#1411). The everyone audience needs content.edit
 // (the people who manage the church's app); a group audience needs groupMembers.edit, as for an immediate group push.
 @controller("/messaging/scheduledNotifications")
@@ -19,11 +33,11 @@ export class ScheduledNotificationController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit) && !au.checkAccess(Permissions.content.edit)) return this.json({ error: "Unauthorized" }, 401);
       return await this.repos.scheduledNotification.loadForChurch(au.churchId);
-    }) as any;
+    });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+  public async save(req: express.Request<{}, {}, ScheduledNotificationBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const body = req.body || {};
       const audience = body.audience === "church" ? "church" : body.audience === "group" ? "group" : "";
@@ -70,7 +84,7 @@ export class ScheduledNotificationController extends MessagingBaseController {
       const result = await ScheduledNotificationHelper.sendNow(this.repos, saved);
       if (!result) return this.json({ error: "This notification is already being sent" }, 409);
       return { ...saved, status: "sent", ...result };
-    }) as any;
+    });
   }
 
   @httpPost("/:id/sendNow")
@@ -83,7 +97,7 @@ export class ScheduledNotificationController extends MessagingBaseController {
       const result = await ScheduledNotificationHelper.sendNow(this.repos, existing);
       if (!result) return this.json({ error: "This notification is already being sent" }, 409);
       return { ...existing, status: "sent", ...result };
-    }) as any;
+    });
   }
 
   // Clears the Recent list (ChurchAppsSupport#1456), limited to the audiences the caller can send to.
@@ -94,7 +108,7 @@ export class ScheduledNotificationController extends MessagingBaseController {
       if (audiences.length === 0) return this.json({ error: "Unauthorized" }, 401);
       const deleted = await this.repos.scheduledNotification.deleteFinished(au.churchId, audiences);
       return { deleted };
-    }) as any;
+    });
   }
 
   // Cancels a pending notification; removes a finished one from the Recent list.
@@ -111,10 +125,10 @@ export class ScheduledNotificationController extends MessagingBaseController {
       }
       if (!(await this.repos.scheduledNotification.delete(au.churchId, id))) return this.json({ error: "Not found" }, 404);
       return { ...existing, deleted: true };
-    }) as any;
+    });
   }
 
-  private canSendTo(au: any, audience?: string) {
+  private canSendTo(au: AuthenticatedUser, audience?: string) {
     if (audience === "church") return au.checkAccess(Permissions.content.edit);
     if (audience === "group") return au.checkAccess(Permissions.groupMembers.edit);
     return false;

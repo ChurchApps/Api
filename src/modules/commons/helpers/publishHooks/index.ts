@@ -1,4 +1,4 @@
-import { Asset, AssetFile, Submission } from "../../models/index.js";
+import { Asset, AssetFile, Submission, SubmissionDetail } from "../../models/index.js";
 import { MASTER_ATTESTATION } from "../AssetTypes.js";
 import { ContentLibraryHelper } from "../ContentLibraryHelper.js";
 import { packageRole, relativeName } from "../PackageLayout.js";
@@ -8,7 +8,7 @@ import { songPublishHook } from "./song.js";
 export interface PublishContext {
   asset: Asset;
   submission: Submission;
-  detail: Record<string, any>;
+  detail: SubmissionDetail;
   files: AssetFile[];
   /** what this approval added, replaced, removed or declined — hooks use it to invalidate derived state and credit uploads */
   filesChanged: { name: string; action: string }[];
@@ -59,9 +59,9 @@ async function previousRows(ctx: PublishContext): Promise<SourceRow[]> {
       const raw = await ctx.readFile(name);
       if (!raw) continue;
       const parsed = JSON.parse(raw.toString("utf8"));
-      const files = Array.isArray(parsed?.files) && parsed.files.every((r: any) => typeof r?.file === "string") ? parsed.files : null;
+      const files = Array.isArray(parsed?.files) && parsed.files.every((r: Partial<SourceRow> | null) => typeof r?.file === "string") ? parsed.files : null;
       const rows = files ?? (Array.isArray(parsed?.sources) ? parsed.sources : null);
-      if (rows) return rows.filter((r: any) => typeof r?.file === "string").map((r: any) => ({ ...r, file: sourceFileName(r.file) }));
+      if (rows) return rows.filter((r: Partial<SourceRow> | null) => typeof r?.file === "string").map((r: SourceRow) => ({ ...r, file: sourceFileName(r.file) }));
     } catch { /* no usable previous manifest */ }
   }
   return [];

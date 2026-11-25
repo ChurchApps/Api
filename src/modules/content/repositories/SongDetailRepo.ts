@@ -26,7 +26,7 @@ export class SongDetailRepo {
       seconds: model.seconds,
       meter: model.meter,
       tones: model.tones
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -44,7 +44,7 @@ export class SongDetailRepo {
       seconds: model.seconds,
       meter: model.meter,
       tones: model.tones
-    } as any).where("id", "=", model.id).execute();
+    }).where("id", "=", model.id).execute();
     return model;
   }
 
@@ -58,7 +58,7 @@ export class SongDetailRepo {
   }
 
   public async loadAll(_churchId: string): Promise<SongDetail[]> {
-    return getDb().selectFrom("songDetails").selectAll().orderBy("title").orderBy("artist").execute() as any;
+    return getDb().selectFrom("songDetails").selectAll().orderBy("title").orderBy("artist").execute();
   }
 
   // Global methods without churchId
@@ -77,7 +77,7 @@ export class SongDetailRepo {
         eb(sql`concat(title, ' ', artist)`, "like", q),
         eb(sql`concat(artist, ' ', title)`, "like", q)
       ]))
-      .execute() as any;
+      .execute();
   }
 
   // Global rows may only be changed by a church when no other church's songs point at them.
@@ -89,7 +89,7 @@ export class SongDetailRepo {
   }
 
   public async loadByPraiseChartsId(praiseChartsId: string): Promise<SongDetail | null> {
-    return (await getDb().selectFrom("songDetails").selectAll().where("praiseChartsId", "=", praiseChartsId).executeTakeFirst()) ?? null as any;
+    return (await getDb().selectFrom("songDetails").selectAll().where("praiseChartsId", "=", praiseChartsId).executeTakeFirst()) ?? null;
   }
 
   public async loadForChurch(churchId: string, limit?: number, offset?: number, search?: string) {
@@ -116,7 +116,7 @@ export class SongDetailRepo {
       query = query.offset(offset);
     }
 
-    return query.execute() as any;
+    return query.execute();
   }
 
   public async loadCountForChurch(churchId: string, search?: string) {
@@ -134,13 +134,13 @@ export class SongDetailRepo {
     }
 
     const result = await query.executeTakeFirst();
-    return (result as any)?.count || 0;
+    return result?.count || 0;
   }
 
-  public convertToModel(data: any) { return data as SongDetail; }
-  public convertAllToModel(data: any[]) { return (data || []) as SongDetail[]; }
+  public convertToModel(data: SongDetail) { return data; }
+  public convertAllToModel(data: SongDetail[]) { return data || []; }
 
-  protected rowToModel(row: any): SongDetail {
+  protected rowToModel(row: SongDetail): SongDetail {
     return {
       id: row.id,
       praiseChartsId: row.praiseChartsId,

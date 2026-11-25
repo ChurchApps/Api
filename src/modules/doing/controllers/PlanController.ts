@@ -2,21 +2,23 @@ import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
-import { PlanHelper } from "../helpers/PlanHelper.js";
-import { MatrixEmailHelper } from "../helpers/MatrixEmailHelper.js";
+import { AutofillContext, PlanHelper } from "../helpers/PlanHelper.js";
+import { MatrixEmailHelper, OverviewEmailRow } from "../helpers/MatrixEmailHelper.js";
 import { MatrixTextHelper } from "../helpers/MatrixTextHelper.js";
 import { SignupDeadlineHelper } from "../helpers/SignupDeadlineHelper.js";
 import { LessonTrimHelper } from "../helpers/LessonTrimHelper.js";
-import { Assignment, Plan, PlanItem, PlanItemTime, Position, Time } from "../models/index.js";
+import { Assignment, BlockoutDate, Plan, PlanItem, PlanItemTime, Position, SchedulingPreference, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanAuth, Permissions } from "../../../shared/helpers/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 
+type PlanCopyBody = Plan & { copyMode?: string; copyServiceOrder?: boolean; targetPlanId?: string };
+
 @controller("/doing/plans")
 export class PlanController extends DoingBaseController {
   @httpGet("/overview")
-  public async getOverview(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getOverview(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
@@ -28,14 +30,14 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpGet("/presenter")
-  public async getForPresenter(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPresenter(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.plan.load7Days(au.churchId);
     });
   }
 
   @httpGet("/ids")
-  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = typeof req.query.ids === "string" ? req.query.ids : req.query.ids ? String(req.query.ids) : "";
       if (!idsString) return this.json({ error: "Missing required parameter: ids" });
@@ -46,18 +48,18 @@ export class PlanController extends DoingBaseController {
 
   // Declared before "/:id" so the id route does not swallow it.
   @httpGet("/textRange")
-  public async textRangePreview(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async textRangePreview(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { startDate, endDate, ministryId, planTypeId } = req.query as Record<string, string | undefined>;
       if (!startDate || !endDate || !ministryId) return this.json({ error: "Missing required parameters: startDate, endDate, ministryId" }, 400);
       if (!au.checkAccess(Permissions.texting.send) || !await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
-      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
+      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as OverviewEmailRow[];
       return await MatrixTextHelper.preview(au.churchId, rows);
     });
   }
 
   @httpGet("/confirmationWorkflows")
-  public async confirmationWorkflows(req: express.Request, res: express.Response): Promise<any> {
+  public async confirmationWorkflows(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const ministryId = typeof req.query.ministryId === "string" ? req.query.ministryId : undefined;
       if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
@@ -67,35 +69,35 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.plan.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
-  public async getForAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.plan.loadAll(au.churchId);
     });
   }
 
   @httpGet("/types/:planTypeId")
-  public async getByPlanTypeId(@requestParam("planTypeId") planTypeId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByPlanTypeId(@requestParam("planTypeId") planTypeId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.plan.loadByPlanTypeId(au.churchId, planTypeId);
     });
   }
 
   @httpGet("/public/current/:planTypeId")
-  public async getCurrentByPlanType(@requestParam("planTypeId") planTypeId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getCurrentByPlanType(@requestParam("planTypeId") planTypeId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repos.plan.loadCurrentByPlanTypeId(planTypeId);
     });
   }
 
   @httpGet("/public/signup/:churchId")
-  public async getSignupPlans(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getSignupPlans(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       let plans: Plan[] = (await this.repos.plan.loadSignupPlans(churchId)) as Plan[];
       if (plans.length === 0) return [];
@@ -134,7 +136,7 @@ export class PlanController extends DoingBaseController {
 
   // Names stay off the anonymous signup endpoint; only signed-in members of the church see them.
   @httpGet("/signup/:planId/volunteers")
-  public async getSignupVolunteers(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getSignupVolunteers(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const plan = (await this.repos.plan.load(au.churchId, planId)) as Plan;
       if (!plan?.showVolunteerNames) return [];
@@ -164,12 +166,12 @@ export class PlanController extends DoingBaseController {
     const positions: Position[] = await this.repos.position.loadByPlanId(churchId, sourcePlanId) as Position[];
     const positionIdMap = new Map<string, string>();
     const timeIdMap = new Map<string, string>();
-    const promises: Promise<any>[] = [];
+    const promises: Promise<unknown>[] = [];
 
     // Copy times and track old->new id mapping
     for (const time of times) {
       const oldTimeId = time.id;
-      time.id = null as any;
+      time.id = null;
       time.planId = targetPlan.id;
       time.startTime = this.adjustTime(time.startTime || new Date(), targetPlan.serviceDate || new Date(), oldPlan.serviceDate || new Date());
       time.endTime = this.adjustTime(time.endTime || new Date(), targetPlan.serviceDate || new Date(), oldPlan.serviceDate || new Date());
@@ -180,7 +182,7 @@ export class PlanController extends DoingBaseController {
     // Copy positions and track old->new id mapping
     for (const position of positions) {
       const oldPositionId = position.id;
-      position.id = null as any;
+      position.id = null;
       position.planId = targetPlan.id;
       const savedPosition = await this.repos.position.save(position);
       if (oldPositionId) positionIdMap.set(oldPositionId, savedPosition.id || "");
@@ -192,7 +194,7 @@ export class PlanController extends DoingBaseController {
       for (const assignment of assignments) {
         const newPositionId = positionIdMap.get(assignment.positionId || "");
         if (newPositionId) {
-          assignment.id = null as any;
+          assignment.id = null;
           assignment.planId = targetPlan.id;
           assignment.positionId = newPositionId;
           assignment.status = "Unconfirmed";
@@ -242,7 +244,7 @@ export class PlanController extends DoingBaseController {
   private async copyPlanItemTimes(churchId: string, sourcePlanId: string, planItemIdMap: Map<string, string>, timeIdMap: Map<string, string>, positionIdMap: Map<string, string>): Promise<void> {
     if (planItemIdMap.size === 0 || timeIdMap.size === 0) return;
     const exclusions: PlanItemTime[] = await this.repos.planItemTime.loadByPlanId(churchId, sourcePlanId) as PlanItemTime[];
-    const promises: Promise<any>[] = [];
+    const promises: Promise<unknown>[] = [];
     for (const ex of exclusions) {
       const newPlanItemId = planItemIdMap.get(ex.planItemId || "");
       const newTimeId = timeIdMap.get(ex.timeId || "");
@@ -260,20 +262,20 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/autofill/:id")
-  public async autofill(@requestParam("id") id: string, req: express.Request<{}, {}, { teams: { positionId: string; personIds: string[] }[] }>, res: express.Response): Promise<any> {
+  public async autofill(@requestParam("id") id: string, req: express.Request<{}, {}, { teams: { positionId: string; personIds: string[] }[] }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
       const plan = (await this.repos.plan.load(au.churchId, id)) as Plan;
       const positions: Position[] = (await this.repos.position.loadByPlanId(au.churchId, id)) as Position[];
-      const assignments = (await this.repos.assignment.loadByPlanId(au.churchId, id)) as any[];
-      const blockoutDates = (await this.repos.blockoutDate.loadUpcoming(au.churchId)) as any[];
-      const lastServed = (await this.repos.assignment.loadLastServed(au.churchId)) as any[];
-      const assignmentsOnSameDate = (await this.repos.assignment.loadByServiceDate(au.churchId, plan.serviceDate || new Date(), id)) as any[];
+      const assignments = (await this.repos.assignment.loadByPlanId(au.churchId, id)) as Assignment[];
+      const blockoutDates = (await this.repos.blockoutDate.loadUpcoming(au.churchId)) as BlockoutDate[];
+      const lastServed = (await this.repos.assignment.loadLastServed(au.churchId)) as AutofillContext["lastServed"];
+      const assignmentsOnSameDate = (await this.repos.assignment.loadByServiceDate(au.churchId, plan.serviceDate || new Date(), id)) as Assignment[];
       const times = (await this.repos.time.loadByPlanId(au.churchId, id)) as Time[];
 
       const teams = req.body.teams || [];
       const candidateIds = [...new Set(teams.flatMap((t) => t.personIds || []))];
-      const preferences = (await this.repos.schedulingPreference.loadByPersonIds(au.churchId, candidateIds)) as any[];
+      const preferences = (await this.repos.schedulingPreference.loadByPersonIds(au.churchId, candidateIds)) as SchedulingPreference[];
       const monthServeCounts = await this.repos.assignment.loadMonthServeCounts(au.churchId, plan.serviceDate || new Date());
       let householdPeople: { id: string; householdId: string }[] = [];
       try {
@@ -290,7 +292,7 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/autofill/:id/undo")
-  public async autofillUndo(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async autofillUndo(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
       const plan = (await this.repos.plan.load(au.churchId, id)) as Plan;
@@ -302,31 +304,31 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/notifyRange")
-  public async notifyRange(req: express.Request<{}, {}, { startDate?: string; endDate?: string; ministryId?: string; planTypeId?: string }>, res: express.Response): Promise<any> {
+  public async notifyRange(req: express.Request<{}, {}, { startDate?: string; endDate?: string; ministryId?: string; planTypeId?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { startDate, endDate, ministryId, planTypeId } = req.body || {};
       if (!startDate || !endDate) return this.json({ error: "Missing required parameters: startDate, endDate" }, 400);
       if (!ministryId) return this.json({ error: "ministryId is required" }, 400);
       if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
-      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
+      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as OverviewEmailRow[];
       return await MatrixEmailHelper.sendConsolidated(au.churchId, rows, ministryId);
     });
   }
 
   @httpPost("/textRange")
-  public async textRange(req: express.Request<{}, {}, { startDate?: string; endDate?: string; ministryId?: string; planTypeId?: string; message?: string }>, res: express.Response): Promise<any> {
+  public async textRange(req: express.Request<{}, {}, { startDate?: string; endDate?: string; ministryId?: string; planTypeId?: string; message?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { startDate, endDate, ministryId, planTypeId, message } = req.body || {};
       if (!startDate || !endDate || !ministryId) return this.json({ error: "Missing required parameters: startDate, endDate, ministryId" }, 400);
       if (!message?.trim()) return this.json({ error: "message is required" }, 400);
       if (!au.checkAccess(Permissions.texting.send) || !await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
-      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
+      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as OverviewEmailRow[];
       return await MatrixTextHelper.send(au.churchId, rows, message.slice(0, 1600));
     });
   }
 
   @httpPost("/:id/issueRequests")
-  public async issueRequests(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async issueRequests(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
       return AssignmentWorkflowHelper.issuePlan(au.churchId, id, this.repos);
@@ -334,7 +336,7 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/copy/:id")
-  public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, Plan & { copyMode?: string; copyServiceOrder?: boolean; targetPlanId?: string }>, res: express.Response): Promise<any> {
+  public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, PlanCopyBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditMinistry(au, req.body.ministryId)) return this.json({}, 401);
       const copyMode = req.body.copyMode || "all"; // "none" | "positions" | "all"
@@ -351,11 +353,11 @@ export class PlanController extends DoingBaseController {
         if (!await PlanAuth.canEditPlan(au, targetPlanId)) return this.json({}, 401);
         plan = target;
       } else {
-        const p = { ...req.body } as Plan;
+        const p: PlanCopyBody = { ...req.body };
         delete p.id;
-        delete (p as any).copyMode;
-        delete (p as any).copyServiceOrder;
-        delete (p as any).targetPlanId;
+        delete p.copyMode;
+        delete p.copyServiceOrder;
+        delete p.targetPlanId;
         delete p.lessonTrimWarning;
         p.churchId = au.churchId;
         p.serviceDate = new Date(req.body.serviceDate || new Date());
@@ -400,14 +402,14 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Plan[] | Plan>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Plan[] | Plan>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Handle both single plan object and array of plans
       const plans = Array.isArray(req.body) ? req.body : [req.body];
 
       const previousPaths = new Map<Plan, string | null>();
       for (const plan of plans) {
-        const existing: any = plan.id ? await this.repos.plan.load(au.churchId, plan.id) : null;
+        const existing: Plan | null = plan.id ? await this.repos.plan.load(au.churchId, plan.id) : null;
         previousPaths.set(plan, existing ? existing.providerPlanId || null : undefined);
         if (existing && !await PlanAuth.canEditMinistry(au, existing.ministryId)) return this.json({}, 401);
         if (plan.confirmationWorkflowId && plan.confirmationWorkflowId !== existing?.confirmationWorkflowId) await AssignmentWorkflowHelper.validateWorkflow(au.churchId, plan.confirmationWorkflowId, this.repos);
@@ -451,7 +453,7 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
       await this.repos.planItemTime.deleteByPlanId(au.churchId, id);

@@ -4,6 +4,22 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { ServiceTime } from "../models/index.js";
 
+// Flat service + time row read by loadPublicTree.
+export interface PublicServiceTimeRow {
+  serviceId: string;
+  serviceName: string;
+  campusId: string | null;
+  timeId: string | null;
+  timeName: string | null;
+}
+
+export interface PublicServiceTreeNode {
+  serviceId: string;
+  serviceName: string;
+  campusName?: string;
+  times: { id: string; name: string }[];
+}
+
 @injectable()
 export class ServiceTimeRepo {
   public async save(model: ServiceTime) {
@@ -37,8 +53,8 @@ export class ServiceTimeRepo {
 
   // A schedule needs both a day and a start time; anything partial is stored as no schedule.
   private scheduleColumns(model: ServiceTime) {
-    const toInt = (v: any) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Math.round(Number(v)));
-    const toTime = (v: any) => (typeof v === "string" && /^\d{1,2}:\d{2}(:\d{2})?$/.test(v) ? v : null);
+    const toInt = (v: unknown) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Math.round(Number(v)));
+    const toTime = (v: unknown) => (typeof v === "string" && /^\d{1,2}:\d{2}(:\d{2})?$/.test(v) ? v : null);
     const dayOfWeek = toInt(model.dayOfWeek);
     const startTime = toTime(model.startTime);
     const scheduled = dayOfWeek !== null && dayOfWeek >= 0 && dayOfWeek <= 6 && startTime !== null;
@@ -69,24 +85,24 @@ export class ServiceTimeRepo {
   }
 
   public async loadNamesWithCampusService(churchId: string) {
-    const rows = await sql<any>`SELECT st.*, concat_ws(' - ', c.name, s.name, st.name) as longName FROM serviceTimes st INNER JOIN services s on s.Id=st.serviceId LEFT JOIN campuses c on c.Id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND st.removed=0 AND s.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
+    const rows = await sql<ServiceTime>`SELECT st.*, concat_ws(' - ', c.name, s.name, st.name) as longName FROM serviceTimes st INNER JOIN services s on s.Id=st.serviceId LEFT JOIN campuses c on c.Id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND st.removed=0 AND s.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
     return rows.rows;
   }
 
   public async loadNamesByServiceId(churchId: string, serviceId: string) {
-    const rows = await sql<any>`SELECT st.*, concat_ws(' - ', c.name, s.name, st.name) as longName FROM serviceTimes st INNER JOIN services s on s.id=st.serviceId LEFT JOIN campuses c on c.id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND s.id=${serviceId} AND st.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
+    const rows = await sql<ServiceTime>`SELECT st.*, concat_ws(' - ', c.name, s.name, st.name) as longName FROM serviceTimes st INNER JOIN services s on s.id=st.serviceId LEFT JOIN campuses c on c.id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND s.id=${serviceId} AND st.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
     return rows.rows;
   }
 
   public async loadByChurchCampusService(churchId: string, campusId: string, serviceId: string) {
-    const rows = await sql<any>`SELECT st.* FROM serviceTimes st LEFT OUTER JOIN services s on s.id=st.serviceId WHERE st.churchId = ${churchId} AND (${serviceId}='0' OR st.serviceId=${serviceId}) AND (${campusId} = '0' OR s.campusId = ${campusId}) AND st.removed=0`.execute(getDb());
+    const rows = await sql<ServiceTime>`SELECT st.* FROM serviceTimes st LEFT OUTER JOIN services s on s.id=st.serviceId WHERE st.churchId = ${churchId} AND (${serviceId}='0' OR st.serviceId=${serviceId}) AND (${campusId} = '0' OR s.campusId = ${campusId}) AND st.removed=0`.execute(getDb());
     return rows.rows;
   }
 
   // Flat service+time rows for the public service-times element. Campus names are
   // resolved separately from the membership master (attendance.campuses is frozen).
   public async loadPublicTree(churchId: string) {
-    const rows = await sql<any>`SELECT s.id as serviceId, s.name as serviceName, s.campusId, st.id as timeId, st.name as timeName
+    const rows = await sql<PublicServiceTimeRow>`SELECT s.id as serviceId, s.name as serviceName, s.campusId, st.id as timeId, st.name as timeName
       FROM services s INNER JOIN serviceTimes st ON st.serviceId=s.id AND st.removed=0
       WHERE s.churchId=${churchId} AND s.removed=0
       ORDER BY s.name, st.name`.execute(getDb());
@@ -94,9 +110,9 @@ export class ServiceTimeRepo {
   }
 
   // Groups flat rows into [{ serviceId, serviceName, campusName?, times:[{id,name}] }].
-  public buildPublicTree(rows: any[], campusNames: { [id: string]: string } = {}) {
-    const byService = new Map<string, any>();
-    const result: any[] = [];
+  public buildPublicTree(rows: PublicServiceTimeRow[], campusNames: { [id: string]: string } = {}): PublicServiceTreeNode[] {
+    const byService = new Map<string, PublicServiceTreeNode>();
+    const result: PublicServiceTreeNode[] = [];
     (Array.isArray(rows) ? rows : []).forEach((r) => {
       let service = byService.get(r.serviceId);
       if (!service) {
@@ -111,15 +127,15 @@ export class ServiceTimeRepo {
     return result;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: ServiceTime) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): ServiceTime[] {
+  public convertAllToModel(_churchId: string, data: ServiceTime[]): ServiceTime[] {
     return data.map((row) => this.rowToModel(row));
   }
 
-  protected rowToModel(data: any): ServiceTime {
+  protected rowToModel(data: ServiceTime): ServiceTime {
     const result: ServiceTime = {
       id: data.id,
       serviceId: data.serviceId,
@@ -135,7 +151,7 @@ export class ServiceTimeRepo {
   }
 
   // MySQL TIME comes back as "HH:mm:ss"; clients use "HH:mm".
-  private formatTime(value: any): string | null {
+  private formatTime(value: unknown): string | null {
     if (typeof value !== "string") return null;
     const m = value.match(/^(\d{1,2}):(\d{2})/);
     return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null;

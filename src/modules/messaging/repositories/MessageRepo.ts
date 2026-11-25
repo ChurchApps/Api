@@ -40,7 +40,7 @@ export class MessageRepo {
     return model;
   }
 
-  public async loadById(churchId: string, id: string): Promise<any> {
+  public async loadById(churchId: string, id: string): Promise<Message> {
     const result = (await getDb().selectFrom("messages").selectAll()
       .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
     return result || {};
@@ -63,7 +63,7 @@ export class MessageRepo {
   }
 
   public async loadLatestPerPerson(churchId: string, conversationId: string): Promise<Message[]> {
-    const result = await sql<any>`
+    const result = await sql<Message>`
       SELECT m.personId, m.messageType, m.content, m.timeSent
       FROM messages m
       INNER JOIN (
@@ -73,7 +73,7 @@ export class MessageRepo {
       ) latest ON latest.personId=m.personId AND latest.maxTime=m.timeSent
       WHERE m.churchId=${churchId} AND m.conversationId=${conversationId}
     `.execute(getDb());
-    return result.rows as Message[];
+    return result.rows;
   }
 
   // One round trip for the same page of several conversations: each UNION ALL part is that
@@ -83,18 +83,18 @@ export class MessageRepo {
     conversationIds: string[],
     page: number = 1,
     limit: number = 20
-  ): Promise<Map<string, any[]>> {
-    const result = new Map<string, any[]>();
+  ): Promise<Map<string, Message[]>> {
+    const result = new Map<string, Message[]>();
     if (conversationIds.length === 0) return result;
     const offset = (page - 1) * limit;
     const parts = conversationIds.map((conversationId) => sql`(SELECT * FROM messages WHERE churchId=${churchId} AND conversationId=${conversationId} ORDER BY timeSent DESC LIMIT ${limit} OFFSET ${offset})`);
-    const rows = (await sql<any>`${sql.join(parts, sql` UNION ALL `)}`.execute(getDb())).rows;
+    const rows = (await sql<Message>`${sql.join(parts, sql` UNION ALL `)}`.execute(getDb())).rows;
     for (const row of rows) {
       const list = result.get(row.conversationId);
       if (list) list.push(row);
       else result.set(row.conversationId, [row]);
     }
-    const time = (row: any) => (row.timeSent ? new Date(row.timeSent).getTime() : 0);
+    const time = (row: Message) => (row.timeSent ? new Date(row.timeSent).getTime() : 0);
     result.forEach((list) => list.sort((a, b) => time(b) - time(a)));
     return result;
   }
@@ -103,7 +103,7 @@ export class MessageRepo {
     await getDb().deleteFrom("messages").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(data: any): Message {
+  protected rowToModel(data: Message): Message {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -117,11 +117,11 @@ export class MessageRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: Message) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: Message[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

@@ -73,7 +73,7 @@ export class MatrixEmailHelper {
     const scheduleUrl = AppUrlHelper.b1AppUrl(subDomain) + "/mobile/plans";
 
     const names = new Map<string, string>();
-    for (const p of (await membership.loadPeople(churchId, recipients.map((r) => r.personId))) as any[]) names.set(p.id, p.displayName);
+    for (const p of await membership.loadPeople(churchId, recipients.map((r) => r.personId))) names.set(p.id, p.displayName);
 
     const emailByPerson: Record<string, { subject: string; html: string }> = {};
     for (const sched of recipients) {

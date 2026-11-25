@@ -8,23 +8,28 @@ import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 const PREF_FIELDS = [
   "allowPush", "allowSms", "emailFrequency", "masterMute", "quietHoursStart", "quietHoursEnd", "timeZone", "maxPushPerDay"
-];
+] as const;
+
+// New save shape: global controls plus sparse per-category overrides.
+type PreferencesUpdate = Partial<Record<(typeof PREF_FIELDS)[number], unknown>> & {
+  overrides?: { categoryKey?: string; channel?: string; optedIn?: boolean }[];
+};
 
 @controller("/messaging/notificationpreferences")
 export class NotificationPreferenceController extends MessagingBaseController {
 
   @httpGet("/categories")
-  public async categories(req: express.Request, res: express.Response): Promise<any> {
+  public async categories(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => NotificationCategoryHelper.all());
   }
 
   @httpGet("/my")
-  public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => this.resolve(au.churchId, au.personId));
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, NotificationPreference[] | PreferencesUpdate>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Legacy shape: an array of NotificationPreference rows. Kept working so
       // current B1App builds are unaffected (architecture §8.2).
@@ -41,7 +46,7 @@ export class NotificationPreferenceController extends MessagingBaseController {
       let pref = await this.repos.notificationPreference.loadByPersonId(au.churchId, au.personId);
       if (!pref) pref = await NotificationHelper.createNotificationPref(au.churchId, au.personId);
       for (const f of PREF_FIELDS) {
-        if (body[f] !== undefined) (pref as any)[f] = body[f];
+        if (body[f] !== undefined) (pref as Record<string, unknown>)[f] = body[f];
       }
       await this.repos.notificationPreference.save(pref);
 
@@ -58,7 +63,7 @@ export class NotificationPreferenceController extends MessagingBaseController {
 
   // Staff with Texting Send can read and set one person's Text reminders switch (issue #1600). Only allowSms is touched.
   @httpGet("/person/:personId/sms")
-  public async loadPersonSms(req: express.Request<{ personId: string }>, res: express.Response): Promise<any> {
+  public async loadPersonSms(req: express.Request<{ personId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const pref = await this.repos.notificationPreference.loadByPersonId(au.churchId, req.params.personId);
@@ -67,7 +72,7 @@ export class NotificationPreferenceController extends MessagingBaseController {
   }
 
   @httpPost("/person/:personId/sms")
-  public async savePersonSms(req: express.Request<{ personId: string }, {}, { allowSms: boolean }>, res: express.Response): Promise<any> {
+  public async savePersonSms(req: express.Request<{ personId: string }, {}, { allowSms: boolean }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const personId = req.params.personId;
@@ -82,7 +87,7 @@ export class NotificationPreferenceController extends MessagingBaseController {
   private resolve = async (churchId: string, personId: string) => {
     let pref = await this.repos.notificationPreference.loadByPersonId(churchId, personId);
     if (!pref) pref = await NotificationHelper.createNotificationPref(churchId, personId);
-    const overrides = (await this.repos.notificationPreferenceOverride.loadForPerson(churchId, personId)) as any[] || [];
+    const overrides = (await this.repos.notificationPreferenceOverride.loadForPerson(churchId, personId)) || [];
     const categories = NotificationCategoryHelper.all().map((cat) => ({
       categoryKey: cat.categoryKey,
       displayName: cat.displayName,

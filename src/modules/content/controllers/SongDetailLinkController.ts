@@ -9,22 +9,31 @@ import { MusicBrainzHelper } from "../helpers/MusicBrainzHelper.js";
 export class SongDetailLinkController extends ContentBaseController {
   private static readonly MUSICBRAINZ_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+  // Declared before "/:id" so the id route does not swallow it.
+  @httpGet("/church/:service")
+  public async getForChurch(@requestParam("service") service: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      return await this.repos.songDetailLink.loadForChurchByService(au.churchId, service);
+    });
+  }
+
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {
       return await this.repos.songDetailLink.load(id);
     });
   }
 
   @httpGet("/songDetail/:songDetailId")
-  public async getForSongDetail(@requestParam("songDetailId") songDetailId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForSongDetail(@requestParam("songDetailId") songDetailId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {
       return await this.repos.songDetailLink.loadForSongDetail(songDetailId);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, SongDetailLink[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, SongDetailLink[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const isServerAdmin = au.checkAccess(Permissions.server.admin);
@@ -75,7 +84,7 @@ export class SongDetailLinkController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       if (!au.checkAccess(Permissions.server.admin)) {

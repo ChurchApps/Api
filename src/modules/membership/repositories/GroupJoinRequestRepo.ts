@@ -5,6 +5,14 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GroupJoinRequest } from "../models/index.js";
 import { PersonHelper } from "../helpers/index.js";
 
+/** groupJoinRequests row, optionally joined with person and group columns. */
+interface GroupJoinRequestRow extends Omit<GroupJoinRequest, "person" | "group"> {
+  photoUpdated?: Date;
+  displayName?: string;
+  email?: string;
+  groupName?: string;
+}
+
 @injectable()
 export class GroupJoinRequestRepo {
   public async save(model: GroupJoinRequest) {
@@ -19,7 +27,7 @@ export class GroupJoinRequestRepo {
       groupId: model.groupId,
       personId: model.personId,
       message: model.message ?? null,
-      requestDate: sql`NOW()` as any,
+      requestDate: sql<Date>`NOW()`,
       status: model.status ?? "pending",
       decidedBy: model.decidedBy ?? null,
       decidedDate: model.decidedDate ?? null,
@@ -91,7 +99,7 @@ export class GroupJoinRequestRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  protected rowToModel(row: any): GroupJoinRequest {
+  protected rowToModel(row: GroupJoinRequestRow): GroupJoinRequest {
     const result: GroupJoinRequest = {
       id: row.id,
       churchId: row.churchId,
@@ -117,12 +125,12 @@ export class GroupJoinRequestRepo {
     return result;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: GroupJoinRequestRow) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: GroupJoinRequestRow[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

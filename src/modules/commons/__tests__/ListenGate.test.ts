@@ -1,7 +1,7 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 jest.mock("../helpers/CommonsMauticHelper.js", () => ({ CommonsMauticHelper: { tagUser: jest.fn(async () => {}), afterSave: jest.fn(async () => {}), afterSubmit: jest.fn(async () => {}), syncWriter: jest.fn(async () => {}) } }));
-jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../shared/helpers/index", () => ({
   Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } },
   Environment: { worshipCommonsRoot: "http://localhost:3104" }
@@ -12,22 +12,29 @@ jest.mock("../helpers/index", () => ({
   CommonsMailHelper: {},
   DuplicateHelper: {},
   ContentLibraryHelper: {
-    fileUrls: (asset: any, files: any[]) => Object.fromEntries(files.map((f) => [ROLES[f.name] || f.name, `http://c/${asset.id}/${f.name}`])),
-    liveKey: (asset: any, name: string) => `commons/assets/song/${asset.id}/${name}`,
-    fileKey: (asset: any, _files: any[], name: string) => `commons/assets/song/${asset.id}/${name}`,
-    readKey: jest.fn(async () => null)
+    fileUrls: (asset: { id?: string }, files: AssetFile[]) => Object.fromEntries(files.map((f) => [ROLES[f.name] || f.name, `http://c/${asset.id}/${f.name}`])),
+    liveKey: (asset: { id?: string }, name: string) => `commons/assets/song/${asset.id}/${name}`,
+    fileKey: (asset: { id?: string }, _files: AssetFile[], name: string) => `commons/assets/song/${asset.id}/${name}`,
+    readKey: jest.fn(async (): Promise<null> => null)
   },
   PublishHelper: {},
   QualityHelper: {},
   userNames: jest.fn(async () => ({}))
 }));
 
+import type express from "express";
 import { CommonsAdminController } from "../controllers/CommonsAdminController.js";
+import type { AssetFile, Song, SongView } from "../models/index.js";
 
-const FULL = [{ name: "score.musicxml" }, { name: "slides.json" }, { name: "lyrics.chordpro" }];
+// MySQL hands the hasChords tinyint back as 0/1, so the fixture carries a number where SongView says boolean.
+type SongRow = Omit<SongView, "hasChords"> & { hasChords?: number };
+type ListenReq = Parameters<CommonsAdminController["listen"]>[0];
+type Row = Record<string, unknown>;
 
-function listenController(overrides: Partial<any> = {}, files: any[] = FULL, admin = true) {
-  const song: any = {
+const FULL: AssetFile[] = [{ name: "score.musicxml" }, { name: "slides.json" }, { name: "lyrics.chordpro" }];
+
+function listenController(overrides: Partial<SongRow> = {}, files: AssetFile[] = FULL, admin = true) {
+  const song: SongRow = {
     id: "song0000001",
     title: "Amazing Grace",
     status: "published",
@@ -46,26 +53,31 @@ function listenController(overrides: Partial<any> = {}, files: any[] = FULL, adm
     form: null,
     ...overrides
   };
-  const repos: any = {
+  const repos = {
     song: {
       loadById: jest.fn(async () => song),
-      update: jest.fn(async (_id: string, fields: any) => Object.assign(song, fields))
+      update: jest.fn(async (_id: string, fields: Partial<Song>) => Object.assign(song, fields))
     },
     assetFile: { loadLive: jest.fn(async () => files) }
   };
   const au = { id: "admin000001", checkAccess: () => admin };
   const controller = new CommonsAdminController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
-  const listen = (keys: unknown) => controller.listen({ params: { id: "song0000001" }, body: { keys }, headers: {} } as any, {} as any);
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (u: typeof au) => Promise<unknown>) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
+  const listen = (keys: unknown) => {
+    const req: Partial<ListenReq> = { params: { id: "song0000001" }, body: { keys }, headers: {} };
+    return controller.listen(req as ListenReq, {} as express.Response);
+  };
   return { listen, repos, song };
 }
 
 describe("POST /commons/admin/songs/:id/listen", () => {
   it("promotes to sunday-ready when the heard keys cover every published key of a package with score, chords and slides", async () => {
     const { listen, repos } = listenController();
-    const detail: any = await listen(["F", "G", "G "]);
+    const detail = (await listen(["F", "G", "G "])) as Row;
     expect(repos.song.update).toHaveBeenCalledWith("song0000001", expect.objectContaining({ listenedKeys: JSON.stringify(["F", "G"]), sundayReadyBy: "admin000001", sundayReadyAt: expect.any(Date), confidence: "sunday-ready" }));
     expect(detail).toMatchObject({ id: "song0000001", confidence: "sunday-ready", sundayReady: true, listenedKeys: ["F", "G"], sundayReadyBy: "admin000001", hasScore: true, hasSlides: true, hasChords: true });
     expect(typeof detail.sundayReadyAt).toBe("string");
@@ -74,42 +86,42 @@ describe("POST /commons/admin/songs/:id/listen", () => {
 
   it("records a partial listen without promoting", async () => {
     const { listen, repos } = listenController();
-    const detail: any = await listen(["G"]);
+    const detail = (await listen(["G"])) as Row;
     expect(repos.song.update).toHaveBeenCalledWith("song0000001", expect.objectContaining({ listenedKeys: JSON.stringify(["G"]), confidence: "score" }));
     expect(detail).toMatchObject({ sundayReady: false, listenedKeys: ["G"], sundayReadyBy: "admin000001" });
   });
 
   it("never promotes a package missing its score, slides or chords", async () => {
     const noSlides = listenController({}, [{ name: "score.musicxml" }]);
-    expect(((await noSlides.listen(["G", "F"])) as any).confidence).toBe("score");
+    expect(((await noSlides.listen(["G", "F"])) as Row).confidence).toBe("score");
     const noScore = listenController({ scoreSource: null }, [{ name: "slides.json" }]);
-    expect(((await noScore.listen(["G", "F"])) as any).confidence).toBe("chart-only");
+    expect(((await noScore.listen(["G", "F"])) as Row).confidence).toBe("chart-only");
     const noChords = listenController({ hasChords: 0 });
-    expect(((await noChords.listen(["G", "F"])) as any).confidence).toBe("score");
+    expect(((await noChords.listen(["G", "F"])) as Row).confidence).toBe("score");
   });
 
   it("treats Open Hymnal ABC as a score when MusicXML was never registered", async () => {
     const abc = listenController({ scoreSource: "abc" }, [{ name: "tune.abc" }, { name: "slides.json" }, { name: "lyrics.chordpro" }]);
-    expect(((await abc.listen(["G", "F"])) as any).confidence).toBe("sunday-ready");
+    expect(((await abc.listen(["G", "F"])) as Row).confidence).toBe("sunday-ready");
   });
 
   it("clears back to the computed tier on an empty list", async () => {
     const { listen, repos } = listenController({ confidence: "sunday-ready", listenedKeys: JSON.stringify(["G", "F"]), sundayReadyBy: "admin000001", sundayReadyAt: new Date() });
-    const detail: any = await listen([]);
+    const detail = (await listen([])) as Row;
     expect(repos.song.update).toHaveBeenCalledWith("song0000001", { listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null, confidence: "score" });
     expect(detail).toMatchObject({ confidence: "score", sundayReady: false, listenedKeys: [], sundayReadyBy: null, sundayReadyAt: null });
   });
 
   it("falls back to the song key when nothing was published yet", async () => {
     const { listen } = listenController({ publishedKeys: null, songKey: "D" });
-    expect(((await listen(["D"])) as any).confidence).toBe("sunday-ready");
+    expect(((await listen(["D"])) as Row).confidence).toBe("sunday-ready");
   });
 
   it("rejects bad bodies, non-reviewers and unknown songs", async () => {
     const { listen } = listenController();
-    expect(((await listen("G")) as any).status).toBe(400);
-    expect(((await listen(["H"])) as any).status).toBe(400);
-    expect(((await listen(["G", "G#", "Bbm", "not a key"])) as any).status).toBe(400);
+    expect(((await listen("G")) as Row).status).toBe(400);
+    expect(((await listen(["H"])) as Row).status).toBe(400);
+    expect(((await listen(["G", "G#", "Bbm", "not a key"])) as Row).status).toBe(400);
     const visitor = listenController({}, FULL, false);
     expect(await visitor.listen(["G"])).toEqual({ obj: {}, status: 401 });
     const gone = listenController();

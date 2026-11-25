@@ -2,10 +2,12 @@ import "reflect-metadata";
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "gen_id" } }));
 
-import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
+import { CompiledQuery, DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler, QueryResult } from "kysely";
+import type { ContentDatabase } from "../../db/DatabaseTypes.js";
 import { BibleVerseTextRepo } from "../BibleVerseTextRepo.js";
+import type { BibleVerseText } from "../../models/index.js";
 
-const verses = (chapter: number, from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => ({ chapterNumber: chapter, verseNumber: from + i })) as any[];
+const verses = (chapter: number, from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => ({ chapterNumber: chapter, verseNumber: from + i })) as BibleVerseText[];
 
 describe("BibleVerseTextRepo.coversRange", () => {
   it("accepts a complete contiguous range", () => {
@@ -33,7 +35,7 @@ describe("BibleVerseTextRepo.loadRange", () => {
     expect(queries).toHaveLength(1);
     expect(queries[0].sql).toMatch(/where `translationKey` = \? and `verseKey` like \? and `bookKey` = \? and `chapterNumber` >= \? and `chapterNumber` <= \? order by `chapterNumber`, `verseNumber`/);
     expect(queries[0].parameters).toEqual(["ENGWEBP", "JHN.%", "JHN", 3, 3]);
-    expect(result.map((r: any) => r.verseNumber)).toEqual([16, 17]);
+    expect(result.map((r) => r.verseNumber)).toEqual([16, 17]);
   });
 
   it("escapes LIKE wildcards in the book key", async () => {
@@ -44,17 +46,17 @@ describe("BibleVerseTextRepo.loadRange", () => {
   });
 });
 
-function capturingDb(rows: any[]) {
+function capturingDb(rows: unknown[]) {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
   driver.acquireConnection = async () => ({
-    executeQuery: async (q: any) => {
+    executeQuery: async <R>(q: CompiledQuery): Promise<QueryResult<R>> => {
       queries.push({ sql: q.sql, parameters: q.parameters });
-      return { rows } as any;
+      return { rows: rows as R[] };
     },
     streamQuery: async function* () {}
   });
-  const db = new Kysely<any>({
+  const db = new Kysely<ContentDatabase>({
     dialect: {
       createAdapter: () => new MysqlAdapter(),
       createDriver: () => driver,

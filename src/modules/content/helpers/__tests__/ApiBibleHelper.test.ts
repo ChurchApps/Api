@@ -4,9 +4,10 @@ jest.mock("axios", () => ({ get: jest.fn() }));
 
 import axios from "axios";
 import { ApiBibleHelper } from "../ApiBibleHelper.js";
+import { BibleHttpError } from "../BibleApiTypes.js";
 
 describe("ApiBibleHelper.getVerseText", () => {
-  const mockGet = (axios as any).get as jest.Mock;
+  const mockGet = axios.get as jest.Mock;
 
   beforeEach(() => mockGet.mockReset());
 
@@ -16,7 +17,7 @@ describe("ApiBibleHelper.getVerseText", () => {
   });
 
   it("attaches HTTP status on axios failures", async () => {
-    const err: any = new Error("Request failed with status code 400");
+    const err: BibleHttpError = new Error("Request failed with status code 400");
     err.response = { status: 400 };
     mockGet.mockRejectedValueOnce(err);
     await expect(ApiBibleHelper.getVerseText("KJV", "GEN.1.1", "GEN.1.2")).rejects.toMatchObject({ status: 400 });
@@ -24,7 +25,7 @@ describe("ApiBibleHelper.getVerseText", () => {
 });
 
 describe("ApiBibleHelper.getContent", () => {
-  const mockGet = (axios as any).get as jest.Mock;
+  const mockGet = axios.get as jest.Mock;
 
   beforeEach(() => mockGet.mockReset());
 
@@ -43,7 +44,7 @@ describe("ApiBibleHelper.getContent", () => {
   });
 
   it("reports a timed-out request as 504", async () => {
-    const err: any = new Error("timeout of 15000ms exceeded");
+    const err: BibleHttpError = new Error("timeout of 15000ms exceeded");
     err.code = "ECONNABORTED";
     mockGet.mockRejectedValueOnce(err);
     await expect(ApiBibleHelper.getContent("https://example.test/bibles")).rejects.toMatchObject({ status: 504 });

@@ -7,7 +7,7 @@ import { Permissions } from "../helpers/index.js";
 @controller("/membership/userchurch")
 export class UserChurchController extends MembershipBaseController {
   @httpPatch("/:userId")
-  public async update(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async update(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (userId !== au.id && !au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const { appName } = req.body;
@@ -32,13 +32,13 @@ export class UserChurchController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, UserChurch, { userId: string }>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, UserChurch, { userId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const userId = req.query.userId || au.id;
       if (!req.body?.personId || !(await this.repos.person.load(au.churchId, req.body.personId))) return this.json({ message: "Person not found" }, 400);
       const record = await this.repos.userChurch.loadByUserId(userId, au.churchId);
-      let result: any = {};
+      let result: UserChurch = {};
       if (!record) {
         const userChurch: UserChurch = {
           userId,
@@ -53,7 +53,7 @@ export class UserChurchController extends MembershipBaseController {
   }
 
   @httpGet("/userid/:userId")
-  public async getByUserId(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getByUserId(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (userId !== au.id && !au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
       const record = await this.repos.userChurch.loadByUserId(userId, au.churchId);
@@ -62,7 +62,7 @@ export class UserChurchController extends MembershipBaseController {
   }
 
   @httpGet("/personid/:personId")
-  public async getByPersonId(@requestParam("personId") personId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getByPersonId(@requestParam("personId") personId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (personId !== au.personId && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       const record = await this.repos.userChurch.loadByPersonId(personId, au.churchId);
@@ -72,7 +72,7 @@ export class UserChurchController extends MembershipBaseController {
   }
 
   @httpGet("/user/:userId")
-  public async loadForUser(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async loadForUser(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
 
@@ -88,7 +88,7 @@ export class UserChurchController extends MembershipBaseController {
     @requestParam("personId") personId: string,
       req: express.Request,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Users may leave any church they belong to; admins may only act within their own church.
       const isSelf = userId === au.id;

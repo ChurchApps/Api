@@ -14,6 +14,8 @@ export interface GatewayObject {
   status?: string;
   error?: string;
   success?: boolean;
+  // ISO currency of a completed charge (Stripe PaymentIntent/Charge carry it).
+  currency?: string;
   // Set by the charge path when the donation is already recorded (e.g. a replayed reference).
   alreadyRecorded?: boolean;
 }
@@ -28,6 +30,8 @@ export interface ExpandableRef {
 export interface GatewayWebhookData extends GatewayObject {
   payment_intent?: string;
   latest_charge?: ExpandableRef;
+  // A Stripe dispute names its charge here.
+  charge?: string;
   reference_number?: string;
   transaction?: { id?: string };
   cancellation_details?: { reason?: string | null };
@@ -85,7 +89,8 @@ export interface GatewayPerson {
 
 export interface GatewayInterval {
   interval?: string;
-  interval_count?: number;
+  // Donation forms post this as text as often as a number.
+  interval_count?: number | string;
   frequency?: string;
 }
 
@@ -332,6 +337,13 @@ export interface GatewayConfig {
   currency?: string;
 }
 
+export interface RefundOptions {
+  // Major units (e.g. dollars); omitted = refund whatever is left on the charge.
+  amount?: number;
+  currency?: string;
+  idempotencyKey?: string;
+}
+
 export interface IGatewayProvider {
   readonly name: string;
   readonly capabilities: ProviderCapabilities;
@@ -393,6 +405,8 @@ export interface IGatewayProvider {
   verifyMethodOwnership?(config: GatewayConfig, paymentMethodId: string, customerId: string, repos: Repos): Promise<boolean>;
   // Full provider-side delete (may cascade schedules); default is detachPaymentMethod.
   deletePaymentMethod?(config: GatewayConfig, paymentMethodId: string, customerId: string, repos: Repos): Promise<void>;
+  // Ids of the customer's live recurring gifts charged to this method; providers without it fall back to listNormalizedSubscriptions.
+  activeSubscriptionIdsUsingMethod?(config: GatewayConfig, paymentMethodId: string, customerId: string): Promise<string[]>;
   // Verifies a gateway-created subscription belongs to the person (no local row exists).
   verifySubscriptionOwnership?(config: GatewayConfig, subscriptionId: string, personId: string, repos: Repos): Promise<boolean>;
   // Maps a provider SDK error to an HTTP response; null falls through to generic handling.
@@ -436,6 +450,6 @@ export interface IGatewayProvider {
   updateDonationStatus?(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: Repos): Promise<void>;
   // Re-charges a failed recurring payment; absent = the provider has no retry and the UI hides Retry.
   retryFailedPayment?(config: GatewayConfig, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }>;
-  // Full refund of a settled charge; absent = the provider has no refunds and the UI hides Refund.
-  refundCharge?(config: GatewayConfig, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }>;
+  // Refund of a settled charge (full unless options.amount is set); absent = the provider has no refunds and the UI hides Refund.
+  refundCharge?(config: GatewayConfig, transactionId: string, options?: RefundOptions): Promise<{ success: boolean; refundId?: string; error?: string }>;
 }

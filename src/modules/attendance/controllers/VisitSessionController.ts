@@ -5,6 +5,45 @@ import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { VisitSession, Visit, Session, ServiceTime } from "../models/index.js";
 import { Permissions, Environment } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
+import { CheckedInByHelper } from "../helpers/CheckedInByHelper.js";
+
+// The fields read from membership's /groupmembers/basic/:groupId response.
+export interface GroupMemberBasic {
+  personId: string;
+  displayName: string;
+}
+
+// One row of the session CSV download: every group member, present or absent.
+export interface SessionDownloadRow {
+  id: string;
+  personId: string;
+  visitId: string;
+  sessionDate: Date;
+  personName: string;
+  status: "present" | "absent";
+  checkinTime: Date | null;
+  checkoutTime: Date | null;
+  checkedOutBy: string;
+  checkedInBy: string;
+  checkinType: string;
+}
+
+export function toSessionDownloadRow(member: GroupMemberBasic, session: Session, visitSession?: VisitSession): SessionDownloadRow {
+  const visit = visitSession?.visit;
+  return {
+    id: visitSession?.id || "",
+    personId: member.personId,
+    visitId: visitSession?.visitId || "",
+    sessionDate: session.sessionDate,
+    personName: member.displayName,
+    status: visitSession ? "present" : "absent",
+    checkinTime: visit?.checkinTime || null,
+    checkoutTime: visit?.checkoutTime || null,
+    checkedOutBy: visit?.checkedOutBy || "",
+    checkedInBy: visit?.checkedInBy || "",
+    checkinType: visit?.checkinType || ""
+  };
+}
 
 @controller("/attendance/visitsessions")
 export class VisitSessionController extends AttendanceBaseController {
@@ -33,10 +72,10 @@ export class VisitSessionController extends AttendanceBaseController {
             visitDate: session.sessionDate
           };
 
-          if (session.serviceTimeId === null) (visit as any).groupId = session.groupId;
+          if (session.serviceTimeId === null) visit.groupId = session.groupId;
           else {
             const st: ServiceTime = await this.repos.serviceTime.load(au.churchId, session.serviceTimeId);
-            (visit as any).serviceId = st?.serviceId;
+            visit.serviceId = st?.serviceId;
           }
           visit = await this.repos.visit.save(visit);
           newVisit = true;
@@ -54,39 +93,24 @@ export class VisitSessionController extends AttendanceBaseController {
   }
 
   @httpGet("/download/:sessionId")
-  public async download(@requestParam("sessionId") sessionId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+  public async download(@requestParam("sessionId") sessionId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json([], 401);
       else {
-        const result: {
-          id: string;
-          personId: string;
-          visitId: string;
-          sessionDate: Date;
-          personName: string;
-          status: "present" | "absent";
-        }[] = [];
+        const result: SessionDownloadRow[] = [];
         const apiUrl = Environment.membershipApi;
         const visitSessions: VisitSession[] = ((await this.repos.visitSession.loadForSession(au.churchId, sessionId)) as VisitSession[]) || [];
         const session: Session = await this.repos.session.load(au.churchId, sessionId);
 
         if (visitSessions.length > 0 && session) {
-          const url = apiUrl + `/groupmembers/basic/${(session as any).groupId}`;
+          await CheckedInByHelper.attachNames(au.churchId, visitSessions.map((vs) => vs.visit));
+          const url = apiUrl + `/groupmembers/basic/${session.groupId}`;
           const config = { headers: { Authorization: "Bearer " + au.jwt } };
-          const groupMembers: any = (await axios.get(url, config)).data;
+          const groupMembers = (await axios.get<GroupMemberBasic[]>(url, config)).data;
 
-          const visitSessionPersonIds = new Set(visitSessions.map((session: any) => session.visit?.personId));
-          groupMembers?.forEach((member: any) => {
-            const status = visitSessionPersonIds.has(member.personId) ? "present" : "absent";
-            const visitSession = visitSessions.find((session: any) => session.visit?.personId === member.personId);
-            result.push({
-              id: visitSession ? visitSession.id : "",
-              personId: member.personId,
-              visitId: visitSession ? visitSession.visitId : "",
-              sessionDate: session.sessionDate,
-              personName: member.displayName,
-              status
-            });
+          groupMembers?.forEach((member) => {
+            const visitSession = visitSessions.find((vs) => vs.visit?.personId === member.personId);
+            result.push(toSessionDownloadRow(member, session, visitSession));
           });
         }
         return result;
@@ -119,10 +143,13 @@ export class VisitSessionController extends AttendanceBaseController {
 
       if (!au.checkAccess(Permissions.attendance.view) && !isGroupLeader) return this.json([], 401);
       else {
-        if (sessionId !== "") return (await this.repos.visitSession.loadForSession(au.churchId, sessionId)) || [];
-        else {
+        if (sessionId !== "") {
+          const visitSessions: VisitSession[] = (await this.repos.visitSession.loadForSession(au.churchId, sessionId)) || [];
+          await CheckedInByHelper.attachNames(au.churchId, visitSessions.map((vs) => vs.visit));
+          return visitSessions;
+        } else {
           const data = await this.repos.visitSession.loadAll(au.churchId);
-          return this.repos.visitSession.convertAllToModel(au.churchId, data as any) || [];
+          return this.repos.visitSession.convertAllToModel(au.churchId, data) || [];
         }
       }
     });
@@ -170,7 +197,7 @@ export class VisitSessionController extends AttendanceBaseController {
         const visit: Visit = await this.repos.visit.loadForSessionPerson(au.churchId, sessionId, personId);
         if (visit !== null) {
           const existingSession = await this.repos.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
-          if (existingSession !== null) await this.repos.visitSession.delete(au.churchId, (existingSession as any).id);
+          if (existingSession !== null) await this.repos.visitSession.delete(au.churchId, existingSession.id);
           const visitSessions: VisitSession[] = ((await this.repos.visitSession.loadByVisitId(au.churchId, visit.id)) as VisitSession[]) || [];
           if (visitSessions.length === 0) await this.repos.visit.delete(au.churchId, visit.id);
         }

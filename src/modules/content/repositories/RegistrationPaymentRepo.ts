@@ -1,7 +1,9 @@
 import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
+import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { RegistrationPayment } from "../models/index.js";
 import { injectable } from "inversify";
+import type { MysqlWriteResult } from "./types.js";
 
 @injectable()
 export class RegistrationPaymentRepo {
@@ -11,24 +13,22 @@ export class RegistrationPaymentRepo {
 
   private async create(model: RegistrationPayment): Promise<RegistrationPayment> {
     model.id = UniqueIdHelper.shortId();
-    const m: any = { ...model };
-    if (!m.createdDate) m.createdDate = new Date();
-    m.createdDate = DateHelper.toMysqlDate(m.createdDate);
+    const createdDate = DateHelper.toMysqlDate(model.createdDate || new Date());
     await getDb().insertInto("registrationPayments").values({
       id: model.id,
       churchId: model.churchId,
       registrationId: model.registrationId,
-      gatewayId: m.gatewayId ?? null,
-      provider: m.provider ?? null,
-      transactionId: m.transactionId ?? null,
-      method: m.method ?? null,
-      amount: m.amount ?? null,
-      currency: m.currency ?? null,
-      kind: m.kind ?? "charge",
-      status: m.status ?? null,
-      personId: m.personId ?? null,
-      createdDate: m.createdDate
-    } as any).execute();
+      gatewayId: model.gatewayId ?? null,
+      provider: model.provider ?? null,
+      transactionId: model.transactionId ?? null,
+      method: model.method ?? null,
+      amount: model.amount ?? null,
+      currency: model.currency ?? null,
+      kind: model.kind ?? "charge",
+      status: model.status ?? null,
+      personId: model.personId ?? null,
+      createdDate
+    }).execute();
     return model;
   }
 
@@ -37,8 +37,33 @@ export class RegistrationPaymentRepo {
       status: model.status ?? null,
       transactionId: model.transactionId ?? null,
       amount: model.amount ?? null
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
+  }
+
+  // Inserts a pending gateway refund only when no other recent pending refund exists on the registration
+  // and the refunded charge still has the amount left, so a double submit can't reach the gateway twice.
+  public async reservePendingRefund(model: RegistrationPayment, chargeAmount: number, blockPendingSince: Date): Promise<boolean> {
+    const id = UniqueIdHelper.shortId();
+    const createdDate = DateHelper.toMysqlDate(new Date());
+    const since = DateHelper.toMysqlDate(blockPendingSince);
+    const result: MysqlWriteResult = await sql`INSERT INTO registrationPayments (id, churchId, registrationId, gatewayId, provider, transactionId, method, amount, currency, kind, status, personId, createdDate)
+      SELECT ${id}, ${model.churchId}, ${model.registrationId}, ${model.gatewayId ?? null}, ${model.provider}, ${model.transactionId}, ${model.method ?? null}, ${model.amount}, ${model.currency ?? null}, 'refund', 'pending', ${model.personId ?? null}, ${createdDate}
+      FROM dual
+      WHERE NOT EXISTS (SELECT 1 FROM registrationPayments WHERE churchId=${model.churchId} AND registrationId=${model.registrationId} AND kind='refund' AND status='pending' AND createdDate > ${since})
+      AND (SELECT COALESCE(SUM(amount), 0) FROM registrationPayments WHERE churchId=${model.churchId} AND registrationId=${model.registrationId} AND kind='refund' AND provider IS NOT NULL AND transactionId=${model.transactionId} AND (status IS NULL OR status <> 'failed')) + ${model.amount} <= ${chargeAmount}`.execute(getDb());
+    if (result?.numAffectedRows > 0n || result?.affectedRows > 0) {
+      model.id = id;
+      model.kind = "refund";
+      model.status = "pending";
+      model.createdDate = new Date();
+      return true;
+    }
+    return false;
+  }
+
+  public async load(churchId: string, id: string): Promise<RegistrationPayment | undefined> {
+    return getDb().selectFrom("registrationPayments").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst();
   }
 
   public async delete(churchId: string, id: string) {
@@ -49,7 +74,7 @@ export class RegistrationPaymentRepo {
     return getDb().selectFrom("registrationPayments").selectAll()
       .where("churchId", "=", churchId)
       .where("registrationId", "=", registrationId)
-      .orderBy("createdDate").execute() as any;
+      .orderBy("createdDate").execute();
   }
 
   public async deleteForRegistration(churchId: string, registrationId: string): Promise<void> {
@@ -58,6 +83,6 @@ export class RegistrationPaymentRepo {
       .where("registrationId", "=", registrationId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as RegistrationPayment; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as RegistrationPayment[]; }
+  public convertToModel(_churchId: string, data: RegistrationPayment) { return data; }
+  public convertAllToModel(_churchId: string, data: RegistrationPayment[]) { return data || []; }
 }

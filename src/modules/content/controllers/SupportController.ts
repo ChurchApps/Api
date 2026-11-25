@@ -7,7 +7,7 @@ import { PollyHelper } from "../helpers/PollyHelper.js";
 export class SupportController extends ContentBaseController {
   // authz-exempt: open to any authenticated user — SSML→MP3 via Polly, no church data touched
   @httpPost("/createAudio")
-  public async post(req: express.Request<{}, {}, { ssml: string }>, res: express.Response): Promise<any> {
+  public async post(req: express.Request<{}, {}, { ssml: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au?.id) return this.json({}, 401);
       const ssml = req.body.ssml || "";

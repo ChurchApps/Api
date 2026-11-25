@@ -1,11 +1,12 @@
 import "reflect-metadata";
+import express from "express";
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("../../helpers/TreeHelper", () => ({
   TreeHelper: {
     populateAnswers: () => {},
-    buildTree: (sections: any[]) => sections,
+    buildTree: (sections: Section[]) => sections,
     insertBlocks: async () => {},
-    duplicateSection: jest.fn(async (s: any) => s)
+    duplicateSection: jest.fn(async (s: Section) => s)
   }
 }));
 jest.mock("../../helpers/index", () => ({
@@ -14,22 +15,36 @@ jest.mock("../../helpers/index", () => ({
 }));
 jest.mock("../ContentBaseController", () => ({
   ContentBaseController: class {
-    json(obj: any, status: number) { return { obj, status }; }
+    json(obj: unknown, status: number) { return { obj, status }; }
     bumpSiteCache() {}
-    authUser(): any { return null; }
+    authUser(): unknown { return null; }
   }
 }));
 
 import { PageController2 } from "../PageController.js";
 import { TreeHelper } from "../../helpers/TreeHelper.js";
+import { Page, Section, Setting } from "../../models/index.js";
+
+type JsonResult = { obj: unknown; status: number };
+// getTree returns either the page tree or a { restricted, visibility } gate marker.
+type TreeResult = Page & { restricted?: boolean };
+type TestPermission = { contentType: string; action: string };
+
+interface TestAu {
+  churchId: string;
+  personId: string;
+  membershipStatus: string;
+  permissions: string[];
+  checkAccess: (p: TestPermission) => boolean;
+}
 
 const EDIT_PERMISSION = "Content__Edit";
 
-function makeAu(churchId: string, permissions: string[] = [EDIT_PERMISSION]) {
-  return { churchId, personId: "p1", membershipStatus: "Member", permissions, checkAccess: (p: any) => permissions.includes(p.contentType + "__" + p.action) };
+function makeAu(churchId: string, permissions: string[] = [EDIT_PERMISSION]): TestAu {
+  return { churchId, personId: "p1", membershipStatus: "Member", permissions, checkAccess: (p: TestPermission) => permissions.includes(p.contentType + "__" + p.action) };
 }
 
-function makeController(page: any, au: any = null) {
+function makeController(page: Page, au: TestAu | null = null) {
   const repos = {
     page: {
       load: jest.fn(async () => page),
@@ -40,16 +55,18 @@ function makeController(page: any, au: any = null) {
     element: { loadForPage: jest.fn(async () => [{ id: "e1", churchId: "c1", sectionId: "s1", sort: 1, answersJSON: "{}" }]) }
   };
   const controller = new PageController2();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).authUser = () => au;
+  Object.assign(controller, {
+    repos,
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action(),
+    authUser: () => au
+  });
   return { controller, repos };
 }
 
-const getTree = (controller: PageController2, query: any, churchId = "c1") => (controller as any).getTree(churchId, { query }, {});
+const getTree = async (controller: PageController2, query: Record<string, string>, churchId = "c1") => (await controller.getTree(churchId, { query } as express.Request, {} as express.Response)) as TreeResult;
 
 const membersPage = () => ({ id: "pg1", churchId: "c1", url: "/members", visibility: "members", siteId: "site1" });
-const publicPage = (extra: any = {}) => ({ id: "pg1", churchId: "c1", url: "/home", visibility: "everyone", siteId: "site1", ...extra });
+const publicPage = (extra: Partial<Page> = {}) => ({ id: "pg1", churchId: "c1", url: "/home", visibility: "everyone", siteId: "site1", ...extra });
 
 describe("PageController2.getTree visibility gating", () => {
   it("gates an anonymous ?id= load of a restricted page", async () => {
@@ -151,26 +168,28 @@ describe("PageController2.importTree", () => {
     url: "/home",
     sections: [{ id: "x", churchId: "other", background: "#fff", elements: [{ id: "y", churchId: "other", elementType: "row", answersJSON: "{}", elements: [{ elementType: "column", answersJSON: "{}" }] }] }]
   });
-  const run = (au: any, b: any) => {
+  const run = (au: TestAu, b: Page) => {
     const controller = new PageController2();
-    const save = jest.fn(async (p: any) => ({ ...p, id: "pg9" }));
-    (controller as any).repos = { page: { save } };
-    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-    return (controller as any).importTree({ body: b }, {}).then((result: any) => ({ result, save }));
+    const save = jest.fn(async (p: Page) => ({ ...p, id: "pg9" }));
+    Object.assign(controller, {
+      repos: { page: { save } },
+      actionWrapper: (_req: express.Request, _res: express.Response, action: (a: TestAu) => unknown) => action(au)
+    });
+    return controller.importTree({ body: b } as express.Request, {} as express.Response).then((result) => ({ result, save }));
   };
 
   it("rejects callers without content edit", async () => {
     const { result, save } = await run(makeAu("c1", []), body());
-    expect(result.status).toBe(401);
+    expect((result as JsonResult).status).toBe(401);
     expect(save).not.toHaveBeenCalled();
   });
 
   it("always inserts under the caller's church, ignoring body ids and churchId", async () => {
     (TreeHelper.duplicateSection as jest.Mock).mockClear();
     const { result, save } = await run(makeAu("c1"), body());
-    expect(result.id).toBe("pg9");
+    expect((result as Page).id).toBe("pg9");
     expect(save.mock.calls[0][0]).toEqual({ churchId: "c1", siteId: "", title: "Home", url: "/home", layout: "headerFooter" });
-    const section = (TreeHelper.duplicateSection as jest.Mock).mock.calls[0][0];
+    const section = (TreeHelper.duplicateSection as jest.Mock).mock.calls[0][0] as Section;
     expect(section).toMatchObject({ churchId: "c1", pageId: "pg9", sort: 1 });
     expect(section.id).toBeUndefined();
     expect(section.elements[0]).toMatchObject({ churchId: "c1", elementType: "row", sort: 1 });
@@ -182,23 +201,25 @@ describe("PageController2.importTree", () => {
     const b = body();
     b.sections[0].elements[0].answersJSON = "{nope";
     const { result, save } = await run(makeAu("c1"), b);
-    expect(result.status).toBe(400);
+    expect((result as JsonResult).status).toBe(400);
     expect(save).not.toHaveBeenCalled();
   });
 });
 
 describe("PageController2.loadPublic hidePublicSite", () => {
-  function makePublicController(settings: any[]) {
+  function makePublicController(settings: Setting[]) {
     const repos = {
       page: { loadAll: jest.fn(async () => [{ url: "/", title: "Home", visibility: "everyone" }, { url: "/about", title: "About" }]) },
       setting: { loadByKeyNames: jest.fn(async () => settings) }
     };
     const controller = new PageController2();
-    (controller as any).repos = repos;
-    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+    Object.assign(controller, {
+      repos,
+      actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action()
+    });
     return { controller, repos };
   }
-  const loadPublic = (controller: PageController2) => (controller as any).loadPublic("c1", { query: {} }, {});
+  const loadPublic = (controller: PageController2) => controller.loadPublic("c1", { query: {} } as express.Request, {} as express.Response);
 
   it("lists public pages when the setting is absent", async () => {
     const { controller } = makePublicController([]);
@@ -219,53 +240,55 @@ describe("PageController2.loadPublic hidePublicSite", () => {
 });
 
 describe("PageController2.save duplicate url", () => {
-  function makeSaveController(existing: any) {
-    const repos: any = {
+  function makeSaveController(existing: Page | null) {
+    const repos = {
       page: {
         loadByUrl: jest.fn(async () => existing),
-        save: jest.fn(async (p: any) => {
+        save: jest.fn(async (p: Page) => {
           if (existing && existing.id !== p.id) throw Object.assign(new Error("Duplicate entry for key 'pages.uq_churchId_url'"), { code: "ER_DUP_ENTRY" });
           return { ...p, id: p.id || "new1" };
         })
       }
     };
     const controller = new PageController2();
-    (controller as any).repos = repos;
-    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(makeAu("c1"));
+    Object.assign(controller, {
+      repos,
+      actionWrapper: (_req: express.Request, _res: express.Response, action: (a: TestAu) => unknown) => action(makeAu("c1"))
+    });
     return { controller, repos };
   }
 
   it("returns 409 when another page on the site already uses the url", async () => {
     const { controller, repos } = makeSaveController({ id: "pg1", url: "/about-us", siteId: "" });
-    const result: any = await (controller as any).save({ body: [{ url: "/about-us", title: "About" }] }, {});
+    const result = await controller.save({ body: [{ url: "/about-us", title: "About" }] } as express.Request, {} as express.Response);
     expect(result).toEqual({ obj: { error: "A page with this url already exists" }, status: 409 });
     expect(repos.page.save).not.toHaveBeenCalled();
   });
 
   it("saves a page that keeps its own url", async () => {
     const { controller, repos } = makeSaveController({ id: "pg1", url: "/about-us", siteId: "" });
-    const result: any = await (controller as any).save({ body: [{ id: "pg1", url: "/about-us", title: "About us" }] }, {});
+    const result = await controller.save({ body: [{ id: "pg1", url: "/about-us", title: "About us" }] } as express.Request, {} as express.Response);
     expect(repos.page.save).toHaveBeenCalledTimes(1);
-    expect(result[0].id).toBe("pg1");
+    expect((result as Page[])[0].id).toBe("pg1");
   });
 
   it("returns 409 instead of 500 when the database rejects a url used on another site", async () => {
     const { controller, repos } = makeSaveController(null);
     repos.page.save.mockRejectedValueOnce(Object.assign(new Error("Duplicate entry 'c1-/' for key 'pages.uq_churchId_url'"), { code: "ER_DUP_ENTRY", errno: 1062 }));
-    const result: any = await (controller as any).save({ body: [{ url: "/", title: "Home", siteId: "site2" }] }, {});
+    const result = await controller.save({ body: [{ url: "/", title: "Home", siteId: "site2" }] } as express.Request, {} as express.Response);
     expect(result).toEqual({ obj: { error: "A page with this url already exists" }, status: 409 });
   });
 
   it("still throws other save errors", async () => {
     const { controller, repos } = makeSaveController(null);
     repos.page.save.mockRejectedValueOnce(new Error("connection lost"));
-    await expect((controller as any).save({ body: [{ url: "/x", title: "X" }] }, {})).rejects.toThrow("connection lost");
+    await expect(controller.save({ body: [{ url: "/x", title: "X" }] } as express.Request, {} as express.Response)).rejects.toThrow("connection lost");
   });
 
   it("saves a page with a new url", async () => {
     const { controller, repos } = makeSaveController(null);
-    const result: any = await (controller as any).save({ body: [{ url: "/new", title: "New" }] }, {});
+    const result = await controller.save({ body: [{ url: "/new", title: "New" }] } as express.Request, {} as express.Response);
     expect(repos.page.loadByUrl).toHaveBeenCalledWith("c1", "/new", "");
-    expect(result[0].id).toBe("new1");
+    expect((result as Page[])[0].id).toBe("new1");
   });
 });

@@ -1,5 +1,8 @@
 import "reflect-metadata";
-jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+import type express from "express";
+import type { AuthenticatedUser } from "@churchapps/apihelper";
+import type { Asset, Report } from "../models/index.js";
+jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 const notifyReportReceived = jest.fn(async () => {});
 const hits = new Map<string, number>();
 const consumeRateLimit = jest.fn(async (buckets: { key: string; max: number }[]) => {
@@ -7,24 +10,31 @@ const consumeRateLimit = jest.fn(async (buckets: { key: string; max: number }[])
   for (const b of buckets) hits.set(b.key, (hits.get(b.key) || 0) + 1);
   return true;
 });
-jest.mock("../helpers/index", () => ({ ipHash: jest.fn(() => "ip-unique"), clientIp: jest.fn(() => "1.2.3.4"), consumeRateLimit: (...a: any[]) => (consumeRateLimit as any)(...a), CommonsMailHelper: { notifyReportReceived } }));
+jest.mock("../helpers/index", () => ({ ipHash: jest.fn(() => "ip-unique"), clientIp: jest.fn(() => "1.2.3.4"), consumeRateLimit: (...a: Parameters<typeof consumeRateLimit>) => consumeRateLimit(...a), CommonsMailHelper: { notifyReportReceived } }));
 jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { currentEnvironment: "prod" } }));
 
 import { CommonsReportController } from "../controllers/CommonsReportController.js";
 import { ipHash } from "../helpers/index.js";
 
+type JsonOut = { obj: unknown; status: number };
+type CreateRequest = Parameters<CommonsReportController["create"]>[0];
+const request = (r: Partial<CreateRequest>) => r as CreateRequest;
+const res = {} as express.Response;
+
 function reportController(signedIn = true) {
-  const repos: any = {
-    report: { create: jest.fn(async (r: any) => ({ ...r, id: "rep00000001" })) },
-    asset: { loadById: jest.fn(async (id: string) => ({ id, name: "Old Hymn" })) }
+  const repos = {
+    report: { create: jest.fn(async (r: Report): Promise<Report> => ({ ...r, id: "rep00000001" })) },
+    asset: { loadById: jest.fn(async (id: string): Promise<Asset> => ({ id, name: "Old Hymn" })) }
   };
-  const au = signedIn
+  const au: Partial<AuthenticatedUser> = signedIn
     ? { id: "user0000001", email: "writer@example.com", firstName: "Ada", lastName: "Crosby", checkAccess: () => false }
     : { checkAccess: () => false };
   const controller = new CommonsReportController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (u: AuthenticatedUser) => Promise<unknown>) => action(au as AuthenticatedUser),
+    json: (obj: unknown, status: number): JsonOut => ({ obj, status })
+  });
   return { controller, repos };
 }
 
@@ -36,7 +46,7 @@ describe("CommonsReportController.create", () => {
 
   it("lets a signed-in writer request removal with assetId and details only", async () => {
     const { controller, repos } = reportController();
-    const result: any = await controller.create({ body: { reporterRole: "writer", assetId: "asset000001", details: "please take this down", reason: "copyright" } } as any, {} as any);
+    const result = await controller.create(request({ body: { reporterRole: "writer", assetId: "asset000001", details: "please take this down", reason: "copyright" } }), res);
     expect(result).toEqual({ id: "rep00000001" });
     expect(repos.report.create).toHaveBeenCalledWith(expect.objectContaining({
       assetId: "asset000001",
@@ -53,26 +63,26 @@ describe("CommonsReportController.create", () => {
   it("accepts reason=other for a writer request and still rate-limits", async () => {
     (ipHash as jest.Mock).mockReturnValue("ip-same");
     const { controller, repos } = reportController();
-    await controller.create({ body: { reporterRole: "writer", assetId: "asset000001", details: "x", reason: "other" } } as any, {} as any);
+    await controller.create(request({ body: { reporterRole: "writer", assetId: "asset000001", details: "x", reason: "other" } }), res);
     expect(repos.report.create).toHaveBeenCalledWith(expect.objectContaining({ reason: "other" }));
-    await controller.create({ body: { reporterRole: "writer", assetId: "asset000001", details: "y", reason: "other" } } as any, {} as any);
-    await controller.create({ body: { reporterRole: "writer", assetId: "asset000001", details: "z", reason: "other" } } as any, {} as any);
-    const limited: any = await controller.create({ body: { reporterRole: "writer", assetId: "asset000001", details: "nope", reason: "other" } } as any, {} as any);
+    await controller.create(request({ body: { reporterRole: "writer", assetId: "asset000001", details: "y", reason: "other" } }), res);
+    await controller.create(request({ body: { reporterRole: "writer", assetId: "asset000001", details: "z", reason: "other" } }), res);
+    const limited = await controller.create(request({ body: { reporterRole: "writer", assetId: "asset000001", details: "nope", reason: "other" } }), res) as JsonOut;
     expect(limited.status).toBe(429);
   });
 
   it("acknowledges the reporter with the stored report, and skips the email on a rejected report", async () => {
     const { controller } = reportController(false);
-    await controller.create({ body: { contentText: "Hymn", details: "stolen", reason: "copyright", name: "Rep Orter", email: "reporter@example.com", signature: "Rep Orter", reporterRole: "owner" } } as any, {} as any);
+    await controller.create(request({ body: { contentText: "Hymn", details: "stolen", reason: "copyright", name: "Rep Orter", email: "reporter@example.com", signature: "Rep Orter", reporterRole: "owner" } }), res);
     expect(notifyReportReceived).toHaveBeenCalledWith(expect.objectContaining({ id: "rep00000001", email: "reporter@example.com", contentText: "Hymn" }));
     notifyReportReceived.mockClear();
-    await controller.create({ body: { contentText: "Hymn", details: "stolen", reason: "copyright" } } as any, {} as any);
+    await controller.create(request({ body: { contentText: "Hymn", details: "stolen", reason: "copyright" } }), res);
     expect(notifyReportReceived).not.toHaveBeenCalled();
   });
 
   it("still requires name, email and signature for anonymous copyright reports", async () => {
     const { controller, repos } = reportController(false);
-    const result: any = await controller.create({ body: { contentText: "Hymn", details: "stolen", reason: "copyright" } } as any, {} as any);
+    const result = await controller.create(request({ body: { contentText: "Hymn", details: "stolen", reason: "copyright" } }), res) as JsonOut;
     expect(result.status).toBe(400);
     expect(repos.report.create).not.toHaveBeenCalled();
   });
@@ -80,8 +90,8 @@ describe("CommonsReportController.create", () => {
   it("limits reports per recipient email even across addresses", async () => {
     const { controller } = reportController(false);
     const body = { contentText: "Hymn", details: "d", reason: "ai", email: "victim@example.com" };
-    for (let i = 0; i < 3; i++) await controller.create({ body } as any, {} as any);
-    const limited: any = await controller.create({ body } as any, {} as any);
+    for (let i = 0; i < 3; i++) await controller.create(request({ body }), res);
+    const limited = await controller.create(request({ body }), res) as JsonOut;
     expect(limited.status).toBe(429);
   });
 });

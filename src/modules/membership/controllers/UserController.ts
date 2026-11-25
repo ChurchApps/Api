@@ -2,7 +2,7 @@ import { controller, httpDelete, httpGet, httpPost } from "inversify-express-uti
 import express from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { body, oneOf, validationResult } from "express-validator";
+import { body, oneOf, validationResult, CustomSanitizer } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch, Person } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
@@ -50,6 +50,11 @@ const REGISTER_MIN_FILL_MS = 2000;
 const CHECK_EMAIL_MAX_PER_IP = 60;
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const VERIFICATION_MAX_ATTEMPTS = 5;
+// Sign-in codes share the users.verification* slot with reset codes; the prefix keeps each usable only on its own endpoint.
+const LOGIN_CODE_PREFIX = "login:";
+const LOGIN_CODE_TTL_MS = 10 * 60 * 1000;
+const CODE_ISSUE_BUCKET = "forgot:";
+const CODE_VERIFY_BUCKET = "verify:";
 
 // A throwaway hash at the same cost factor as real passwords. Compared against when the email is
 // unknown so both failure paths burn the same bcrypt time and cannot be told apart by response time.
@@ -57,7 +62,7 @@ const TIMING_EQUALIZER_HASH = "$2a$10$EIDWkbY3nzGaFR.cML8bBuI7fFECgvh7y93pqA6uT.
 
 // Runs before normalizeEmail and keeps the address as typed. Staff-invited and Google/Microsoft accounts are
 // stored that way (plus-tags and googlemail.com intact), so the canonical form alone never finds them.
-const keepTypedEmail = (value: any, { req }: any) => {
+const keepTypedEmail: CustomSanitizer = (value, { req }) => {
   req.typedEmail = (value || "").toString().trim().toLowerCase();
   return value;
 };
@@ -76,7 +81,7 @@ function generateVerificationCode(): string {
 @controller("/membership/users")
 export class UserController extends MembershipBaseController {
   @httpPost("/login")
-  public async login(req: express.Request<{}, {}, LoginRequest>, res: express.Response): Promise<any> {
+  public async login(req: express.Request<{}, {}, LoginRequest>, res: express.Response): Promise<unknown> {
     // Ensure repositories are hydrated for anonymous access routes
     return this.actionWrapperAnon(req, res, async () => {
       try {
@@ -117,34 +122,112 @@ export class UserController extends MembershipBaseController {
           await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
           return this.json({ mfaRequired: true, mfaToken: MfaHelper.createLoginToken(user.id) }, 200);
         } else {
-          const userChurches = await this.getUserChurches(user.id);
-
-          const churchesOnly: Church[] = [];
-          userChurches.forEach((uc) => churchesOnly.push(uc.church));
-          await ChurchHelper.appendLogos(churchesOnly);
-          userChurches.forEach((uc) => {
-            const foundChurch = ArrayHelper.getOne(churchesOnly, "id", uc.church.id);
-            uc.church.settings = foundChurch?.settings || [];
-          });
-
-          const result = await AuthenticatedUser.login(userChurches, user);
-          if (result === null) return this.denyAccess(["No permissions"]);
-          else {
-            user.lastLogin = new Date();
-            await this.repos.user.save(user);
-            if (!isJwtRefresh) await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
-            MauticHelper.trackLogin(user.email, req.body.appName).catch(() => {});
-            const selectedChurch = userChurches[0];
-            if (selectedChurch) {
-              AuditLogHelper.logLogin(this.repos, selectedChurch.church.id, user.id, true, ip, { email: user.email });
-            }
-            return this.json(result, 200);
-          }
+          return await this.completeLogin(user, req.body.appName, ip, isJwtRefresh ? null : async () => LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp));
         }
       } catch (e) {
         if (Environment.currentEnvironment === "dev") {
           throw e;
         }
+        this.logger.error(e);
+        return this.error(["Unexpected error"]);
+      }
+    });
+  }
+
+  /** The response every successful sign-in returns, whichever credential proved it. */
+  private async completeLogin(user: User, appName: string, ip: string, onSuccess: (() => Promise<void>) | null, auditDetails: object = {}): Promise<unknown> {
+    const userChurches = await this.getUserChurches(user.id);
+
+    const churchesOnly: Church[] = [];
+    userChurches.forEach((uc) => churchesOnly.push(uc.church));
+    await ChurchHelper.appendLogos(churchesOnly);
+    userChurches.forEach((uc) => {
+      const foundChurch = ArrayHelper.getOne(churchesOnly, "id", uc.church.id);
+      uc.church.settings = foundChurch?.settings || [];
+    });
+
+    const result = await AuthenticatedUser.login(userChurches, user);
+    if (result === null) return this.denyAccess(["No permissions"]);
+    user.lastLogin = new Date();
+    await this.repos.user.save(user);
+    if (onSuccess) await onSuccess();
+    MauticHelper.trackLogin(user.email, appName).catch(() => {});
+    const selectedChurch = userChurches[0];
+    if (selectedChurch) {
+      AuditLogHelper.logLogin(this.repos, selectedChurch.church.id, user.id, true, ip, { email: user.email, ...auditDetails });
+    }
+    return this.json(result, 200);
+  }
+
+  @httpPost("/requestLoginCode", body("email").isEmail().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"))
+  public async requestLoginCode(req: express.Request<{}, {}, { email: string }>, res: express.Response): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+        if (!Environment.isMailConfigured) return res.status(400).json({ errors: ["Email is not configured on this server."], mailConfigured: false });
+
+        const rateLimitIp = LoginRateLimiter.getClientIp(req);
+        const account = CODE_ISSUE_BUCKET + (req.body.email || "").toString().trim().toLowerCase();
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
+        await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
+
+        const user = await this.loadByTypedEmail(req, req.body.email);
+        if (user !== null) {
+          const code = generateVerificationCode();
+          await this.repos.user.updateVerification(user.id, LOGIN_CODE_PREFIX + bcrypt.hashSync(code, 10), new Date(Date.now() + LOGIN_CODE_TTL_MS));
+          await UserHelper.sendLoginCodeEmail(user.email, code);
+          AuditLogHelper.log(this.repos, "", user.id, "security", "login_code_requested", "user", user.id, { email: user.email }, AuditLogHelper.getClientIp(req));
+        }
+        // Same answer for unknown addresses, so this cannot be used to find out who has an account.
+        return this.json({ emailed: true }, 200);
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") throw e;
+        this.logger.error(e);
+        return this.error(["Unexpected error"]);
+      }
+    });
+  }
+
+  @httpPost("/loginWithCode", body("email").isEmail().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"), body("code").isString().isLength({ min: 6, max: 6 }).withMessage("enter a 6-digit code"))
+  public async loginWithCode(req: express.Request<{}, {}, { email: string; code: string; appName?: string }>, res: express.Response): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+        // Shares the reset-code bucket, so alternating the two endpoints cannot double the guess budget.
+        const rateLimitIp = LoginRateLimiter.getClientIp(req);
+        const account = CODE_VERIFY_BUCKET + (req.body.email || "").toString().trim().toLowerCase();
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
+
+        const ip = AuditLogHelper.getClientIp(req);
+        const user = await this.loadByTypedEmail(req, req.body.email);
+        const stored = user?.verificationCode || "";
+        const isLive = !!user && stored.startsWith(LOGIN_CODE_PREFIX) && !!user.verificationExpires && new Date(user.verificationExpires).getTime() >= Date.now();
+        let attemptsOk = false;
+        if (isLive) {
+          attemptsOk = (await this.repos.user.incrementVerificationAttempts(user.id)) <= VERIFICATION_MAX_ATTEMPTS;
+          if (!attemptsOk) {
+            await this.repos.user.clearVerification(user.id);
+            AuditLogHelper.log(this.repos, "", user.id, "security", "verification_locked", "user", user.id, { email: user.email }, ip);
+          }
+        }
+        // One bcrypt compare on every path (unknown email, no code, expired, locked), so failures cost the same.
+        const matched = await bcrypt.compare(req.body.code || "", isLive && attemptsOk ? stored.slice(LOGIN_CODE_PREFIX.length) : TIMING_EQUALIZER_HASH);
+        const consumed = isLive && attemptsOk && matched && (await this.repos.user.consumeVerification(user.id, stored));
+        if (!consumed) {
+          await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
+          AuditLogHelper.logLogin(this.repos, "", user?.id || "", false, ip, { email: req.body.email, reason: "Invalid sign-in code" });
+          return this.json({ errors: ["Invalid or expired code"] }, 400);
+        }
+
+        await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
+        // A code proves the mailbox, not the second factor: MFA accounts get the same challenge as a password login.
+        if (await this.repos.userMfa.isEnabled(user.id)) return this.json({ mfaRequired: true, mfaToken: MfaHelper.createLoginToken(user.id) }, 200);
+        return await this.completeLogin(user, req.body.appName, ip, null, { method: "emailCode" });
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") throw e;
         this.logger.error(e);
         return this.error(["Unexpected error"]);
       }
@@ -189,9 +272,9 @@ export class UserController extends MembershipBaseController {
     const allPeople = peopleIds.length > 0 ? await this.repos.person.loadByIdsOnly(peopleIds) : [];
     const allGroups = peopleIds.length > 0 ? await this.repos.groupMember.loadForPeople(peopleIds) : [];
     roleUserChurches.forEach((uc) => {
-      const person = ArrayHelper.getOne(allPeople as any[], "id", uc.person.id);
+      const person = ArrayHelper.getOne(allPeople, "id", uc.person.id);
       if (person) uc.person.membershipStatus = person.membershipStatus;
-      const groups = ArrayHelper.getAll(allGroups as any[], "personId", uc.person.id);
+      const groups = ArrayHelper.getAll(allGroups, "personId", uc.person.id);
       uc.groups = [];
       // PASS groupId TO ID FIELD. OR CREATE NEW groupId FIELD.
       groups.forEach((g) => uc.groups.push({ id: g.groupId, tags: g.tags, name: g.name, leader: g.leader }));
@@ -201,7 +284,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/verifyCredentials", ...emailPasswordValidation)
-  public async verifyCredentials(req: express.Request<{}, {}, EmailPassword>, res: express.Response): Promise<any> {
+  public async verifyCredentials(req: express.Request<{}, {}, EmailPassword>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         const errors = validationResult(req);
@@ -255,7 +338,7 @@ export class UserController extends MembershipBaseController {
 
   // authz-exempt: open to any authenticated user — onboarding helper; provisions an inert user (random temp password, email-verification required) and returns no credentials (password nulled)
   @httpPost("/loadOrCreate", ...loadOrCreateValidation)
-  public async loadOrCreate(req: express.Request<{}, {}, LoadCreateUserRequest>, res: express.Response): Promise<any> {
+  public async loadOrCreate(req: express.Request<{}, {}, LoadCreateUserRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
@@ -308,8 +391,8 @@ export class UserController extends MembershipBaseController {
   }
 
   /** Finds the account by the address as typed first, then by its canonical form (how sign-up stores it). */
-  private async loadByTypedEmail(req: express.Request<any, any, any>, canonical: string): Promise<User | null> {
-    const typed: string = (req as any).typedEmail || "";
+  private async loadByTypedEmail(req: express.Request<unknown, unknown, unknown> & { typedEmail?: string }, canonical: string): Promise<User | null> {
+    const typed: string = req.typedEmail || "";
     const user = typed ? await this.repos.user.loadByEmail(typed) : null;
     if (user || typed === canonical) return user;
     return this.repos.user.loadByEmail(canonical);
@@ -320,7 +403,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/register", ...registerValidation)
-  public async register(req: express.Request<{}, {}, RegisterUserRequest>, res: express.Response): Promise<any> {
+  public async register(req: express.Request<{}, {}, RegisterUserRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
@@ -354,7 +437,7 @@ export class UserController extends MembershipBaseController {
         if (mailConfigured) {
           try {
             const emailStart = Date.now();
-            const emailPromises: Promise<any>[] = [];
+            const emailPromises: Promise<unknown>[] = [];
             emailPromises.push(UserHelper.sendWelcomeEmail(register.email, code, register.appName, register.appUrl));
 
             if (Environment.emailOnRegistration) {
@@ -400,7 +483,7 @@ export class UserController extends MembershipBaseController {
         // Add first user to server admins group
         if (userCount === 0) {
           const roles = await this.repos.role.loadAll();
-          const serverAdmins = roles.find((r: any) => r.churchId === "0" && r.name === "Server Admins");
+          const serverAdmins = roles.find((r) => r.churchId === "0" && r.name === "Server Admins");
           if (serverAdmins) await this.repos.roleMember.save({ roleId: serverAdmins.id, userId: user.id, addedBy: user.id });
         }
         console.log("Register: total", Date.now() - regStart, "ms");
@@ -408,14 +491,14 @@ export class UserController extends MembershipBaseController {
       user.password = null;
       user.authGuid = null;
       const mailConfigured = Environment.isMailConfigured;
-      const response: any = { ...user, mailConfigured };
+      const response: User & { mailConfigured: boolean } = { ...user, mailConfigured };
       if (!mailConfigured && minted) response.authGuid = minted.raw;
       return this.json(response, 200);
     });
   }
 
   @httpPost("/setPasswordGuid", body("newPassword").isString().isLength({ min: 6 }).withMessage("must be at least 6 chars long"))
-  public async setPasswordGuid(req: express.Request<{}, {}, NewPasswordRequest>, res: express.Response): Promise<any> {
+  public async setPasswordGuid(req: express.Request<{}, {}, NewPasswordRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         const errors = validationResult(req);
@@ -441,7 +524,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/forgot", body("userEmail").exists().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"))
-  public async forgotPassword(req: express.Request<{}, {}, ResetPasswordRequest>, res: express.Response): Promise<any> {
+  public async forgotPassword(req: express.Request<{}, {}, ResetPasswordRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         const errors = validationResult(req);
@@ -455,7 +538,7 @@ export class UserController extends MembershipBaseController {
 
         const rateLimitIp = LoginRateLimiter.getClientIp(req);
         // Own bucket so reset requests don't lock out password login; every request counts since each one reissues a code.
-        const account = "forgot:" + (req.body.userEmail || "").toString().trim().toLowerCase();
+        const account = CODE_ISSUE_BUCKET + (req.body.userEmail || "").toString().trim().toLowerCase();
         if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
         await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
 
@@ -464,7 +547,7 @@ export class UserController extends MembershipBaseController {
           user.authGuid = "";
           const code = generateVerificationCode();
           const codeHash = bcrypt.hashSync(code, 10);
-          const promises = [] as Promise<any>[];
+          const promises = [] as Promise<unknown>[];
           promises.push(this.repos.user.save(user));
           promises.push(this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS)));
           promises.push(UserHelper.sendForgotEmail(user.email, code, req.body.appName, req.body.appUrl));
@@ -484,7 +567,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/verifyCode", body("email").isEmail().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"), body("code").isString().isLength({ min: 6, max: 6 }).withMessage("enter a 6-digit code"))
-  public async verifyCode(req: express.Request<{}, {}, { email: string; code: string }>, res: express.Response): Promise<any> {
+  public async verifyCode(req: express.Request<{}, {}, { email: string; code: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         const errors = validationResult(req);
@@ -494,12 +577,12 @@ export class UserController extends MembershipBaseController {
 
         // Per-account bucket that survives code reissue, so /forgot can't reset the guess budget.
         const rateLimitIp = LoginRateLimiter.getClientIp(req);
-        const account = "verify:" + (req.body.email || "").toString().trim().toLowerCase();
+        const account = CODE_VERIFY_BUCKET + (req.body.email || "").toString().trim().toLowerCase();
         if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
 
         const user = await this.loadByTypedEmail(req, req.body.email);
         if (user === null) return this.json({ errors: ["invalid code"] }, 400);
-        if (!user.verificationCode || !user.verificationExpires) return this.json({ errors: ["invalid code"] }, 400);
+        if (!user.verificationCode || !user.verificationExpires || user.verificationCode.startsWith(LOGIN_CODE_PREFIX)) return this.json({ errors: ["invalid code"] }, 400);
         if (new Date(user.verificationExpires).getTime() < Date.now()) return this.json({ errors: ["code expired"] }, 400);
 
         const attempts = await this.repos.user.incrementVerificationAttempts(user.id);
@@ -533,7 +616,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/checkEmail", body("email").isEmail().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }))
-  public async checkEmail(req: express.Request<{}, {}, { email: string }>, res: express.Response): Promise<any> {
+  public async checkEmail(req: express.Request<{}, {}, { email: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
@@ -546,7 +629,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/setDisplayName", ...setDisplayNameValidation)
-  public async setDisplayName(req: express.Request<{}, {}, { firstName: string; lastName: string; userId?: string }>, res: express.Response): Promise<any> {
+  public async setDisplayName(req: express.Request<{}, {}, { firstName: string; lastName: string; userId?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -568,7 +651,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/updateEmail", ...updateEmailValidation)
-  public async updateEmail(req: express.Request<{}, {}, { email: string; userId?: string }>, res: express.Response): Promise<any> {
+  public async updateEmail(req: express.Request<{}, {}, { email: string; userId?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const workingUserId = req.body.userId || au.id;
       if (workingUserId !== au.id && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
@@ -596,7 +679,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/updateOptedOut")
-  public async updateOptedOut(req: express.Request<{}, {}, { personId: string; optedOut: boolean }>, res: express.Response): Promise<any> {
+  public async updateOptedOut(req: express.Request<{}, {}, { personId: string; optedOut: boolean }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       await this.repos.person.updateOptedOut(au.churchId, req.body.personId, req.body.optedOut);
@@ -606,7 +689,7 @@ export class UserController extends MembershipBaseController {
 
   // authz-exempt: self-service — only ever loads/updates au.id (the JWT caller's own user); no request-supplied target id
   @httpPost("/updatePassword", body("newPassword").isLength({ min: 6 }).withMessage("must be at least 6 chars long"), body("currentPassword").isString().notEmpty().withMessage("current password is required"))
-  public async updatePassword(req: express.Request<{}, {}, { newPassword: string; currentPassword: string }>, res: express.Response): Promise<any> {
+  public async updatePassword(req: express.Request<{}, {}, { newPassword: string; currentPassword: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -630,7 +713,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpGet("/search")
-  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
 
@@ -650,7 +733,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpGet("/:id/details")
-  public async details(req: express.Request<{ id: string }, {}, null>, res: express.Response): Promise<any> {
+  public async details(req: express.Request<{ id: string }, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
 
@@ -668,8 +751,8 @@ export class UserController extends MembershipBaseController {
         entry[key] = true;
       };
 
-      (await this.repos.userChurch.loadForUser(user.id)).forEach((uc: any) => upsert(uc.church, "viaMembership"));
-      (await this.repos.rolePermission.loadForUser(user.id, true)).forEach((uc: any) => upsert(uc.church, "viaRoles"));
+      (await this.repos.userChurch.loadForUser(user.id)).forEach((uc) => upsert(uc.church, "viaMembership"));
+      (await this.repos.rolePermission.loadForUser(user.id, true)).forEach((uc) => upsert(uc.church, "viaRoles"));
 
       return this.json({
         id: user.id,
@@ -685,7 +768,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpGet("/:id/impersonate")
-  public async impersonate(req: express.Request<{ id: string }, {}, null>, res: express.Response): Promise<any> {
+  public async impersonate(req: express.Request<{ id: string }, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
 
@@ -698,7 +781,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/sendInviteEmail")
-  public async sendInviteEmail(req: express.Request<{}, {}, { email: string; personName: string; contextName: string; churchName: string }>, res: express.Response): Promise<any> {
+  public async sendInviteEmail(req: express.Request<{}, {}, { email: string; personName: string; contextName: string; churchName: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const { email, personName, contextName } = req.body;
@@ -736,12 +819,12 @@ export class UserController extends MembershipBaseController {
 
   // authz-exempt: self-service — deletes only au.id (caller's own user, userChurch, roleMembers); no request-supplied target id
   @httpDelete("/")
-  public async Delete(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async Delete(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const soleAdminChurchIds = await this.repos.roleMember.loadSoleDomainAdminChurchIds(au.id);
       if (soleAdminChurchIds.length > 0) {
         const churches = await this.repos.church.loadByIds(soleAdminChurchIds);
-        const names = churches.map((c: any) => c.name).join(", ") || "your church";
+        const names = churches.map((c) => c.name).join(", ") || "your church";
         return this.json({ errors: ["You are the only Domain Admin for " + names + ". Make someone else a Domain Admin before deleting your account."] }, 400);
       }
       await this.repos.user.delete(au.id);

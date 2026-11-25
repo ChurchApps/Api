@@ -2,13 +2,14 @@ import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import { Permissions, canViewPage, PUBLIC_VISIBILITY } from "../helpers/index.js";
 import { TreeHelper } from "../helpers/TreeHelper.js";
-import { Element, Page, Section } from "../models/index.js";
+import { Element, Page, Section, Setting } from "../models/index.js";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { ContentBaseController } from "./ContentBaseController.js";
 
 @controller("/content/pages")
 export class PageController2 extends ContentBaseController {
   @httpGet("/:churchId/tree")
-  public async getTree(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getTree(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       let url = req.query.url as string;
       if (url && url[0] !== "/") {
@@ -16,11 +17,11 @@ export class PageController2 extends ContentBaseController {
       }
       const id = req.query.id as string;
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
-      const page = id ? await this.repos.page.load(churchId, id) : await this.repos.page.loadByUrl(churchId, url, siteId);
+      const page: Page = id ? await this.repos.page.load(churchId, id) : await this.repos.page.loadByUrl(churchId, url, siteId);
       // Id-based (editor) loads carry no ?siteId — the page row itself knows its site (footer selection).
-      const effectiveSiteId = (page as any)?.siteId ?? siteId;
+      const effectiveSiteId = page?.siteId ?? siteId;
 
-      let au: any = null;
+      let au: AuthenticatedUser = null;
       try {
         au = this.authUser();
       } catch {
@@ -80,7 +81,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpPost("/:id/publish")
-  public async publish(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async publish(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const page = await this.repos.page.load(au.churchId, id);
@@ -95,7 +96,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpPost("/:id/discard")
-  public async discard(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async discard(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const snapshot = await this.loadPublishedSnapshot(au.churchId, id);
@@ -107,7 +108,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpDelete("/:id/published")
-  public async unpublish(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async unpublish(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.page.savePublished(au.churchId, id, null);
@@ -117,10 +118,10 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpGet("/public/:churchId")
-  public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // A church that disabled its public website exposes no pages to anonymous enumerators (sitemap, etc.).
-      const hideSettings: any[] = await this.repos.setting.loadByKeyNames(churchId, ["hidePublicSite"]);
+      const hideSettings: Setting[] = await this.repos.setting.loadByKeyNames(churchId, ["hidePublicSite"]);
       if (hideSettings?.some((s) => s.keyName === "hidePublicSite" && s.value === "true")) return [];
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       const pages: Page[] = await this.repos.page.loadAll(churchId, siteId);
@@ -131,14 +132,14 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.page.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       return await this.repos.page.loadAll(au.churchId, siteId);
@@ -146,7 +147,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpPost("/duplicate/:id")
-  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -181,7 +182,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpPost("/temp/ai")
-  public async ai(req: express.Request<{}, {}, { page: Page; sections: Section[]; elements: Element[] }>, res: express.Response): Promise<any> {
+  public async ai(req: express.Request<{}, {}, { page: Page; sections: Section[]; elements: Element[] }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -207,7 +208,7 @@ export class PageController2 extends ContentBaseController {
   // Creates a page with its full section/element tree in one call (generated pages). Always inserts: ids and churchId
   // from the body are ignored, and rows must carry their column children so no auto-created columns are needed.
   @httpPost("/importTree")
-  public async importTree(req: express.Request<{}, {}, Page>, res: express.Response): Promise<any> {
+  public async importTree(req: express.Request<{}, {}, Page>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const { title, url, layout, siteId, sections } = req.body;
@@ -244,7 +245,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Page[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Page[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -258,10 +259,11 @@ export class PageController2 extends ContentBaseController {
         let result: Page[];
         try {
           result = await Promise.all(req.body.map((page) => this.repos.page.save(page)));
-        } catch (e: any) {
+        } catch (e: unknown) {
           // The unique key is (churchId, url) across all of the church's sites, while the check above is
           // per site; a url used on another site, or two saves racing, lands here.
-          if (e?.errno === 1062 || e?.code === "ER_DUP_ENTRY") return this.json({ error: "A page with this url already exists" }, 409);
+          const dbError = e as { errno?: number; code?: string } | undefined;
+          if (dbError?.errno === 1062 || dbError?.code === "ER_DUP_ENTRY") return this.json({ error: "A page with this url already exists" }, 409);
           throw e;
         }
         this.bumpSiteCache(au.churchId);
@@ -271,7 +273,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

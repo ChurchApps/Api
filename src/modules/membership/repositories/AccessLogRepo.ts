@@ -17,7 +17,7 @@ export class AccessLogRepo {
       churchId: log.churchId,
       userId: log.userId,
       appName: log.appName,
-      loginTime: sql`NOW()` as any
+      loginTime: sql<Date>`NOW()`
     }).execute();
     return log;
   }
@@ -42,6 +42,6 @@ export class AccessLogRepo {
     return getDb().selectFrom("accessLogs").selectAll().where("churchId", "=", churchId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: AccessLog) { return data; }
+  public convertAllToModel(_churchId: string, data: AccessLog[]) { return data || []; }
 }

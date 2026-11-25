@@ -3,6 +3,10 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Webhook } from "../models/index.js";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
+
+// active is a tinyint column, but callers may also hand in an already-converted boolean.
+export type WebhookRow = Omit<MembershipDatabase["webhooks"], "active"> & { active?: number | boolean };
 
 @injectable()
 export class WebhookRepo {
@@ -24,7 +28,7 @@ export class WebhookRepo {
       connectorConfig: model.connectorConfig ?? null,
       consecutiveFailures: 0,
       createdBy: model.createdBy,
-      dateCreated: sql`NOW()` as any
+      dateCreated: sql<Date>`NOW()`
     }).execute();
     return model;
   }
@@ -38,7 +42,7 @@ export class WebhookRepo {
       active: model.active === false ? 0 : 1,
       connectorType: model.connectorType ?? "standard",
       connectorConfig: model.connectorConfig ?? null,
-      dateModified: sql`NOW()` as any
+      dateModified: sql<Date>`NOW()`
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -69,12 +73,12 @@ export class WebhookRepo {
   // Records an exhausted delivery; auto-disables the webhook once 3 deliveries in a row exhaust.
   public async recordExhaustion(churchId: string, id: string) {
     await getDb().updateTable("webhooks").set({
-      consecutiveFailures: sql`consecutiveFailures + 1` as any,
-      active: sql`IF(consecutiveFailures + 1 >= 3, 0, active)` as any
+      consecutiveFailures: sql<number>`consecutiveFailures + 1`,
+      active: sql<number>`IF(consecutiveFailures + 1 >= 3, 0, active)`
     }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  private rowToModel(row: any): Webhook {
+  private rowToModel(row: WebhookRow): Webhook {
     if (!row) return null;
     let events: string[] = [];
     try { events = JSON.parse(row.events ?? "[]"); } catch { events = []; }
@@ -95,6 +99,6 @@ export class WebhookRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) { return this.rowToModel(data); }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []).map((d) => this.rowToModel(d)); }
+  public convertToModel(_churchId: string, data: WebhookRow) { return this.rowToModel(data); }
+  public convertAllToModel(_churchId: string, data: WebhookRow[]) { return (data || []).map((d) => this.rowToModel(d)); }
 }

@@ -1,6 +1,19 @@
 import { type Kysely, sql } from "kysely";
 
+// Skip when the table is already there: on databases whose migration history was reset
+// (demo), this migration is replayed and the index creation below would fail on a
+// second run. 2026-11-12_drop_hymns removes the table afterwards either way.
+async function tableExists(db: Kysely<any>, table: string): Promise<boolean> {
+  const result = await sql<{ count: number }>`
+    SELECT COUNT(*) as count
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${table}
+  `.execute(db);
+  return Number((result.rows[0] as any)?.count ?? 0) > 0;
+}
+
 export async function up(db: Kysely<any>): Promise<void> {
+  if (await tableExists(db, "hymns")) return;
   await db.schema
     .createTable("hymns")
     .ifNotExists()

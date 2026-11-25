@@ -43,6 +43,7 @@ interface PeopleTable {
   conversationId?: string;
   optedOut?: boolean;
   smsOptedOut?: boolean;
+  disablePrivateMessages?: boolean;
   nametagNotes?: string;
   donorNumber?: string;
   importKey?: string;
@@ -90,7 +91,7 @@ export interface MembershipDatabase {
   people: PeopleTable;
   personFields: PersonField;
   personFieldValues: PersonFieldValue;
-  questions: Question & { removed?: boolean };
+  questions: Omit<Question, "showIf"> & { removed?: boolean; showIf?: string | null };
   roles: Role;
   roleMembers: Omit<RoleMember, "user">;
   rolePermissions: RolePermission;

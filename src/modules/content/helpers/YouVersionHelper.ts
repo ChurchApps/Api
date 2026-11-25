@@ -1,4 +1,5 @@
 import axios from "axios";
+import { BibleHttpError, BibleSearchResponse, BibleSearchVerse, YouVersionBible, YouVersionBook, YouVersionNumbered, YouVersionPage, YouVersionPassage, YouVersionTranslation } from "./BibleApiTypes.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models/index.js";
 
@@ -21,10 +22,10 @@ export class YouVersionHelper {
     let hasMore = true;
 
     while (hasMore) {
-      const data = await this.getContent(url);
+      const data = await this.getContent<YouVersionPage<YouVersionTranslation>>(url);
 
       if (data.data) {
-        data.data.forEach((d: any) => {
+        data.data.forEach((d) => {
           const translation: BibleTranslation = {
             attributionRequired: true,
             attributionString: d.copyright || "",
@@ -100,11 +101,11 @@ export class YouVersionHelper {
   static async getBooks(translationKey: string) {
     const result: BibleBook[] = [];
     const url = this.baseUrl + "/bibles/" + translationKey + "/books";
-    const data = await this.getContent(url);
+    const data = await this.getContent<YouVersionPage<YouVersionBook> | YouVersionBook[]>(url);
 
-    const books = data.data || data;
+    const books = (data as YouVersionPage<YouVersionBook>).data || data;
     if (Array.isArray(books)) {
-      books.forEach((d: any, i: number) => {
+      books.forEach((d: YouVersionBook, i: number) => {
         result.push({
           translationKey: this.cacheKey(translationKey),
           keyName: d.id,
@@ -120,11 +121,11 @@ export class YouVersionHelper {
   static async getChapters(translationKey: string, bookKey: string) {
     const result: BibleChapter[] = [];
     const url = this.baseUrl + "/bibles/" + translationKey + "/books/" + bookKey + "/chapters";
-    const data = await this.getContent(url);
+    const data = await this.getContent<YouVersionPage<YouVersionNumbered>>(url);
 
     // YouVersion returns: { data: [{ id: 1, passage_id: "GEN.1", title: "1", verses: [...] }, ...] }
     if (data.data) {
-      data.data.forEach((d: any) => {
+      data.data.forEach((d) => {
         // Skip intro chapters (id like "INTRO1")
         const chapterNum = typeof d.id === "number" ? d.id : parseInt(d.id, 10);
         if (!isNaN(chapterNum)) {
@@ -147,11 +148,11 @@ export class YouVersionHelper {
     const chapterNumber = parts[1];
 
     const url = this.baseUrl + "/bibles/" + translationKey + "/books/" + bookKey + "/chapters/" + chapterNumber + "/verses";
-    const data = await this.getContent(url);
+    const data = await this.getContent<YouVersionPage<YouVersionNumbered>>(url);
 
     // YouVersion returns: { data: [{ id: "1", passage_id: "GEN.1.1", title: "1" }, ...] }
     if (data.data) {
-      data.data.forEach((d: any) => {
+      data.data.forEach((d) => {
         const verseNum = typeof d.id === "number" ? d.id : parseInt(d.id, 10);
         if (!isNaN(verseNum)) {
           result.push({
@@ -180,7 +181,7 @@ export class YouVersionHelper {
     const chapterKey = `${bookKey}.${chapterNumber}`;
     const url = this.baseUrl + "/bibles/" + translationKey + "/passages/" + chapterKey + "?format=html";
 
-    const data = await this.getContent(url);
+    const data = await this.getContent<YouVersionPassage>(url);
     if (data.content) {
       const verses = this.parseChapterHtml(data.content, bookKey, chapterNumber, translationKey);
       for (const verse of verses) {
@@ -252,11 +253,11 @@ export class YouVersionHelper {
 
   static async getCopyright(translationKey: string) {
     const url = this.baseUrl + "/bibles/" + translationKey;
-    const data = await this.getContent(url);
+    const data = await this.getContent<YouVersionBible>(url);
     return data.data?.copyright || "";
   }
 
-  static async search(_translationKey: string, _query: string, _limit: number) {
+  static async search(_translationKey: string, _query: string, _limit: number): Promise<BibleSearchResponse> {
     return {
       data: {
         query: _query,
@@ -264,7 +265,7 @@ export class YouVersionHelper {
         offset: 0,
         total: 0,
         verseCount: 0,
-        verses: [] as any[]
+        verses: [] as BibleSearchVerse[]
       }
     };
     // YouVersion has not implemented yet
@@ -276,17 +277,18 @@ export class YouVersionHelper {
   // Rate-limit circuit breaker: after an upstream 429, skip calls until the retry-after window clears so cache misses can't keep the limit pinned.
   static blockedUntil = 0;
 
-  static async getContent(url: string) {
+  static async getContent<T = unknown>(url: string): Promise<T> {
     if (Date.now() < this.blockedUntil) {
-      const err: any = new Error("YouVersion rate limit cooldown");
+      const err: BibleHttpError = new Error("YouVersion rate limit cooldown");
       err.status = 429;
       err.response = { status: 429 };
       throw err;
     }
     try {
-      const resp = await axios.get(url, { headers: { "X-YVP-App-Key": Environment.youVersionApiKey } });
+      const resp = await axios.get<T>(url, { headers: { "X-YVP-App-Key": Environment.youVersionApiKey } });
       return resp.data;
-    } catch (error: any) {
+    } catch (e) {
+      const error = e as BibleHttpError;
       if (error.response?.status) {
         error.status = error.response.status;
         if (error.response.status === 429) {

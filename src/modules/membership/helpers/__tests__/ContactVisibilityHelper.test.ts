@@ -1,34 +1,36 @@
 jest.mock("../index.js", () => ({ Permissions: { people: { view: "peopleView" } } }));
 
 import { ContactVisibilityHelper } from "../ContactVisibilityHelper.js";
+import type { GroupMember, Person, Setting, VisibilityPreference } from "../../models/index.js";
+import type { Repos } from "../../repositories/index.js";
 
-function fakeRepos(opts: { settings?: any[]; prefs?: any[]; groupRows?: any[]; viewerRows?: any[] } = {}) {
-  return {
+function fakeRepos(opts: { settings?: Setting[]; prefs?: VisibilityPreference[]; groupRows?: GroupMember[]; viewerRows?: GroupMember[] } = {}) {
+  return Object.assign({} as Repos, {
     setting: {
       loadPublicSettings: jest.fn(async () => opts.settings ?? []),
-      convertAllToModel: (_c: string, rows: any[]) => rows
+      convertAllToModel: (_c: string, rows: Setting[]) => rows
     },
     visibilityPreference: { loadForPeople: jest.fn(async () => opts.prefs ?? []) },
     groupMember: {
       loadForPeople: jest.fn(async () => opts.groupRows ?? []),
       loadForPerson: jest.fn(async () => opts.viewerRows ?? [])
     }
-  } as any;
+  });
 }
 
-function viewer(opts: any = {}) {
+function viewer(opts: { personId?: string; membershipStatus?: string; groupIds?: string[]; leaderGroupIds?: string[]; access?: unknown[] } = {}) {
   return {
     churchId: "c1",
     personId: opts.personId ?? "viewer",
     membershipStatus: opts.membershipStatus ?? "Member",
     groupIds: opts.groupIds ?? [],
     leaderGroupIds: opts.leaderGroupIds ?? [],
-    checkAccess: (perm: any) => (opts.access ?? []).includes(perm)
+    checkAccess: (perm: unknown) => (opts.access ?? []).includes(perm)
   };
 }
 
 function target(id = "t1") {
-  return { id, name: { display: "Target " + id }, contactInfo: { email: id + "@x.org", mobilePhone: "111", homePhone: "222", workPhone: "333", address1: "1 Main", address2: "Apt 2", city: "Springfield", state: "IL", zip: "62701" } } as any;
+  return { id, name: { display: "Target " + id }, contactInfo: { email: id + "@x.org", mobilePhone: "111", homePhone: "222", workPhone: "333", address1: "1 Main", address2: "Apt 2", city: "Springfield", state: "IL", zip: "62701" } } as Person;
 }
 
 describe("ContactVisibilityHelper.canSee", () => {

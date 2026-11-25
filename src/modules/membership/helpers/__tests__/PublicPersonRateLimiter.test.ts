@@ -1,13 +1,14 @@
 import { PublicPersonRateLimiter } from "../PublicPersonRateLimiter.js";
+import type { Repos } from "../../repositories/Repos.js";
 
 function fakeRepos() {
   const counts: Record<string, number> = {};
-  const repos: any = {
+  const repos = Object.assign({} as Repos, {
     loginAttempt: {
       loadCount: jest.fn(async (key: string) => counts[key] ?? 0),
       increment: jest.fn(async (key: string) => { counts[key] = (counts[key] ?? 0) + 1; })
     }
-  };
+  });
   return { repos, counts };
 }
 

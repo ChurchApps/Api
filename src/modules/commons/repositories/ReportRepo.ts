@@ -19,7 +19,7 @@ export class ReportRepo {
       email: report.email,
       signature: report.signature,
       status: "open"
-    } as any).execute();
+    }).execute();
     return report;
   }
 
@@ -39,6 +39,6 @@ export class ReportRepo {
   }
 
   public async update(id: string, fields: Partial<Report>): Promise<void> {
-    await getDb().updateTable("reports").set({ ...fields } as any).where("id", "=", id).execute();
+    await getDb().updateTable("reports").set({ ...fields }).where("id", "=", id).execute();
   }
 }

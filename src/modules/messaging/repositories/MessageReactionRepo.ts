@@ -42,6 +42,6 @@ export class MessageReactionRepo {
       .execute();
   }
 
-  public convertToModel(data: any) { return data as MessageReaction; }
-  public convertAllToModel(data: any[]) { return (data || []) as MessageReaction[]; }
+  public convertToModel(data: MessageReaction) { return data; }
+  public convertAllToModel(data: MessageReaction[]) { return data || []; }
 }

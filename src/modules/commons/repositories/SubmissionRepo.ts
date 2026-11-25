@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
+import type { SubmissionRow } from "../db/DatabaseTypes.js";
 import { Submission } from "../models/index.js";
 import { NEW_PACKAGE_TYPES } from "../helpers/SubmitValidation.js";
 
@@ -24,11 +25,13 @@ export interface QueueRow extends Submission {
   byCoPublisher?: number;
 }
 
-const parseJson = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
+const parseJson = <V>(v: V | string): V => (typeof v === "string" ? JSON.parse(v) as V : v);
 
-function fromRow<T extends Submission>(row: any): T {
-  if (!row) return row;
-  return { ...row, payload: parseJson(row.payload) || {}, filesChanged: row.filesChanged ? parseJson(row.filesChanged) : undefined };
+type StoredRow<T extends Submission> = Omit<T, "payload" | "filesChanged"> & Pick<SubmissionRow, "payload" | "filesChanged">;
+
+function fromRow<T extends Submission>(row: StoredRow<T> | undefined): T {
+  if (!row) return undefined;
+  return { ...row, payload: parseJson(row.payload) || {}, filesChanged: row.filesChanged ? parseJson(row.filesChanged) : undefined } as T;
 }
 
 @injectable()
@@ -44,7 +47,7 @@ export class SubmissionRepo {
       type: sub.type || "new",
       payload: JSON.stringify(sub.payload || {}),
       note: sub.note
-    } as any).execute();
+    }).execute();
     return sub;
   }
 
@@ -140,11 +143,11 @@ export class SubmissionRepo {
     const result = await sql`update submissions set status = 'pending', submittedAt = now(), triageScore = ${triageScore}
       where id = ${id} and status = 'draft'
       and not exists (select 1 from (select 1 from submissions where assetId = ${assetId} and status = 'pending') as p)`.execute(getDb());
-    return Number((result as any).numAffectedRows || 0) > 0;
+    return Number(result.numAffectedRows || 0) > 0;
   }
 
   public async update(id: string, fields: Partial<Submission>): Promise<void> {
-    const values: any = { ...fields };
+    const values: Partial<SubmissionRow> = { ...fields };
     if (fields.payload !== undefined) values.payload = JSON.stringify(fields.payload);
     if (fields.filesChanged !== undefined) values.filesChanged = JSON.stringify(fields.filesChanged);
     await getDb().updateTable("submissions").set(values).where("id", "=", id).execute();

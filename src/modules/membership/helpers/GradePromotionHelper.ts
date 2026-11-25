@@ -28,7 +28,7 @@ export class GradePromotionHelper {
     const lastRunByChurch = new Map<string, Setting>();
     lastRunSettings.forEach((s) => lastRunByChurch.set(s.churchId, s));
 
-    const churches = (await repos.church.loadByIds([...new Set(dateSettings.map((s) => s.churchId))])) as any[];
+    const churches = await repos.church.loadByIds([...new Set(dateSettings.map((s) => s.churchId))]);
     const timeZoneByChurch = new Map<string, string>();
     churches.forEach((c) => timeZoneByChurch.set(c.id, c.timeZone));
 

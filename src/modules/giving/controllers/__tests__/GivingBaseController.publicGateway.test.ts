@@ -9,7 +9,7 @@ describe("GivingBaseController.toPublicGateway", () => {
     const settings = JSON.stringify({ sandbox: true, secret: "x" });
     const pub = GivingBaseController.toPublicGateway({ id: "G1", provider: "stripe", publicKey: "pk", privateKey: "sk", webhookKey: "wh", currency: "usd", settings });
     expect(pub).toEqual(expect.objectContaining({ id: "G1", provider: "stripe", publicKey: "pk", currency: "usd", settings: { sandbox: true } }));
-    expect(pub.privateKey).toBeUndefined();
-    expect(pub.webhookKey).toBeUndefined();
+    expect(pub).not.toHaveProperty("privateKey");
+    expect(pub).not.toHaveProperty("webhookKey");
   });
 });

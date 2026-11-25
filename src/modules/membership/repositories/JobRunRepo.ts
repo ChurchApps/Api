@@ -11,7 +11,7 @@ export class JobRunRepo {
       id: run.id,
       jobName: run.jobName,
       status: run.status,
-      startedAt: DateHelper.toMysqlDate(run.startedAt) as any,
+      startedAt: sql<Date>`${DateHelper.toMysqlDate(run.startedAt)}`,
       durationMs: run.durationMs,
       errorMessage: run.errorMessage
     }).execute();
@@ -37,9 +37,9 @@ export class JobRunRepo {
   }
 
   public async deleteOld(days: number = 30): Promise<void> {
-    await getDb().deleteFrom("jobRuns").where("startedAt", "<", sql`DATE_SUB(NOW(), INTERVAL ${days} DAY)` as any).execute();
+    await getDb().deleteFrom("jobRuns").where("startedAt", "<", sql<Date>`DATE_SUB(NOW(), INTERVAL ${days} DAY)`).execute();
   }
 
-  public convertToModel(data: any) { return data; }
-  public convertAllToModel(data: any[]) { return data || []; }
+  public convertToModel(data: JobRun) { return data; }
+  public convertAllToModel(data: JobRun[]) { return data || []; }
 }

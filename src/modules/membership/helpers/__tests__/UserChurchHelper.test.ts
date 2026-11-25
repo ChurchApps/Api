@@ -1,9 +1,11 @@
+import type { UserChurch } from "../../models/index.js";
+
 // Issue #1251: two people in a church share an email. Adding the second one to a role created
 // a user that createForNewUser linked to whichever person the database returned first, and the
 // admin's later POST /userchurch for the chosen person was ignored because a link already existed.
 
 const mockRows: { personId: string; churchId: string }[] = [];
-const mockSave = jest.fn(async (uc: any) => uc);
+const mockSave = jest.fn(async (uc: UserChurch) => uc);
 
 jest.mock("kysely", () => ({ ...jest.requireActual("kysely"), sql: () => ({ execute: async () => ({ rows: mockRows }) }) }));
 jest.mock("../../db/index", () => ({ getDb: () => ({}) }));

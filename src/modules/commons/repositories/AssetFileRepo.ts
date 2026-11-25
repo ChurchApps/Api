@@ -16,7 +16,7 @@ export class AssetFileRepo {
       sizeBytes: file.sizeBytes,
       contentHash: file.contentHash,
       uploadedBy: file.uploadedBy
-    } as any).execute();
+    }).execute();
     return file;
   }
 
@@ -55,7 +55,7 @@ export class AssetFileRepo {
   }
 
   public async update(id: string, fields: Partial<AssetFile>): Promise<void> {
-    await getDb().updateTable("assetFiles").set({ ...fields } as any).where("id", "=", id).execute();
+    await getDb().updateTable("assetFiles").set({ ...fields }).where("id", "=", id).execute();
   }
 
   public async delete(id: string): Promise<void> {

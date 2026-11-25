@@ -1,16 +1,18 @@
 import { controller, httpPost, httpGet, httpPut, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
-import { Registration, RegistrationMember, RegistrationType, RegistrationSelection, RegistrationCoupon, RegistrationPayment } from "../models/index.js";
-import { Permissions, RegistrationHelper, RegistrationPricingHelper } from "../helpers/index.js";
+import { Event, Registration, RegistrationMember, RegistrationType, RegistrationSelection, RegistrationSelectionChoice, RegistrationCoupon, RegistrationPayment } from "../models/index.js";
+import { Permissions, RegistrationHelper, RegistrationPaymentHelper, RegistrationPricingHelper } from "../helpers/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
+import type { ChargeResult } from "../../../shared/helpers/gateways/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
 import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
+import { CurrencyHelper } from "@churchapps/apihelper";
 
 interface RegisterMemberInput { personId?: string; firstName: string; lastName: string; registrationTypeId?: string }
 interface RegisterSelectionInput { selectionId: string; quantity?: number; registrationMemberId?: string }
@@ -33,13 +35,68 @@ interface RegisterRequest {
   captchaPass?: string;
   paymentMethodId?: string;
   currency?: string;
+  payLater?: boolean;
 }
+
+// Payment fields shared by POST /register and POST /:id/pay.
+type ChargeRequestBody = Pick<RegisterRequest, "provider" | "gatewayId" | "type" | "token" | "id" | "customerId" | "paymentMethodId" | "currency">;
+
+interface EditRegistrationBody {
+  notes?: string;
+  formSubmissionId?: string;
+  members?: RegisterMemberInput[];
+  selections?: RegisterSelectionInput[];
+}
+
+// Staff-keyed cash, check or other payment or refund; checkNumber is kept for checks only.
+interface OfflinePaymentBody {
+  amount?: number | string;
+  method?: string;
+  checkNumber?: string;
+}
+
+interface GatewayRefundBody {
+  amount?: number | string;
+}
+
+type PaymentResult = { registration: Registration; payments: RegistrationPayment[] };
+
+interface RegistrationChargeOutcome {
+  ok: boolean;
+  error?: string;
+  requiresAction?: boolean;
+  data?: ChargeResult["data"];
+  transactionId?: string;
+}
+
+// Registration as returned by GET /:id and GET /person/:personId, with its related records attached.
+interface RegistrationDetail extends Registration {
+  event?: Event;
+  selectionChoices?: RegistrationSelectionChoice[];
+  payments?: RegistrationPayment[];
+}
+
+// The registration fee charge handed to GatewayService (a donation-style payment request with no funds).
+interface RegistrationChargeData {
+  amount: number;
+  currency: string;
+  type: string;
+  id?: string;
+  customerId?: string;
+  paymentMethodId?: string;
+  funds: { fundId?: string; amount?: number }[];
+  person: { email?: string; name?: string };
+  church: { churchURL?: string };
+}
+
+// loadActiveWithUsage rows: the type/selection columns plus a computed usage count.
+type WithUsage<T> = T & { used?: number | string };
 
 @controller("/content/registrations")
 export class RegistrationController extends ContentBaseController {
 
   @httpPost("/register")
-  public async register(req: express.Request<{}, {}, RegisterRequest>, res: express.Response): Promise<any> {
+  public async register(req: express.Request<{}, {}, RegisterRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = req.body;
       // authz-exempt: anonymous guest checkout — the public wizard runs logged out and posts churchId directly
@@ -99,6 +156,10 @@ export class RegistrationController extends ContentBaseController {
         if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
       }
       if (RegistrationPricingHelper.membersMissingPaidType(activeTypes, members)) return this.json({ error: "Attendee type required" }, 400);
+      if (!data.guestInfo) {
+        const alreadyRegistered = await this.repos.registration.loadRegisteredPersonIds(churchId, data.eventId, this.linkedPersonIds(members, personId));
+        if (alreadyRegistered.length > 0) return this.json({ error: "Already registered for this event", status: "already-registered", personIds: alreadyRegistered }, 409);
+      }
 
       const selections = await this.repos.registrationSelection.loadForEvent(churchId, data.eventId);
       const activeSelections = selections.filter((s: RegistrationSelection) => s.active !== false);
@@ -123,6 +184,11 @@ export class RegistrationController extends ContentBaseController {
         couponId = coupon.id;
       }
 
+      // Staff adds and churches with no online giving already skip the charge; otherwise a member may
+      // skip it only when the event allows paying later.
+      const takesPayment = total > 0 && !staffAdd && await this.hasGateway(churchId);
+      if (takesPayment && data.payLater && !event.allowPayLater) return this.json({ error: "Pay later is not available for this event" }, 400);
+
       const registration: Registration = {
         churchId,
         eventId: data.eventId,
@@ -144,7 +210,7 @@ export class RegistrationController extends ContentBaseController {
           await this.insertMembers(churchId, registration.id, members, typeMap, true);
           try {
             const church = await getMembershipModuleGateway().loadChurch(churchId);
-            await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, members as any, church?.timeZone);
+            await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, members, church?.timeZone);
           } catch (e) { console.error("Failed to send waitlist email", e); }
           return redact({ ...registration, members, status: "waitlisted" });
         }
@@ -170,21 +236,23 @@ export class RegistrationController extends ContentBaseController {
         return this.json({ error: "Selection is at capacity", status: "selection-full", selectionId: choiceResult.fullSelectionId }, 409);
       }
 
-      // Charge when priced; free registrations are already confirmed. Staff adds and churches with no
-      // online giving stay pending with a balance due, paid later from /mobile/registrations or in person.
-      if (total > 0 && !staffAdd && await this.hasGateway(churchId)) {
+      // Charge when priced; free registrations are already confirmed. Staff adds, churches with no online
+      // giving and pay-later signups stay pending with a balance due, paid later from /mobile/registrations
+      // or in person. A type with a deposit charges only the deposit and leaves the rest as that balance.
+      if (takesPayment && !data.payLater) {
         if (!au?.id && !CaptchaPass.verify(req, churchId)) {
           await this.deleteCascade(churchId, registration.id);
           return this.json({ error: "Captcha verification required" }, 403);
         }
-        const charge = await this.processRegistrationCharge(churchId, total, data, { personId, email, name });
+        const dueNow = RegistrationPricingHelper.computeDueNow(activeTypes, activeSelections, members, choices, total);
+        const charge = await this.processRegistrationCharge(churchId, dueNow, data, { personId, email, name });
         if (!charge.ok) {
           await this.deleteCascade(churchId, registration.id);
           return this.json({ error: charge.error || "Payment failed" }, 400);
         }
         if (charge.requiresAction) return redact({ ...registration, members: memberResult.members, payment: charge.data });
-        await this.recordPayment(churchId, registration.id, charge, total, data.type, personId);
-        registration.amountPaid = total;
+        await this.recordPayment(churchId, registration.id, charge, dueNow, data.type, personId);
+        registration.amountPaid = dueNow;
         registration.status = "confirmed";
         await this.repos.registration.save(registration);
       }
@@ -203,24 +271,25 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/types/event/:eventId")
-  public async getTypesForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getTypesForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public wizard needs attendee types for the church's public event
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "churchId required" }, 400);
-      const rows = await this.repos.registrationType.loadActiveWithUsage(churchId, eventId);
-      return rows.map((r: any) => {
+      const rows: WithUsage<RegistrationType>[] = await this.repos.registrationType.loadActiveWithUsage(churchId, eventId);
+      return rows.map((r) => {
         const capacity = r.capacity == null ? null : Number(r.capacity);
         const used = Number(r.used) || 0;
-        return { ...r, price: r.price == null ? null : Number(r.price), remainingCapacity: capacity == null ? null : Math.max(0, capacity - used) };
+        return { ...r, price: r.price == null ? null : Number(r.price), depositAmount: r.depositAmount == null ? null : Number(r.depositAmount), remainingCapacity: capacity == null ? null : Math.max(0, capacity - used) };
       });
     });
   }
 
   @httpPost("/types")
-  public async saveType(req: express.Request<{}, {}, RegistrationType[]>, res: express.Response): Promise<any> {
+  public async saveType(req: express.Request<{}, {}, RegistrationType[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      if (req.body.some((t) => !RegistrationPricingHelper.isValidDeposit(t))) return this.json({ error: "Deposit must be more than 0 and no more than the price" }, 400);
       const result: RegistrationType[] = [];
       for (const t of req.body) {
         t.churchId = au.churchId;
@@ -231,7 +300,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpDelete("/types/:id")
-  public async deleteType(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteType(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       await this.repos.registrationType.delete(au.churchId, id);
@@ -240,13 +309,13 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/selections/event/:eventId")
-  public async getSelectionsForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getSelectionsForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public wizard needs selections for the church's public event
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "churchId required" }, 400);
-      const rows = await this.repos.registrationSelection.loadActiveWithUsage(churchId, eventId);
-      return rows.map((r: any) => {
+      const rows: WithUsage<RegistrationSelection>[] = await this.repos.registrationSelection.loadActiveWithUsage(churchId, eventId);
+      return rows.map((r) => {
         const capacity = r.capacity == null ? null : Number(r.capacity);
         const used = Number(r.used) || 0;
         return { ...r, price: r.price == null ? null : Number(r.price), remainingCapacity: capacity == null ? null : Math.max(0, capacity - used) };
@@ -255,7 +324,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpPost("/selections")
-  public async saveSelection(req: express.Request<{}, {}, RegistrationSelection[]>, res: express.Response): Promise<any> {
+  public async saveSelection(req: express.Request<{}, {}, RegistrationSelection[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const result: RegistrationSelection[] = [];
@@ -268,7 +337,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpDelete("/selections/:id")
-  public async deleteSelection(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteSelection(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       await this.repos.registrationSelection.delete(au.churchId, id);
@@ -277,7 +346,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpPost("/coupons/validate")
-  public async validateCoupon(req: express.Request<{}, {}, { churchId?: string; eventId: string; code: string; memberCount?: number }>, res: express.Response): Promise<any> {
+  public async validateCoupon(req: express.Request<{}, {}, { churchId?: string; eventId: string; code: string; memberCount?: number }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public wizard validates a discount code before checkout
       const churchId = req.body.churchId;
@@ -290,17 +359,17 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/coupons/event/:eventId")
-  public async getCouponsForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getCouponsForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
-      const coupons = await this.repos.registrationCoupon.loadForEvent(au.churchId, eventId);
-      for (const c of coupons) (c as any).uses = await this.repos.registration.countActiveForCoupon(au.churchId, c.id);
+      const coupons: (RegistrationCoupon & { uses?: number })[] = await this.repos.registrationCoupon.loadForEvent(au.churchId, eventId);
+      for (const c of coupons) c.uses = await this.repos.registration.countActiveForCoupon(au.churchId, c.id);
       return coupons;
     });
   }
 
   @httpPost("/coupons")
-  public async saveCoupon(req: express.Request<{}, {}, RegistrationCoupon[]>, res: express.Response): Promise<any> {
+  public async saveCoupon(req: express.Request<{}, {}, RegistrationCoupon[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const result: RegistrationCoupon[] = [];
@@ -313,7 +382,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpDelete("/coupons/:id")
-  public async deleteCoupon(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteCoupon(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       await this.repos.registrationCoupon.delete(au.churchId, id);
@@ -322,7 +391,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/payments/:registrationId")
-  public async getPayments(@requestParam("registrationId") registrationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPayments(@requestParam("registrationId") registrationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, registrationId);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
@@ -332,23 +401,23 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/event/:eventId")
-  public async getForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.view)) {
         // Leaders of the event's group read its registrations, like its RSVPs.
         const event = await this.repos.event.load(au.churchId, eventId);
         if (!event?.groupId || !au.leaderGroupIds?.includes(event.groupId)) return this.json({}, 401);
       }
-      const registrations = await this.repos.registration.loadForEvent(au.churchId, eventId);
+      const registrations: Registration[] = await this.repos.registration.loadForEvent(au.churchId, eventId);
       for (const reg of registrations) {
-        (reg as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);
+        reg.members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);
       }
       return registrations;
     });
   }
 
   @httpGet("/event/:eventId/count")
-  public async getCountForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getCountForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public count for the public event's church
       const churchId = req.query.churchId?.toString();
@@ -358,36 +427,82 @@ export class RegistrationController extends ContentBaseController {
     });
   }
 
+  // Which of the caller's household members are already on an active registration for the event.
+  @httpGet("/event/:eventId/household")
+  public async getHouseholdRegisteredForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return { personIds: [] as string[] };
+      const household = await getMembershipModuleGateway().loadHouseholdPeople(au.churchId, [au.personId]);
+      const householdIds = [...new Set([au.personId, ...household.map((p) => p.id)])];
+      const personIds = await this.repos.registration.loadRegisteredPersonIds(au.churchId, eventId, householdIds);
+      return { personIds };
+    });
+  }
+
+  // Emails each active registrant on the event who still owes money their total, paid, balance and the
+  // My Registrations pay link. Waitlisted registrations can't be paid yet, so they're skipped with cancelled ones.
+  @httpPost("/event/:eventId/balance-reminders")
+  public async sendBalanceReminders(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const event = await this.repos.event.load(au.churchId, eventId);
+      if (!event) return this.json({ error: "Event not found" }, 404);
+
+      const registrations: Registration[] = await this.repos.registration.loadForEvent(au.churchId, eventId);
+      const owing = registrations.filter((r) => (r.status === "pending" || r.status === "confirmed") && r.personId && RegistrationPaymentHelper.balanceDue(r) > 0);
+      if (owing.length === 0) return { sent: 0 };
+
+      const church = await getMembershipModuleGateway().loadChurch(au.churchId);
+      const payUrl = this.payUrl(church);
+      const currency = await this.churchCurrency(au.churchId);
+      const money = (n: number) => CurrencyHelper.formatCurrencyWithLocale(n, currency);
+      let sent = 0;
+      for (const reg of owing) {
+        try {
+          const person = await getMembershipModuleGateway().loadPerson(au.churchId, reg.personId);
+          if (!person?.email) continue;
+          const total = RegistrationPricingHelper.num(reg.totalAmount);
+          const paid = RegistrationPricingHelper.num(reg.amountPaid);
+          await RegistrationHelper.sendBalanceReminderEmail(person.email, church?.name || "Church", event, { total: money(total), paid: money(paid), balance: money(RegistrationPaymentHelper.balanceDue(reg)) }, payUrl, church?.timeZone);
+          sent++;
+        } catch (e) {
+          console.error("Failed to send balance reminder email", e);
+        }
+      }
+      return { sent };
+    });
+  }
+
   @httpGet("/person/:personId")
-  public async getForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (au.personId !== personId && !au.checkAccess(Permissions.registrations.view)) return this.json({}, 401);
-      const registrations = await this.repos.registration.loadForPerson(au.churchId, personId);
+      const registrations: RegistrationDetail[] = await this.repos.registration.loadForPerson(au.churchId, personId);
       for (const reg of registrations) {
-        (reg as any).event = await this.repos.event.load(au.churchId, reg.eventId);
-        (reg as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);
+        reg.event = await this.repos.event.load(au.churchId, reg.eventId);
+        reg.members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);
       }
       return registrations;
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const registration = await this.repos.registration.load(au.churchId, id);
+      const registration: RegistrationDetail = await this.repos.registration.load(au.churchId, id);
       if (registration) {
         if (registration.personId !== au.personId && !au.checkAccess(Permissions.registrations.view)) return this.json({}, 401);
-        (registration as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
-        (registration as any).selectionChoices = await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
-        (registration as any).payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
-        (registration as any).event = await this.repos.event.load(au.churchId, registration.eventId);
+        registration.members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+        registration.selectionChoices = await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
+        registration.payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
+        registration.event = await this.repos.event.load(au.churchId, registration.eventId);
       }
       return registration;
     });
   }
 
   @httpPut("/:id")
-  public async edit(@requestParam("id") id: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async edit(@requestParam("id") id: string, req: express.Request<{}, {}, EditRegistrationBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
@@ -416,6 +531,10 @@ export class RegistrationController extends ContentBaseController {
           if (!selMap.has(c.selectionId)) return this.json({ error: "Invalid selection" }, 400);
           if (!RegistrationPricingHelper.isValidQuantity(c.quantity)) return this.json({ error: "Invalid quantity" }, 400);
         }
+      }
+      if (members) {
+        const alreadyRegistered = await this.repos.registration.loadRegisteredPersonIds(au.churchId, registration.eventId, this.linkedPersonIds(members), id);
+        if (alreadyRegistered.length > 0) return this.json({ error: "Already registered for this event", status: "already-registered", personIds: alreadyRegistered }, 409);
       }
 
       const oldMembers = members ? await this.repos.registrationMember.loadForRegistration(au.churchId, id) : [];
@@ -453,23 +572,26 @@ export class RegistrationController extends ContentBaseController {
 
       // Recompute totalAmount from the current members/choices; do NOT auto-charge or refund.
       // A changed total surfaces as balance-due in admin (overpayment is handled by staff).
-      const currentMembers = members || await this.repos.registrationMember.loadForRegistration(au.churchId, id);
-      const currentChoices = choices || await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
-      let total = RegistrationPricingHelper.computeTotal(activeTypes, activeSelections, currentMembers as any, currentChoices as any);
-      if (registration.couponId) {
-        const coupon = await this.repos.registrationCoupon.load(au.churchId, registration.couponId);
-        if (coupon?.minMembers == null || currentMembers.length >= coupon.minMembers) total = RegistrationPricingHelper.applyDiscount(total, coupon);
+      // Notes or answers alone keep the price the registrant signed up at.
+      if (members || choices) {
+        const currentMembers = members || await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+        const currentChoices = choices || await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
+        let total = RegistrationPricingHelper.computeTotal(activeTypes, activeSelections, currentMembers, currentChoices);
+        if (registration.couponId) {
+          const coupon = await this.repos.registrationCoupon.load(au.churchId, registration.couponId);
+          if (coupon?.minMembers == null || currentMembers.length >= coupon.minMembers) total = RegistrationPricingHelper.applyDiscount(total, coupon);
+        }
+        registration.totalAmount = total;
       }
-      registration.totalAmount = total;
       await this.repos.registration.save(registration);
 
-      (registration as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+      registration.members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
       return registration;
     });
   }
 
   @httpPost("/:id/pay")
-  public async pay(@requestParam("id") id: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async pay(@requestParam("id") id: string, req: express.Request<{}, {}, ChargeRequestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
@@ -477,7 +599,7 @@ export class RegistrationController extends ContentBaseController {
       if (!isSelf && !au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       if (registration.status === "waitlisted") return this.json({ error: "Registration is waitlisted" }, 409);
 
-      const balance = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.totalAmount) - RegistrationPricingHelper.num(registration.amountPaid));
+      const balance = RegistrationPaymentHelper.balanceDue(registration);
       if (balance <= 0) return this.json({ error: "No balance due" }, 400);
 
       let email: string = null;
@@ -492,14 +614,138 @@ export class RegistrationController extends ContentBaseController {
 
       await this.recordPayment(au.churchId, id, charge, balance, req.body?.type, registration.personId);
       registration.amountPaid = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.amountPaid) + balance);
-      if (registration.status === "pending") registration.status = "confirmed";
+      registration.status = RegistrationPaymentHelper.statusAfterPayment(registration, registration.amountPaid);
       await this.repos.registration.save(registration);
       return registration;
     });
   }
 
+  @httpPost("/:id/payments")
+  public async recordOfflinePayment(@requestParam("id") id: string, req: express.Request<{}, {}, OfflinePaymentBody>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const registration = await this.repos.registration.load(au.churchId, id);
+      if (!registration) return this.json({ error: "Registration not found" }, 404);
+      if (registration.status === "cancelled" || registration.status === "waitlisted") return this.json({ error: `Registration is ${registration.status}` }, 409);
+
+      const amount = RegistrationPaymentHelper.parseAmount(req.body?.amount);
+      if (amount === null) return this.json({ error: "Amount must be greater than zero" }, 400);
+      const method = RegistrationPaymentHelper.parseOfflineMethod(req.body?.method);
+      if (!method) return this.json({ error: "Method must be cash, check or other" }, 400);
+      // Overpayment is never recorded; an edited total that drops below what was paid is settled with a refund.
+      if (amount > RegistrationPaymentHelper.balanceDue(registration)) return this.json({ error: "Amount is more than the balance due" }, 400);
+
+      const payment: RegistrationPayment = {
+        churchId: au.churchId,
+        registrationId: id,
+        transactionId: RegistrationPaymentHelper.checkReference(method, req.body?.checkNumber),
+        method,
+        amount,
+        kind: "payment",
+        status: "succeeded",
+        personId: registration.personId || null
+      };
+      const payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
+      if (RegistrationPaymentHelper.hasRecentDuplicate(payments, payment)) return this.json({ error: "This payment was just recorded" }, 409);
+
+      const newPaid = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.amountPaid) + amount);
+      return this.applyLedgerRow(au.churchId, registration, payment, { amountPaid: newPaid, status: RegistrationPaymentHelper.statusAfterPayment(registration, newPaid) });
+    });
+  }
+
+  @httpPost("/:id/refunds")
+  public async recordOfflineRefund(@requestParam("id") id: string, req: express.Request<{}, {}, OfflinePaymentBody>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const registration = await this.repos.registration.load(au.churchId, id);
+      if (!registration) return this.json({ error: "Registration not found" }, 404);
+
+      const amount = RegistrationPaymentHelper.parseAmount(req.body?.amount);
+      if (amount === null) return this.json({ error: "Amount must be greater than zero" }, 400);
+      const method = RegistrationPaymentHelper.parseOfflineMethod(req.body?.method);
+      if (!method) return this.json({ error: "Method must be cash, check or other" }, 400);
+      if (amount > RegistrationPricingHelper.num(registration.amountPaid)) return this.json({ error: "Amount is more than has been paid" }, 400);
+
+      const refund: RegistrationPayment = {
+        churchId: au.churchId,
+        registrationId: id,
+        transactionId: RegistrationPaymentHelper.checkReference(method, req.body?.checkNumber),
+        method,
+        amount,
+        kind: "refund",
+        status: "succeeded",
+        personId: registration.personId || null
+      };
+      const payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
+      if (RegistrationPaymentHelper.hasRecentDuplicate(payments, refund)) return this.json({ error: "This refund was just recorded" }, 409);
+
+      // A refund gives money back; it never changes the registration's status.
+      const newPaid = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.amountPaid) - amount);
+      return this.applyLedgerRow(au.churchId, registration, refund, { amountPaid: newPaid, status: registration.status });
+    });
+  }
+
+  @httpPost("/payments/:paymentId/refund")
+  public async refundGatewayPayment(@requestParam("paymentId") paymentId: string, req: express.Request<{}, {}, GatewayRefundBody>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const payment = await this.repos.registrationPayment.load(au.churchId, paymentId);
+      if (!payment) return this.json({ error: "Payment not found" }, 404);
+      if (!RegistrationPaymentHelper.isGatewayPayment(payment)) return this.json({ error: "Only online payments can be refunded through the gateway" }, 400);
+      const registration = await this.repos.registration.load(au.churchId, payment.registrationId);
+      if (!registration) return this.json({ error: "Registration not found" }, 404);
+
+      const payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, registration.id);
+      const refundable = RegistrationPaymentHelper.refundableForPayment(payment, payments, registration.amountPaid);
+      const amount = RegistrationPaymentHelper.parseAmount(req.body?.amount);
+      if (amount === null) return this.json({ error: "Amount must be greater than zero" }, 400);
+      if (amount > refundable) return this.json({ error: "Amount is more than is left to refund on this payment" }, 400);
+
+      const gateway = await this.loadRefundGateway(au.churchId, payment.provider);
+      if (!gateway) return this.json({ error: "This payment's gateway does not support refunds" }, 400);
+
+      const refund: RegistrationPayment = {
+        churchId: au.churchId,
+        registrationId: registration.id,
+        provider: payment.provider,
+        transactionId: payment.transactionId,
+        method: payment.method,
+        amount,
+        currency: payment.currency,
+        personId: registration.personId || null
+      };
+      const reserved = await this.repos.registrationPayment.reservePendingRefund(refund, RegistrationPricingHelper.num(payment.amount), new Date(Date.now() - RegistrationPaymentHelper.PENDING_REFUND_BLOCK_MS));
+      if (!reserved) return this.json({ error: "Another refund on this registration is in progress, or the amount is no longer available" }, 409);
+
+      let result: { success: boolean; refundId?: string; error?: string };
+      try {
+        result = await GatewayService.refundDonation(gateway, payment.transactionId, { amount, currency: payment.currency || gateway.currency, idempotencyKey: `registration-refund-${refund.id}` });
+      } catch (e) {
+        result = { success: false, error: (e as { message?: string } | undefined)?.message };
+      }
+      if (!result?.success) {
+        await this.repos.registrationPayment.delete(au.churchId, refund.id);
+        return this.json({ error: result?.error || "Refund failed" }, 400);
+      }
+
+      refund.status = "succeeded";
+      await this.repos.registrationPayment.save(refund);
+      // The money has moved, so the paid total must follow even if another write raced this one.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const current = attempt === 0 ? registration : await this.repos.registration.load(au.churchId, registration.id);
+        if (!current) break;
+        const newPaid = Math.max(0, RegistrationPricingHelper.round(RegistrationPricingHelper.num(current.amountPaid) - amount));
+        if (await this.repos.registration.updatePaidIfUnchanged(au.churchId, current.id, current, { amountPaid: newPaid, status: current.status })) {
+          return this.paymentResult(au.churchId, { ...current, amountPaid: newPaid });
+        }
+      }
+      console.error(`Registration refund ${refund.id} succeeded at the gateway but amountPaid on ${registration.id} could not be updated`);
+      return this.json({ error: "The refund went through, but the paid total could not be updated. Reload and check the payments." }, 500);
+    });
+  }
+
   @httpPost("/:id/promote")
-  public async promote(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async promote(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const registration = await this.repos.registration.load(au.churchId, id);
@@ -512,18 +758,22 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpPost("/:id/cancel")
-  public async cancel(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async cancel(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
-      if (registration.personId !== au.personId && !au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const isStaff = au.checkAccess(Permissions.registrations.edit);
+      if (registration.personId !== au.personId && !isStaff) return this.json({}, 401);
       if (registration.status === "cancelled") return this.json({ error: "Already cancelled" }, 400);
+      const event = await this.repos.event.load(au.churchId, registration.eventId);
+      if (!isStaff && event?.allowSelfCancel === false) return this.json({ error: "This event does not allow cancelling online. Please contact the church." }, 403);
 
       registration.status = "cancelled";
       registration.cancelledDate = new Date();
       const updated = await this.repos.registration.save(registration);
+      // Same shape as registration.created, fired only on the transition (an already-cancelled registration returned above).
+      await WebhookDispatcher.emit(au.churchId, "registration.cancelled", { ...updated, members: await this.repos.registrationMember.loadForRegistration(au.churchId, id) });
 
-      const event = await this.repos.event.load(au.churchId, registration.eventId);
       try {
         const person = registration.personId ? await getMembershipModuleGateway().loadPerson(au.churchId, registration.personId) : null;
         if (person?.email) {
@@ -541,11 +791,66 @@ export class RegistrationController extends ContentBaseController {
     });
   }
 
-  @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  @httpPost("/:id/restore")
+  public async restore(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const registration = await this.repos.registration.load(au.churchId, id);
+      if (!registration) return this.json({ error: "Registration not found" }, 404);
+      if (registration.status !== "cancelled") return this.json({ error: "Registration is not cancelled" }, 400);
+
+      // Neither the registrant nor anyone on it may have signed up again on another registration since.
+      const members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+      const alreadyRegistered = await this.repos.registration.loadRegisteredPersonIds(au.churchId, registration.eventId, this.linkedPersonIds(members, registration.personId), id);
+      if (alreadyRegistered.length > 0) return this.json({ error: "Already registered for this event", code: "already-registered", personIds: alreadyRegistered }, 409);
+
+      const event = await this.repos.event.load(au.churchId, registration.eventId);
+      const balance = RegistrationPricingHelper.num(registration.totalAmount) - RegistrationPricingHelper.num(registration.amountPaid);
+      const status = balance > 0 ? "pending" : "confirmed";
+      const restored = await this.repos.registration.restoreWithCapacityCheck(au.churchId, id, registration.eventId, status, event?.capacity ?? null);
+      if (!restored) return this.json({ error: "Event is at capacity", code: "event-full" }, 409);
+
+      const undo = async () => {
+        registration.status = "cancelled";
+        await this.repos.registration.save(registration);
+      };
+
+      // The members count toward type capacity again now that the registration is active.
+      const types = await this.repos.registrationType.loadForEvent(au.churchId, registration.eventId);
+      for (const typeId of new Set(members.map((m: RegistrationMember) => m.registrationTypeId).filter(Boolean))) {
+        const type = types.find((t: RegistrationType) => t.id === typeId);
+        if (type?.capacity == null) continue;
+        if (Number(await this.repos.registrationMember.countActiveForType(au.churchId, typeId)) > Number(type.capacity)) {
+          await undo();
+          return this.json({ error: "Attendee type is at capacity", code: "type-full", registrationTypeId: typeId }, 409);
+        }
+      }
+
+      if (registration.couponId) {
+        const coupon = await this.repos.registrationCoupon.load(au.churchId, registration.couponId);
+        if (coupon?.maxUses != null && Number(await this.repos.registration.countActiveForCoupon(au.churchId, coupon.id)) > Number(coupon.maxUses)) {
+          await undo();
+          return this.json({ error: "Discount code has no uses left", code: "coupon-max-uses" }, 409);
+        }
+      }
+
+      registration.status = status;
+      registration.cancelledDate = null;
+      registration.members = members;
+      return registration;
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      const registration = await this.repos.registration.load(au.churchId, id);
+      if (registration) {
+        // Deleting would erase the payment records; staff cancel a paid registration instead.
+        const payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
+        if (payments.length > 0) return this.json({ error: "This registration has payments. Cancel it instead of deleting it.", code: "registration-has-payments" }, 409);
+      }
       await this.deleteCascade(au.churchId, id);
       if (registration) {
         const event = await this.repos.event.load(au.churchId, registration.eventId);
@@ -554,6 +859,10 @@ export class RegistrationController extends ContentBaseController {
       }
       return this.json({});
     });
+  }
+
+  private linkedPersonIds(members: { personId?: string }[], registrantPersonId?: string): string[] {
+    return [...new Set([registrantPersonId, ...members.map((m) => m.personId)].filter((id): id is string => !!id))];
   }
 
   // Attendees may only be linked to people in the registrant's household.
@@ -595,7 +904,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   private async hasGateway(churchId: string): Promise<boolean> {
-    const givingRepos = await RepoManager.getRepos<any>("giving");
+    const givingRepos = await RepoManager.getRepos<{ gateway: { loadAll(churchId: string): Promise<unknown> } }>("giving");
     const gateways = await givingRepos.gateway.loadAll(churchId);
     return Array.isArray(gateways) && gateways.length > 0;
   }
@@ -603,20 +912,21 @@ export class RegistrationController extends ContentBaseController {
   private async processRegistrationCharge(
     churchId: string,
     amount: number,
-    body: any,
+    body: ChargeRequestBody,
     person: { personId?: string; email?: string; name?: string }
-  ): Promise<{ ok: boolean; error?: string; requiresAction?: boolean; data?: any; transactionId?: string }> {
+  ): Promise<RegistrationChargeOutcome> {
     if (!body.provider && !body.gatewayId) return { ok: false, error: "Either provider or gatewayId is required" };
-    let gateway: any;
-    const givingRepos = await RepoManager.getRepos<any>("giving");
+    let gateway;
+    // content may not import the giving module's Repos (import/no-restricted-paths), so take the type from GatewayService.
+    const givingRepos = await RepoManager.getRepos<Parameters<typeof GatewayService.prepareCharge>[2]>("giving");
     try {
       gateway = await GatewayService.getGatewayForChurch(churchId, { provider: body.provider, gatewayId: body.gatewayId }, givingRepos.gateway);
-    } catch (e: any) {
-      return { ok: false, error: e?.message || "Gateway not found" };
+    } catch (e) {
+      return { ok: false, error: (e as { message?: string } | undefined)?.message || "Gateway not found" };
     }
     if (!gateway) return { ok: false, error: "Gateway not found" };
 
-    const chargeData: any = {
+    const chargeData: RegistrationChargeData = {
       amount,
       currency: (body.currency || gateway.currency || "USD").toLowerCase(),
       type: body.type || "card",
@@ -627,20 +937,20 @@ export class RegistrationController extends ContentBaseController {
       person: { email: person.email, name: person.name },
       church: { churchURL: Environment.b1AdminRoot }
     };
-    let chargeResult: any;
+    let chargeResult: ChargeResult;
     try {
       // Provider-specific request prep (e.g. saved-method id shaping).
       await GatewayService.prepareCharge(gateway, chargeData, givingRepos);
       chargeResult = await GatewayService.processCharge(gateway, chargeData);
-    } catch (e: any) {
-      return { ok: false, error: e?.message || "Payment processing failed" };
+    } catch (e) {
+      return { ok: false, error: (e as { message?: string } | undefined)?.message || "Payment processing failed" };
     }
     if (!chargeResult?.success) return { ok: false, error: chargeResult?.data?.error || chargeResult?.error || "Payment failed" };
     if (chargeResult.data?.status === "requires_action") return { ok: true, requiresAction: true, data: chargeResult.data };
     return { ok: true, data: chargeResult.data, transactionId: chargeResult.transactionId, error: gateway.provider };
   }
 
-  private async recordPayment(churchId: string, registrationId: string, charge: any, amount: number, method: string, personId: string): Promise<void> {
+  private async recordPayment(churchId: string, registrationId: string, charge: RegistrationChargeOutcome, amount: number, method: string, personId: string): Promise<void> {
     const payment: RegistrationPayment = {
       churchId,
       registrationId,
@@ -656,14 +966,55 @@ export class RegistrationController extends ContentBaseController {
     await this.repos.registrationPayment.save(payment);
   }
 
-  private async notifyPromotion(churchId: string, promoted: Registration, event: any): Promise<void> {
+  // The member site's My Registrations page, where a registrant pays a balance.
+  private payUrl(church: { subDomain?: string } | null): string | undefined {
+    return church?.subDomain ? AppUrlHelper.b1AppUrl(church.subDomain) + "/mobile/registrations" : undefined;
+  }
+
+  // The church currency: the first gateway's, else the church's "currency" setting, else usd (the apps' CurrencyHelper.loadCurrency rule).
+  private async churchCurrency(churchId: string): Promise<string> {
+    try {
+      const givingRepos = await RepoManager.getRepos<{ gateway: { loadAll(churchId: string): Promise<{ currency?: string }[]> } }>("giving");
+      const gateways = await givingRepos.gateway.loadAll(churchId);
+      if (Array.isArray(gateways) && gateways[0]?.currency) return gateways[0].currency.toLowerCase();
+      const membershipRepos = await RepoManager.getRepos<{ setting: { loadMulipleChurches(keyNames: string[], churchIds: string[]): Promise<{ value?: string }[]> } }>("membership");
+      const settings = await membershipRepos.setting.loadMulipleChurches(["currency"], [churchId]);
+      return (settings?.[0]?.value || "usd").toLowerCase();
+    } catch {
+      return "usd";
+    }
+  }
+
+  // Writes the ledger row, then moves amountPaid/status only if nobody changed them since they were read;
+  // if they did, the row is removed again so the ledger and the paid total never disagree.
+  private async applyLedgerRow(churchId: string, registration: Registration, row: RegistrationPayment, next: Pick<Registration, "amountPaid" | "status">): Promise<unknown> {
+    await this.repos.registrationPayment.save(row);
+    const updated = await this.repos.registration.updatePaidIfUnchanged(churchId, registration.id, registration, next);
+    if (!updated) {
+      await this.repos.registrationPayment.delete(churchId, row.id);
+      return this.json({ error: "This registration changed while saving. Reload and try again." }, 409);
+    }
+    return this.paymentResult(churchId, { ...registration, ...next });
+  }
+
+  private async paymentResult(churchId: string, registration: Registration): Promise<PaymentResult> {
+    return { registration, payments: await this.repos.registrationPayment.loadForRegistration(churchId, registration.id) };
+  }
+
+  private async loadRefundGateway(churchId: string, provider: string) {
+    const givingRepos = await RepoManager.getRepos<Parameters<typeof GatewayService.prepareCharge>[2]>("giving");
+    const gateways = await givingRepos.gateway.loadAll(churchId);
+    return (gateways || []).find((g) => (g.provider || "").toLowerCase() === (provider || "").toLowerCase() && GatewayService.supportsRefund(g)) || null;
+  }
+
+  private async notifyPromotion(churchId: string, promoted: Registration, event: Event): Promise<void> {
     try {
       if (!promoted.personId) return;
       const person = await getMembershipModuleGateway().loadPerson(churchId, promoted.personId);
       if (!person?.email) return;
       const church = await getMembershipModuleGateway().loadChurch(churchId);
       const priced = RegistrationPricingHelper.num(promoted.totalAmount) - RegistrationPricingHelper.num(promoted.amountPaid) > 0;
-      const payUrl = priced && church?.subDomain ? AppUrlHelper.b1AppUrl(church.subDomain) + "/mobile/registrations" : undefined;
+      const payUrl = priced ? this.payUrl(church) : undefined;
       await RegistrationHelper.sendWaitlistAvailabilityEmail(person.email, church?.name || "Church", event, payUrl);
     } catch (e) {
       console.error("Failed to send waitlist promotion email", e);

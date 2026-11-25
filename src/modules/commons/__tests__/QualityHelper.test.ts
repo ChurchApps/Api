@@ -1,6 +1,7 @@
 jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { openAiApiKey: "" } }));
 
-import { QualityHelper } from "../helpers/QualityHelper";
+import { QualityHelper } from "../helpers/QualityHelper.js";
+import type { SongView } from "../models/index.js";
 
 describe("QualityHelper", () => {
   const origKey = process.env.OPENAI_API_KEY;
@@ -38,9 +39,11 @@ describe("QualityHelper", () => {
 
 describe("demoted gate", () => {
   it("exposes demoted as a boolean on the public summary and never the score", async () => {
-    const { SongPackageHelper } = await import("../helpers/SongPackageHelper");
-    const row: any = { id: "x", title: "T", qualityScore: 20, demoted: 1 };
-    const out: any = SongPackageHelper.summary(row, {});
+    const { SongPackageHelper } = await import("../helpers/SongPackageHelper.js");
+    // the DB hands demoted back as a tinyint, which SongView does not model
+    const row: SongView = { id: "x", title: "T", qualityScore: 20 };
+    Object.assign(row, { demoted: 1 });
+    const out = SongPackageHelper.summary(row, {});
     expect(out.demoted).toBe(true);
     expect(out).not.toHaveProperty("qualityScore");
   });

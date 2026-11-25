@@ -1,4 +1,5 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
+import express from "express";
 import { Sermon, StreamingService } from "../models/index.js";
 import { StreamingConfigHelper, SubDomainHelper } from "../helpers/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
@@ -7,7 +8,7 @@ import { Link } from "../models/index.js";
 @controller("/content/preview")
 export class PreviewController extends ContentBaseController {
   @httpGet("/data/:key")
-  public async loadData(@requestParam("key") key: string, req: any, res: any): Promise<any> {
+  public async loadData(@requestParam("key") key: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const churchId = await SubDomainHelper.getId(key);
       let tabs: Link[] = null;
@@ -15,7 +16,7 @@ export class PreviewController extends ContentBaseController {
       let services: StreamingService[] = null;
       let sermons: Sermon[] = null;
 
-      const promises: Promise<any>[] = [];
+      const promises: Promise<unknown>[] = [];
       promises.push(this.repos.link.loadByCategory(churchId, "streamingTab").then((d) => (tabs = d)));
       promises.push(this.repos.link.loadByCategory(churchId, "streamingLink").then((d) => (links = d)));
       promises.push(this.repos.streamingService.loadAll(churchId).then((d) => (services = d)));

@@ -34,8 +34,8 @@ export class UserRepo {
       authGuid: user.authGuid,
       firstName: user.firstName,
       lastName: user.lastName,
-      registrationDate: registrationDate as any,
-      lastLogin: lastLogin as any
+      registrationDate: sql<Date>`${registrationDate}`,
+      lastLogin: sql<Date>`${lastLogin}`
     }).where("id", "=", user.id).execute();
     return user;
   }
@@ -43,15 +43,26 @@ export class UserRepo {
   public async updateVerification(userId: string, codeHash: string | null, expires: Date | null): Promise<void> {
     await getDb().updateTable("users").set({
       verificationCode: codeHash,
-      verificationExpires: DateHelper.toMysqlDate(expires) as any,
+      verificationExpires: sql<Date>`${DateHelper.toMysqlDate(expires)}`,
       verificationAttempts: 0
-    } as any).where("id", "=", userId).execute();
+    }).where("id", "=", userId).execute();
   }
 
   public async incrementVerificationAttempts(userId: string): Promise<number> {
-    await getDb().updateTable("users").set({ verificationAttempts: sql`verificationAttempts + 1` } as any).where("id", "=", userId).execute();
-    const row = await getDb().selectFrom("users").select("verificationAttempts" as any).where("id", "=", userId).executeTakeFirst();
-    return parseInt((row as any)?.verificationAttempts ?? "0", 10);
+    await getDb().updateTable("users").set({ verificationAttempts: sql<number>`verificationAttempts + 1` }).where("id", "=", userId).execute();
+    const row = await getDb().selectFrom("users").select("verificationAttempts").where("id", "=", userId).executeTakeFirst();
+    return parseInt(String(row?.verificationAttempts ?? "0"), 10);
+  }
+
+  // Single conditional UPDATE, so of N racing requests holding the right code exactly one consumes it.
+  public async consumeVerification(userId: string, expectedHash: string): Promise<boolean> {
+    if (!userId || !expectedHash) return false;
+    const result = await getDb().updateTable("users")
+      .set({ verificationCode: null, verificationExpires: null, verificationAttempts: 0 })
+      .where("id", "=", userId)
+      .where("verificationCode", "=", expectedHash)
+      .executeTakeFirst();
+    return Number(result?.numUpdatedRows ?? 0) > 0;
   }
 
   public async clearVerification(userId: string): Promise<void> {
@@ -59,7 +70,7 @@ export class UserRepo {
       verificationCode: null,
       verificationExpires: null,
       verificationAttempts: 0
-    } as any).where("id", "=", userId).execute();
+    }).where("id", "=", userId).execute();
   }
 
   public async load(id: string): Promise<User> {
@@ -104,8 +115,8 @@ export class UserRepo {
   }
 
   public async loadCount() {
-    const result = (await getDb().selectFrom("users").select(sql`COUNT(*)`.as("count")).executeTakeFirst()) ?? null;
-    return parseInt((result as any)?.count || "0", 10);
+    const result = (await getDb().selectFrom("users").select(sql<number>`COUNT(*)`.as("count")).executeTakeFirst()) ?? null;
+    return parseInt(String(result?.count || "0"), 10);
   }
 
   public async search(term: string): Promise<User[]> {
@@ -122,6 +133,6 @@ export class UserRepo {
       .execute() as Promise<User[]>;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel<T>(_churchId: string, data: T) { return data; }
+  public convertAllToModel<T>(_churchId: string, data: T[]) { return data || []; }
 }

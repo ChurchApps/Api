@@ -5,14 +5,14 @@ jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { 
 import { getDb } from "../../db/index";
 import { FundDonationRepo } from "../FundDonationRepo";
 
-function recordingDb(executeTakeFirst: any) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+function recordingDb(executeTakeFirst: unknown) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "executeTakeFirst") return async () => executeTakeFirst;
-      if (prop === "fn") return { sum: (c: any) => ({ as: () => ({ col: c }) }), count: (c: any) => ({ distinct: () => ({ as: () => ({ col: c }) }) }) };
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      if (prop === "fn") return { sum: (c: string) => ({ as: () => ({ col: c }) }), count: (c: string) => ({ distinct: () => ({ as: () => ({ col: c }) }) }) };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };

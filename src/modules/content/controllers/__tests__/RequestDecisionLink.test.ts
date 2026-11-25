@@ -1,5 +1,6 @@
 import "reflect-metadata";
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+import express from "express";
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("ics", () => ({ createEvents: jest.fn() }));
 jest.mock("../../helpers/index", () => ({
   CalendarHelper: { addExceptionDates: jest.fn() },
@@ -10,20 +11,25 @@ jest.mock("../../helpers/ApprovalHelper", () => ({ ApprovalHelper: { determineSt
 jest.mock("../../helpers/ConflictHelper", () => ({ ConflictHelper: { findConflicts: jest.fn() } }));
 jest.mock("../../helpers/IcsHelper", () => ({ IcsHelper: { parseEvents: jest.fn() } }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
-jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadGroupMembersForPerson: jest.fn(async () => []) }) }));
+jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadGroupMembersForPerson: jest.fn(async (): Promise<unknown[]> => []) }) }));
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
 
 import { EventController } from "../EventController.js";
 import { EventBookingController } from "../EventBookingController.js";
 import { NotificationService } from "../../../../shared/helpers/NotificationService.js";
+import { Event, EventBooking } from "../../models/index.js";
 
 const createNotifications = NotificationService.createNotifications as jest.Mock;
-const au = { churchId: "c1", personId: "admin", checkAccess: (perm: any) => perm === "contentEdit" };
+const au = { churchId: "c1", personId: "admin", checkAccess: (perm: string) => perm === "contentEdit" };
+const req = (body?: unknown) => ({ body } as express.Request);
+const res = {} as express.Response;
 
-function wire(controller: any, repos: any) {
-  controller.repos = repos;
-  controller.actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  controller.json = (obj: any, status: number) => ({ obj, status });
+function wire<T extends EventController | EventBookingController>(controller: T, repos: Record<string, unknown>) {
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return controller;
 }
 
@@ -33,21 +39,21 @@ beforeEach(() => createNotifications.mockClear());
 describe("request decision notifications link to My Requests (#1495)", () => {
   it("event request rejection", async () => {
     const event = { id: "e1", churchId: "c1", title: "Family issues", requestedBy: "p1", approvalStatus: "pending" };
-    const controller = wire(new EventController(), { event: { load: jest.fn(async () => event), save: jest.fn(async (e: any) => e) } });
-    await controller.reject("e1", {}, {});
+    const controller = wire(new EventController(), { event: { load: jest.fn(async () => event), save: jest.fn(async (e: Event) => e) } });
+    await controller.reject("e1", req(), res);
     expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "event", "e1", 'Your event request "Family issues" was rejected.', "/mobile/myRequests");
   });
 
   it("room booking approval", async () => {
     const booking = { id: "b1", churchId: "c1", eventId: "e1", roomId: "r1", status: "pending", requestedBy: "p1" };
     const repos = {
-      eventBooking: { load: jest.fn(async () => booking), save: jest.fn(async (b: any) => b) },
+      eventBooking: { load: jest.fn(async () => booking), save: jest.fn(async (b: EventBooking) => b) },
       event: { load: jest.fn(async () => ({ id: "e1", title: "Retreat" })), save: jest.fn() },
       room: { load: jest.fn(async () => ({ id: "r1", name: "Fellowship Hall" })) },
       resource: { load: jest.fn() }
     };
     const controller = wire(new EventBookingController(), repos);
-    await controller.approve("b1", { body: {} }, {});
+    await controller.approve("b1", req({}), res);
     expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "eventBooking", "b1", expect.stringContaining("was approved"), "/mobile/myRequests");
   });
 });
@@ -56,12 +62,12 @@ describe("request decision notifications link to My Requests (#1495)", () => {
 describe("rejection reason (#1546)", () => {
   const eventRepos = () => {
     const event = { id: "e1", churchId: "c1", title: "Youth Lock-in", requestedBy: "p1", approvalStatus: "pending" };
-    return { event: { load: jest.fn(async () => event), save: jest.fn(async (e: any) => e) } };
+    return { event: { load: jest.fn(async () => event), save: jest.fn(async (e: Event) => e) } };
   };
   const bookingRepos = () => {
     const booking = { id: "b1", churchId: "c1", eventId: "e1", roomId: "r1", status: "pending", requestedBy: "p1" };
     return {
-      eventBooking: { load: jest.fn(async () => booking), save: jest.fn(async (b: any) => b) },
+      eventBooking: { load: jest.fn(async () => booking), save: jest.fn(async (b: EventBooking) => b) },
       event: { load: jest.fn(async () => ({ id: "e1", title: "Youth Lock-in" })), save: jest.fn() },
       room: { load: jest.fn(async () => ({ id: "r1", name: "Room A" })) },
       resource: { load: jest.fn() }
@@ -70,31 +76,31 @@ describe("rejection reason (#1546)", () => {
 
   it("event reject with a reason appends it", async () => {
     const controller = wire(new EventController(), eventRepos());
-    await controller.reject("e1", { body: { reason: "  Projector is already booked that night.  " } }, {});
+    await controller.reject("e1", req({ reason: "  Projector is already booked that night.  " }), res);
     expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "event", "e1", 'Your event request "Youth Lock-in" was rejected: Projector is already booked that night.', "/mobile/myRequests");
   });
 
   it("event reject without a reason is unchanged", async () => {
     const controller = wire(new EventController(), eventRepos());
-    await controller.reject("e1", { body: {} }, {});
+    await controller.reject("e1", req({}), res);
     expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "event", "e1", 'Your event request "Youth Lock-in" was rejected.', "/mobile/myRequests");
   });
 
   it("booking reject with a reason appends it", async () => {
     const controller = wire(new EventBookingController(), bookingRepos());
-    await controller.reject("b1", { body: { reason: "Room A is being repainted." } }, {});
+    await controller.reject("b1", req({ reason: "Room A is being repainted." }), res);
     expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "eventBooking", "b1", 'Your request for Room A for "Youth Lock-in" was rejected: Room A is being repainted.', "/mobile/myRequests");
   });
 
   it("whitespace-only reason leaves the message unchanged", async () => {
     const controller = wire(new EventBookingController(), bookingRepos());
-    await controller.reject("b1", { body: { reason: "   " } }, {});
+    await controller.reject("b1", req({ reason: "   " }), res);
     expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "eventBooking", "b1", 'Your request for Room A for "Youth Lock-in" was rejected.', "/mobile/myRequests");
   });
 
   it("caps the reason at 500 characters", async () => {
     const controller = wire(new EventController(), eventRepos());
-    await controller.reject("e1", { body: { reason: "x".repeat(600) } }, {});
+    await controller.reject("e1", req({ reason: "x".repeat(600) }), res);
     expect(createNotifications.mock.calls[0][4]).toBe(`Your event request "Youth Lock-in" was rejected: ${"x".repeat(500)}`);
   });
 });

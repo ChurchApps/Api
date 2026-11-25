@@ -18,7 +18,7 @@ export class SongRepo {
       songDetailId: model.songDetailId,
       name: model.name,
       dateAdded: model.dateAdded ? DateHelper.toMysqlDate(model.dateAdded) : model.dateAdded
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -27,7 +27,7 @@ export class SongRepo {
       songDetailId: model.songDetailId,
       name: model.name,
       dateAdded: model.dateAdded ? DateHelper.toMysqlDate(model.dateAdded) : model.dateAdded
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -40,7 +40,7 @@ export class SongRepo {
   }
 
   public async loadAll(churchId: string): Promise<Song[]> {
-    return getDb().selectFrom("songs").selectAll().where("churchId", "=", churchId).orderBy("name").execute() as any;
+    return getDb().selectFrom("songs").selectAll().where("churchId", "=", churchId).orderBy("name").execute();
   }
 
   // Song pickers only ever render a short list, so cap the join to keep large
@@ -63,13 +63,13 @@ export class SongRepo {
       .orderBy("sd.title")
       .orderBy("sd.artist")
       .limit(limit)
-      .execute() as any;
+      .execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Song; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Song[]; }
+  public convertToModel(_churchId: string, data: Song) { return data; }
+  public convertAllToModel(_churchId: string, data: Song[]) { return data || []; }
 
-  protected rowToModel(row: any): Song {
+  protected rowToModel(row: Song): Song {
     return {
       id: row.id,
       churchId: row.churchId,

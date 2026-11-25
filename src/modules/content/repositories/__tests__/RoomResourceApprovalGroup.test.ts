@@ -2,7 +2,8 @@ import "reflect-metadata";
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "gen_id" } }));
 
-import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
+import { CompiledQuery, DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
+import type { ContentDatabase } from "../../db/DatabaseTypes.js";
 import { RoomRepo } from "../RoomRepo";
 import { ResourceRepo } from "../ResourceRepo";
 
@@ -12,13 +13,13 @@ function capturingDb() {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
   driver.acquireConnection = async () => ({
-    executeQuery: async (q: any) => {
+    executeQuery: async (q: CompiledQuery) => {
       queries.push({ sql: q.sql, parameters: q.parameters });
-      return { rows: [] } as any;
+      return { rows: [] };
     },
     streamQuery: async function* () {}
   });
-  const db = new Kysely<any>({
+  const db = new Kysely<ContentDatabase>({
     dialect: {
       createAdapter: () => new MysqlAdapter(),
       createDriver: () => driver,
@@ -37,7 +38,7 @@ describe.each([
   it.each([["undefined", undefined], ["null", null]])("writes approvalGroupId = NULL when it is %s", async (_label, value) => {
     const { db, queries } = capturingDb();
     getDb.mockReturnValue(db);
-    await makeRepo().save({ id: "item1", churchId: "church1", name: "Main Hall", approvalGroupId: value } as any);
+    await makeRepo().save({ id: "item1", churchId: "church1", name: "Main Hall", approvalGroupId: value });
     expect(queries).toHaveLength(1);
     expect(queries[0].sql).toContain("`approvalGroupId` = ?");
     const cols = queries[0].sql.match(/`(\w+)` = \?/g).map((c) => c.replace(/[`= ?]/g, ""));

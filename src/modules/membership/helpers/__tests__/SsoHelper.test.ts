@@ -9,6 +9,8 @@ import jwt from "jsonwebtoken";
 import { SsoHelper } from "../SsoHelper.js";
 import { UserChurchHelper } from "../UserChurchHelper.js";
 import { Environment } from "../../../../shared/helpers/Environment.js";
+import type { Repos } from "../../repositories/index.js";
+import type { User } from "../../models/index.js";
 
 beforeAll(() => {
   Environment.jwtSecret = "test-secret";
@@ -134,7 +136,7 @@ describe("SsoHelper.fetchProviderPhoto", () => {
   const realFetch = global.fetch;
   afterEach(() => { global.fetch = realFetch; });
 
-  const mockRes = (contentType: string, bytes: number, contentLength?: string): any => ({
+  const mockRes = (contentType: string, bytes: number, contentLength?: string) => ({
     ok: true,
     status: 200,
     headers: {
@@ -149,22 +151,22 @@ describe("SsoHelper.fetchProviderPhoto", () => {
   });
 
   it("rejects a non-image content-type", async () => {
-    global.fetch = jest.fn().mockResolvedValue(mockRes("text/html", 100)) as any;
+    global.fetch = jest.fn().mockResolvedValue(mockRes("text/html", 100)) as typeof fetch;
     expect(await SsoHelper.fetchProviderPhoto("google", { picture: "https://x/p.jpg" })).toBeNull();
   });
 
   it("rejects a photo over the size cap", async () => {
-    global.fetch = jest.fn().mockResolvedValue(mockRes("image/jpeg", 3 * 1024 * 1024)) as any;
+    global.fetch = jest.fn().mockResolvedValue(mockRes("image/jpeg", 3 * 1024 * 1024)) as typeof fetch;
     expect(await SsoHelper.fetchProviderPhoto("google", { picture: "https://x/p.jpg" })).toBeNull();
   });
 
   it("rejects a photo whose declared content-length exceeds the cap", async () => {
-    global.fetch = jest.fn().mockResolvedValue(mockRes("image/jpeg", 1024, String(3 * 1024 * 1024))) as any;
+    global.fetch = jest.fn().mockResolvedValue(mockRes("image/jpeg", 1024, String(3 * 1024 * 1024))) as typeof fetch;
     expect(await SsoHelper.fetchProviderPhoto("google", { picture: "https://x/p.jpg" })).toBeNull();
   });
 
   it("accepts a valid image within the cap", async () => {
-    global.fetch = jest.fn().mockResolvedValue(mockRes("image/png", 1024)) as any;
+    global.fetch = jest.fn().mockResolvedValue(mockRes("image/png", 1024)) as typeof fetch;
     const result = await SsoHelper.fetchProviderPhoto("google", { picture: "https://x/p.png" });
     expect(result).toMatch(/^data:image\/png;base64,/);
   });
@@ -186,7 +188,7 @@ describe("SsoHelper.findOrCreateUser", () => {
 
   it("returns an existing user without creating", async () => {
     const existing = { id: "u1", email: "a@example.com" };
-    const repos: any = { user: { loadByEmail: jest.fn().mockResolvedValue(existing), save: jest.fn() } };
+    const repos = Object.assign({} as Repos, { user: { loadByEmail: jest.fn().mockResolvedValue(existing), save: jest.fn() } });
 
     const result = await SsoHelper.findOrCreateUser("A@Example.com", "Jane", "Doe", repos);
 
@@ -196,12 +198,12 @@ describe("SsoHelper.findOrCreateUser", () => {
   });
 
   it("creates a normalized user and links matching people when none exists", async () => {
-    const repos: any = {
+    const repos = Object.assign({} as Repos, {
       user: {
         loadByEmail: jest.fn().mockResolvedValue(null),
-        save: jest.fn().mockImplementation(async (u: any) => ({ ...u, id: "new1" }))
+        save: jest.fn().mockImplementation(async (u: User) => ({ ...u, id: "new1" }))
       }
-    };
+    });
 
     const result = await SsoHelper.findOrCreateUser("New@Example.com", "New", "User", repos);
 

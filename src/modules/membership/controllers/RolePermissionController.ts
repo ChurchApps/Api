@@ -8,14 +8,14 @@ import { Permissions, IPermission } from "../helpers/index.js";
 @controller("/membership/rolepermissions")
 export class RolePermissionController extends MembershipBaseController {
   @httpGet("/roles/:id")
-  public async loadByRole(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadByRole(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
       else {
         let permissions: RolePermission[] = [];
         if (id === "null") {
           const everyonePermission = await this.repos.rolePermission.loadForEveryone(au.churchId);
-          permissions = (everyonePermission as any[]).map((e: any) => {
+          permissions = everyonePermission.map((e) => {
             delete e.churchName;
             delete e.subDomain;
             return e;
@@ -28,7 +28,7 @@ export class RolePermissionController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async deletePermission(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async deletePermission(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
       else {
@@ -39,7 +39,7 @@ export class RolePermissionController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, RolePermission[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, RolePermission[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
       else {

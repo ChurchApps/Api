@@ -7,29 +7,39 @@ jest.mock("../../db/index.js", () => ({ getDb: jest.fn(), withDoingConnection: j
 jest.mock("@churchapps/apihelper", () => ({ DateHelper: {}, UniqueIdHelper: { shortId: () => "gen" } }));
 jest.mock("../WorkflowHelper.js", () => ({ WorkflowHelper: {} }));
 jest.mock("../EventTriggerHelper.js", () => ({ EventTriggerHelper: {} }));
-jest.mock("../ConjunctionHelper.js", () => ({ ConjunctionHelper: { getPeopleIdsForTrigger: (...args: any[]) => mockGetPeopleIds(...args) } }));
+jest.mock("../ConjunctionHelper.js", () => ({ ConjunctionHelper: { getPeopleIdsForTrigger: (...args: unknown[]) => mockGetPeopleIds(...args) } }));
 
 import { ExecutionHelper } from "../ExecutionHelper.js";
 import { RuleEngine } from "../RuleEngine.js";
 import { TaskRepo } from "../../repositories/TaskRepo.js";
 import { getDb } from "../../db/index.js";
+import type { Repos } from "../../repositories/Repos.js";
+import type { WorkflowTrigger } from "../../models/index.js";
 
 // Issue #1656: birthday/anniversary rules made cards from Run but not on their own.
 // The scheduler must evaluate each church's rules just after its local midnight, and a card
 // from the previous period must not block this period's card.
 
 // A tiny in-memory stand-in for the Kysely chain, enough for TaskRepo.loadByTriggerIdContent.
-const fakeDb = (rows: any[]) => {
-  const preds: ((r: any) => boolean)[] = [];
-  const cmp = (a: any, b: any) => (a instanceof Date ? a.getTime() : a) - (b instanceof Date ? b.getTime() : b);
-  const chain: any = {
+type Row = Record<string, unknown>;
+interface FakeChain {
+  selectAll: () => FakeChain;
+  orderBy: () => FakeChain;
+  where: (col: string, op: string, val: unknown) => FakeChain;
+  execute: () => Promise<Row[]>;
+}
+const fakeDb = (rows: Row[]) => {
+  const preds: ((r: Row) => boolean)[] = [];
+  // Values compared here are Dates or numbers.
+  const cmp = (a: unknown, b: unknown) => ((a instanceof Date ? a.getTime() : a) as number) - ((b instanceof Date ? b.getTime() : b) as number);
+  const chain: FakeChain = {
     selectAll: () => chain,
     orderBy: () => chain,
-    where: (col: string, op: string, val: any) => {
+    where: (col: string, op: string, val: unknown) => {
       preds.push((r) => {
         switch (op) {
           case "=": return r[col] === val;
-          case "in": return val.includes(r[col]);
+          case "in": return (val as unknown[]).includes(r[col]);
           case ">": return cmp(r[col], val) > 0;
           case ">=": return cmp(r[col], val) >= 0;
           default: throw new Error("unsupported op " + op);
@@ -51,7 +61,7 @@ describe("Scheduled rules use the church's calendar day", () => {
     mockGetPeopleIds.mockResolvedValue(["p1"]);
     mockLoadChurch.mockResolvedValue({ id: "c1", timeZone: "America/Chicago" });
     mockLoadPeople.mockImplementation((_c: string, ids: string[]) => Promise.resolve(ids.map((id) => ({ id, displayName: id }))));
-    jest.spyOn(ExecutionHelper, "startAndAttempt").mockImplementation((async (_t: any, subject: any) => { started.push(subject.id); }) as any);
+    jest.spyOn(ExecutionHelper, "startAndAttempt").mockImplementation(async (_t, subject) => { started.push(subject.id); return undefined; });
   });
 
   afterEach(() => {
@@ -63,8 +73,8 @@ describe("Scheduled rules use the church's calendar day", () => {
     jest.setSystemTime(new Date(now));
     const rows = cards.map((c, i) => ({ id: "t" + i, churchId: "c1", triggerId: "r1", associatedWithType: "person", associatedWithId: "p1", dateCreated: new Date(c.at) }));
     (getDb as jest.Mock).mockReturnValue(fakeDb(rows));
-    const rule: any = { id: "r1", churchId: "c1", workflowId: "w1", triggerKind: "schedule", recurs, oncePerSubject: false };
-    return ExecutionHelper.runScheduledRule(rule, { task: new TaskRepo() } as any);
+    const rule: WorkflowTrigger = { id: "r1", churchId: "c1", workflowId: "w1", triggerKind: "schedule", recurs, oncePerSubject: false };
+    return ExecutionHelper.runScheduledRule(rule, { task: new TaskRepo() } as Repos);
   };
 
   it("a daily rule fires again the next night even though yesterday's card was made a few seconds later in the day", async () => {
@@ -96,7 +106,7 @@ describe("Scheduled rules use the church's calendar day", () => {
 
 describe("RuleEngine.runScheduled near each church's midnight", () => {
   let ran: string[];
-  const repos: any = { workflowTrigger: { loadScheduledAllChurches: jest.fn() } };
+  const repos = Object.assign({} as Repos, { workflowTrigger: { loadScheduledAllChurches: jest.fn() } });
 
   beforeEach(() => {
     jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
@@ -106,7 +116,7 @@ describe("RuleEngine.runScheduled near each church's midnight", () => {
       { id: "london", churchId: "cLondon", workflowId: "w1", triggerKind: "schedule", recurs: "yearly" }
     ]);
     mockLoadChurch.mockImplementation((id: string) => Promise.resolve({ id, timeZone: id === "cChicago" ? "America/Chicago" : "Europe/London" }));
-    jest.spyOn(ExecutionHelper, "runScheduledRule").mockImplementation((async (rule: any) => { ran.push(rule.id); return { created: 1, skipped: 0 }; }) as any);
+    jest.spyOn(ExecutionHelper, "runScheduledRule").mockImplementation(async (rule) => { ran.push(rule.id); return { created: 1, skipped: 0 }; });
   });
 
   afterEach(() => {

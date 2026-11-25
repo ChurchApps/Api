@@ -3,8 +3,9 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 // apihelper ships untransformed ESM; stub the only symbol MessageRepo uses.
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "msg_generated" } }));
 
-import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
-import { MessageRepo } from "../MessageRepo";
+import { CompiledQuery, DatabaseConnection, DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler, QueryResult } from "kysely";
+import type { MessagingDatabase } from "../../db/DatabaseTypes.js";
+import { MessageRepo } from "../MessageRepo.js";
 
 const { getDb } = jest.requireMock("../../db/index");
 
@@ -51,17 +52,17 @@ describe("MessageRepo.loadForConversationsPaginated", () => {
 });
 
 // A Kysely that compiles real MySQL but never connects; every statement it runs is recorded.
-function capturingDb(rows: any[] = []) {
+function capturingDb(rows: Record<string, unknown>[] = []) {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
-  driver.acquireConnection = async () => ({
-    executeQuery: async (q: any) => {
+  driver.acquireConnection = async (): Promise<DatabaseConnection> => ({
+    executeQuery: async <R>(q: CompiledQuery): Promise<QueryResult<R>> => {
       queries.push({ sql: q.sql, parameters: q.parameters });
-      return { rows } as any;
+      return { rows: rows as R[] };
     },
     streamQuery: async function* () {}
   });
-  const db = new Kysely<any>({
+  const db = new Kysely<MessagingDatabase>({
     dialect: {
       createAdapter: () => new MysqlAdapter(),
       createDriver: () => driver,

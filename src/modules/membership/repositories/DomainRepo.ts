@@ -92,7 +92,7 @@ export class DomainRepo {
     return getDb().selectFrom("domains").selectAll()
       .where((eb) => eb.or([
         eb("lastChecked", "is", null),
-        eb("lastChecked", "<", sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)` as any)
+        eb("lastChecked", "<", sql<Date>`DATE_SUB(NOW(), INTERVAL 24 HOUR)`)
       ]))
       .execute();
   }
@@ -107,7 +107,7 @@ export class DomainRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): Domain {
+  protected rowToModel(row: Domain): Domain {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -118,12 +118,12 @@ export class DomainRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Domain) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: Domain[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

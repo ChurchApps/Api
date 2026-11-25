@@ -14,8 +14,12 @@ export class CheckinController extends AttendanceBaseController {
   public async getSettings(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.checkin) && !au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
-      const gradePromotionDate = await getMembershipModuleGateway().loadSetting(au.churchId, "gradePromotionDate");
-      return { gradePromotionDate };
+      const gateway = getMembershipModuleGateway();
+      const [gradePromotionDate, checkinAnnouncement] = await Promise.all([
+        gateway.loadSetting(au.churchId, "gradePromotionDate"),
+        gateway.loadSetting(au.churchId, "checkinAnnouncement")
+      ]);
+      return { gradePromotionDate, checkinAnnouncement: checkinAnnouncement || "" };
     });
   }
 
@@ -44,7 +48,7 @@ export class CheckinController extends AttendanceBaseController {
       if (String(message).length > MAX_MESSAGE_LENGTH) return this.json({ error: "Message is too long" }, 400);
       if (!(await BroadcastRateLimiter.consume(au.churchId))) return this.json({ error: "Too many broadcasts. Please try again later." }, 429);
 
-      const rows = (await this.repos.visit.loadActiveByServiceToday(au.churchId, serviceId)) as any[];
+      const rows = await this.repos.visit.loadActiveByServiceToday(au.churchId, serviceId);
       const personIds = [...new Set(rows.map((r) => r.personId).filter((id) => !!id))];
       if (personIds.length === 0) return { sent: 0, skippedOptedOut: 0, skippedNoPhone: 0 };
 

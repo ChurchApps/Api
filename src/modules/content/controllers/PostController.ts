@@ -8,7 +8,7 @@ import { ContentBaseController } from "./ContentBaseController.js";
 @controller("/content/posts")
 export class PostController extends ContentBaseController {
   @httpGet("/public/:churchId")
-  public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const category = req.query.category ? req.query.category.toString() : undefined;
       const tag = req.query.tag ? req.query.tag.toString() : undefined;
@@ -20,14 +20,14 @@ export class PostController extends ContentBaseController {
   }
 
   @httpGet("/public/:churchId/categories")
-  public async loadPublicCategories(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async loadPublicCategories(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repos.post.loadPublishedCategories(churchId);
     });
   }
 
   @httpGet("/public/:churchId/slug/:slug")
-  public async loadPublicBySlug(@requestParam("churchId") churchId: string, @requestParam("slug") slug: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async loadPublicBySlug(@requestParam("churchId") churchId: string, @requestParam("slug") slug: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const post = await this.repos.post.loadPublishedBySlug(churchId, slug);
       if (post) await this.attachAuthorNames(churchId, [post]);
@@ -36,7 +36,7 @@ export class PostController extends ContentBaseController {
   }
 
   @httpGet("/rss/:churchId")
-  public async rss(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async rss(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const siteUrl = req.query.siteUrl ? req.query.siteUrl.toString().replace(/\/$/, "") : "";
       const posts = await this.repos.post.loadPublished(churchId, { limit: 50 });
@@ -47,7 +47,7 @@ export class PostController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const post = await this.repos.post.load(au.churchId, id);
       if (post) await this.attachAuthorNames(au.churchId, [post]);
@@ -56,7 +56,7 @@ export class PostController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const posts = await this.repos.post.loadAll(au.churchId);
       return await this.attachAuthorNames(au.churchId, posts);
@@ -64,7 +64,7 @@ export class PostController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Post[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Post[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<Post>[] = [];
@@ -79,7 +79,7 @@ export class PostController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.post.delete(au.churchId, id);

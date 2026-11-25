@@ -1,4 +1,4 @@
-import { toConnections } from "../OAuthConnectionHelper.js";
+import { toConnections, type OAuthConnectionRow } from "../OAuthConnectionHelper.js";
 
 const now = new Date("2026-05-19T00:00:00Z");
 const future = new Date("2026-08-01T00:00:00Z");
@@ -7,7 +7,7 @@ const past = new Date("2026-01-01T00:00:00Z");
 describe("toConnections", () => {
   it("returns an empty array for empty/absent input", () => {
     expect(toConnections([], now)).toEqual([]);
-    expect(toConnections(undefined as any, now)).toEqual([]);
+    expect(toConnections(undefined, now)).toEqual([]);
   });
 
   it("maps a live token row to a connection", () => {
@@ -24,7 +24,7 @@ describe("toConnections", () => {
   });
 
   it("falls back to clientId when the client name is missing", () => {
-    const rows = [{ id: "t", clientId: "cid-xyz", clientName: null, scopes: null, createdAt: past, expiresAt: future }];
+    const rows: OAuthConnectionRow[] = [{ id: "t", clientId: "cid-xyz", clientName: null, scopes: null, createdAt: past, expiresAt: future }];
     const result = toConnections(rows, now);
     expect(result[0].clientName).toBe("cid-xyz");
     expect(result[0].scopes).toBe("");

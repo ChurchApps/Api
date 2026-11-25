@@ -6,18 +6,19 @@ import { getDb } from "../../db/index.js";
 import { SongRepo } from "../SongRepo.js";
 import { ArrangementRepo } from "../ArrangementRepo.js";
 import { SongDetailRepo } from "../SongDetailRepo.js";
+import { SongDetailLinkRepo } from "../SongDetailLinkRepo.js";
 
 // Records Kysely builder calls for assertion without DB execution.
-function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy(
+function recordingDb(results: { execute?: unknown; executeTakeFirst?: unknown } = {}) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy(
     {},
     {
       get(_t, prop) {
         if (typeof prop === "symbol" || prop === "then") return undefined;
         if (prop === "execute") return async () => results.execute ?? [];
         if (prop === "executeTakeFirst") return async () => results.executeTakeFirst ?? null;
-        return (...args: any[]) => {
+        return (...args: unknown[]) => {
           calls.push({ method: prop as string, args });
           return proxy;
         };
@@ -27,7 +28,7 @@ function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
   return { proxy, calls };
 }
 
-const firstArg = (calls: { method: string; args: any[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
+const firstArg = (calls: { method: string; args: unknown[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
 
 describe("SongRepo persists song identity (songDetailId)", () => {
   afterEach(() => jest.restoreAllMocks());
@@ -90,5 +91,18 @@ describe("SongDetailRepo.loadForChurch resolves identity from the song", () => {
     const joins = calls.filter((c) => c.method === "innerJoin");
     expect(joins.some((c) => c.args[0] === "songDetails as sd" && c.args[2] === "s.songDetailId")).toBe(true);
     expect(joins.some((c) => String(c.args[0]).startsWith("arrangements"))).toBe(false);
+  });
+});
+
+describe("SongDetailLinkRepo.loadForChurchByService", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("scopes the links to songs in the church's library", async () => {
+    const { proxy, calls } = recordingDb();
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new SongDetailLinkRepo().loadForChurchByService("c1", "CCLI");
+    expect(firstArg(calls, "innerJoin")).toBe("songs as s");
+    const wheres = calls.filter((c) => c.method === "where").map((c) => c.args);
+    expect(wheres).toEqual(expect.arrayContaining([["s.churchId", "=", "c1"], ["l.service", "=", "CCLI"]]));
   });
 });

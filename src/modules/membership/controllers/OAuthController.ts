@@ -27,7 +27,7 @@ export class OAuthController extends MembershipBaseController {
     const allGroups = await this.repos.groupMember.loadForPeople([personId]);
 
     const groups: Array<{ id: string; tags: string; name: string; leader: boolean }> = [];
-    allGroups.forEach((g: any) => {
+    allGroups.forEach((g) => {
       groups.push({ id: g.groupId, tags: g.tags, name: g.name, leader: g.leader });
     });
 
@@ -39,11 +39,14 @@ export class OAuthController extends MembershipBaseController {
 
   // authz-exempt: self-service — issues an auth code for the caller's own userChurch (loadByUserId(au.id, au.churchId)); user consents on their own behalf
   @httpPost("/authorize")
-  public async authorize(req: express.Request<{}, {}, { client_id: string; redirect_uri: string; response_type: string; scope: string; state?: string; code_challenge?: string; code_challenge_method?: string }>, res: express.Response): Promise<any> {
+  public async authorize(
+    req: express.Request<{}, {}, { client_id: string; redirect_uri: string; response_type: string; scope: string; state?: string; code_challenge?: string; code_challenge_method?: string }>,
+    res: express.Response
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { client_id, redirect_uri, response_type, scope, state, code_challenge, code_challenge_method } = req.body;
 
-      const client = (await this.repos.oAuthClient.loadByClientId(client_id)) as any;
+      const client = await this.repos.oAuthClient.loadByClientId(client_id);
       if (!client) return this.json({ error: "invalid_client" }, 400);
       if (!isRegisteredRedirectUri(client.redirectUris, redirect_uri)) return this.json({ error: "invalid_redirect_uri" }, 400);
       if (response_type !== "code") return this.json({ error: "unsupported_response_type" }, 400);
@@ -52,7 +55,7 @@ export class OAuthController extends MembershipBaseController {
         if (code_challenge_method !== "S256" || !isS256Challenge(code_challenge)) return this.json({ error: "invalid_request", error_description: "code_challenge must be S256" }, 400);
       } else if (!client.clientSecret) return this.json({ error: "invalid_request", error_description: "code_challenge required" }, 400);
 
-      const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
+      const userChurch = await this.repos.userChurch.loadByUserId(au.id, au.churchId);
       if (!userChurch) return this.json({ error: "access_denied" }, 400);
 
       const authCode: OAuthCode = {
@@ -91,7 +94,7 @@ export class OAuthController extends MembershipBaseController {
       }
     >,
     res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const { grant_type, code, refresh_token, device_code, client_id, client_secret, redirect_uri, code_verifier } = oauthBody<typeof req.body>(req);
 
@@ -103,16 +106,16 @@ export class OAuthController extends MembershipBaseController {
       // Only public (secret-less) clients may omit client_secret; if client has a secret, it must match.
       let client;
       if ((grant_type === "refresh_token" || grant_type === "authorization_code") && !client_secret) {
-        client = (await this.repos.oAuthClient.loadByClientId(client_id)) as any;
+        client = await this.repos.oAuthClient.loadByClientId(client_id);
         if (client?.clientSecret) return this.json({ error: "invalid_client" }, 400);
       } else {
-        client = (await this.repos.oAuthClient.loadByClientIdAndSecret(client_id, client_secret)) as any;
+        client = await this.repos.oAuthClient.loadByClientIdAndSecret(client_id, client_secret);
       }
       if (!client) return this.json({ error: "invalid_client" }, 400);
 
       if (grant_type === "authorization_code") {
         if (!code) return this.json({ error: "invalid_request" }, 400);
-        const authCode = (await this.repos.oAuthCode.loadByCode(code)) as any;
+        const authCode = await this.repos.oAuthCode.loadByCode(code);
         if (!authCode || authCode.clientId !== client.clientId) return this.json({ error: "invalid_grant" }, 400);
         if (redirect_uri && authCode.redirectUri !== redirect_uri) return this.json({ error: "invalid_grant" }, 400);
         if (authCode.codeChallenge) {
@@ -125,9 +128,9 @@ export class OAuthController extends MembershipBaseController {
         }
         if (!(await this.repos.oAuthCode.consume(authCode.id))) return this.json({ error: "invalid_grant" }, 400);
 
-        const userChurch = (await this.repos.userChurch.load(authCode.userChurchId)) as any;
-        const user = userChurch ? ((await this.repos.user.load(userChurch.userId)) as any) : null;
-        const church = userChurch ? ((await this.repos.church.loadById(userChurch.churchId)) as any) : null;
+        const userChurch = await this.repos.userChurch.load(authCode.userChurchId);
+        const user = userChurch ? (await this.repos.user.load(userChurch.userId)) : null;
+        const church = userChurch ? (await this.repos.church.loadById(userChurch.churchId)) : null;
         if (!user || !church) return this.json({ error: "invalid_grant" }, 400);
         const personData = await this.loadPersonAndGroups(userChurch.personId);
         const loginUserChurch: LoginUserChurch = {
@@ -164,7 +167,7 @@ export class OAuthController extends MembershipBaseController {
         });
       } else if (grant_type === "refresh_token") {
         if (!refresh_token) return this.json({ error: "invalid_request" }, 400);
-        const oldToken = (await this.repos.oAuthToken.loadByRefreshToken(refresh_token)) as any;
+        const oldToken = await this.repos.oAuthToken.loadByRefreshToken(refresh_token);
 
         if (!oldToken || oldToken.clientId !== client.clientId) return this.json({ error: "invalid_grant" }, 400);
         if (oldToken.expiresAt && new Date(oldToken.expiresAt) < new Date()) {
@@ -174,15 +177,15 @@ export class OAuthController extends MembershipBaseController {
         // A rotated token is replayed when the client never got the reply that replaced it (a TV that lost power or
         // Wi-Fi mid-refresh). Honor it only while that replacement is unused, and drop the replacement nobody holds.
         if (oldToken.replacedById) {
-          const replacement = (await this.repos.oAuthToken.load(oldToken.replacedById)) as any;
+          const replacement = await this.repos.oAuthToken.load(oldToken.replacedById);
           if (replacement?.replacedById) return this.json({ error: "invalid_grant" }, 400);
           if (replacement) await this.repos.oAuthToken.delete(replacement.id);
         }
 
         // Fetch user/church data to generate proper JWT
-        const userChurch = (await this.repos.userChurch.load(oldToken.userChurchId)) as any;
-        const user = userChurch ? ((await this.repos.user.load(userChurch.userId)) as any) : null;
-        const church = userChurch ? ((await this.repos.church.loadById(userChurch.churchId)) as any) : null;
+        const userChurch = await this.repos.userChurch.load(oldToken.userChurchId);
+        const user = userChurch ? (await this.repos.user.load(userChurch.userId)) : null;
+        const church = userChurch ? (await this.repos.church.loadById(userChurch.churchId)) : null;
         if (!user || !church) return this.json({ error: "invalid_grant" }, 400);
         const personData = await this.loadPersonAndGroups(userChurch.personId);
         const loginUserChurch: LoginUserChurch = {
@@ -231,7 +234,7 @@ export class OAuthController extends MembershipBaseController {
 
   /** Dynamic Client Registration (RFC 7591) for public clients such as claude.ai and ChatGPT MCP connectors. */
   @httpPost("/register")
-  public async register(req: express.Request<{}, {}, { client_name?: string; redirect_uris?: string[]; scope?: string }>, res: express.Response): Promise<any> {
+  public async register(req: express.Request<{}, {}, { client_name?: string; redirect_uris?: string[]; scope?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), "", "oauth-register", 20, 60 * 60))) {
         return this.json({ error: "too_many_requests" }, 429);
@@ -269,7 +272,7 @@ export class OAuthController extends MembershipBaseController {
 
   /** Device Authorization Request per RFC 8628 Section 3.1. */
   @httpPost("/device/authorize")
-  public async deviceAuthorize(req: express.Request<{}, {}, { client_id: string; scope?: string }>, res: express.Response): Promise<any> {
+  public async deviceAuthorize(req: express.Request<{}, {}, { client_id: string; scope?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const { client_id, scope } = req.body;
 
@@ -314,7 +317,7 @@ export class OAuthController extends MembershipBaseController {
   }
 
   /** Handle device_code grant type (called from /token endpoint). */
-  private async handleDeviceCodeGrant(deviceCode: string, clientId: string, _res: express.Response): Promise<any> {
+  private async handleDeviceCodeGrant(deviceCode: string, clientId: string, _res: express.Response): Promise<unknown> {
     if (!deviceCode) {
       return this.json({ error: "invalid_request", error_description: "device_code required" }, 400);
     }
@@ -338,13 +341,13 @@ export class OAuthController extends MembershipBaseController {
         return this.json({ error: "access_denied" }, 400);
       case "approved":
         // Generate tokens using the stored userChurchId
-        const userChurch = (await this.repos.userChurch.load(dc.userChurchId)) as any;
+        const userChurch = await this.repos.userChurch.load(dc.userChurchId);
         if (!userChurch) {
           return this.json({ error: "server_error" }, 500);
         }
 
-        const user = (await this.repos.user.load(userChurch.userId)) as any;
-        const church = (await this.repos.church.loadById(userChurch.churchId)) as any;
+        const user = await this.repos.user.load(userChurch.userId);
+        const church = await this.repos.church.loadById(userChurch.churchId);
         const personData = await this.loadPersonAndGroups(userChurch.personId);
 
         if (!user || !church) {
@@ -398,7 +401,7 @@ export class OAuthController extends MembershipBaseController {
 
   /** Get pending device code info for admin approval UI. */
   @httpGet("/device/pending/:userCode")
-  public async getPendingDevice(@requestParam("userCode") userCode: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getPendingDevice(@requestParam("userCode") userCode: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (_au) => {
       const dc = await this.repos.oAuthDeviceCode.loadByUserCode(userCode);
 
@@ -418,7 +421,7 @@ export class OAuthController extends MembershipBaseController {
 
   /** Approve device authorization (called from admin UI). */
   @httpPost("/device/approve")
-  public async approveDevice(req: express.Request<{}, {}, { user_code: string; church_id: string; plan_type_id?: string }>, res: express.Response): Promise<any> {
+  public async approveDevice(req: express.Request<{}, {}, { user_code: string; church_id: string; plan_type_id?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { user_code, church_id, plan_type_id } = req.body;
 
@@ -429,7 +432,7 @@ export class OAuthController extends MembershipBaseController {
       }
 
       // Verify user has access to the selected church
-      const userChurch = (await this.repos.userChurch.loadByUserId(au.id, church_id)) as any;
+      const userChurch = await this.repos.userChurch.loadByUserId(au.id, church_id);
       if (!userChurch) {
         return this.json({ error: "access_denied", message: "No access to selected church" }, 403);
       }
@@ -449,7 +452,7 @@ export class OAuthController extends MembershipBaseController {
   /** Deny device authorization. */
   // authz-exempt: open to any authenticated user — only marks a pending device code "denied" (blocks pairing); no data access or escalation, holder of the on-screen user_code may decline
   @httpPost("/device/deny")
-  public async denyDevice(req: express.Request<{}, {}, { user_code: string }>, res: express.Response): Promise<any> {
+  public async denyDevice(req: express.Request<{}, {}, { user_code: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (_au) => {
       const { user_code } = req.body;
 
@@ -468,7 +471,7 @@ export class OAuthController extends MembershipBaseController {
 
   /** Create relay session for external OAuth providers; TV app receives sessionCode to poll for auth code. */
   @httpPost("/relay/sessions")
-  public async createRelaySession(req: express.Request<{}, {}, { provider: string; codeChallenge?: string }>, res: express.Response): Promise<any> {
+  public async createRelaySession(req: express.Request<{}, {}, { provider: string; codeChallenge?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const { provider, codeChallenge } = req.body || {};
       if (!provider) return this.json({ error: "invalid_request", error_description: "provider is required" }, 400);
@@ -500,7 +503,7 @@ export class OAuthController extends MembershipBaseController {
 
   /** Poll relay session for auth code; returns "pending" or "completed" with authCode. */
   @httpGet("/relay/sessions/:sessionCode")
-  public async getRelaySession(@requestParam("sessionCode") sessionCode: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getRelaySession(@requestParam("sessionCode") sessionCode: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
       if (!session) {
@@ -523,7 +526,7 @@ export class OAuthController extends MembershipBaseController {
 
   /** OAuth callback from external provider; stores code and shows HTML confirmation. */
   @httpGet("/relay/callback")
-  public async relayCallback(req: express.Request, res: express.Response): Promise<any> {
+  public async relayCallback(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const code = req.query.code as string;
       const sessionCode = req.query.state as string;
@@ -573,10 +576,10 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
 
   // Connected Apps screen in B1Admin Settings
   @httpGet("/connections")
-  public async getConnections(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getConnections(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
-      const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
+      const userChurch = await this.repos.userChurch.loadByUserId(au.id, au.churchId);
       if (!userChurch) return [];
       return toConnections(await this.repos.oAuthToken.loadForUser(userChurch.id));
     });
@@ -584,12 +587,12 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
 
   // Token can only be revoked by the user it belongs to
   @httpDelete("/connections/:id")
-  public async deleteConnection(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteConnection(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
-      const token = (await this.repos.oAuthToken.load(id)) as any;
+      const token = await this.repos.oAuthToken.load(id);
       if (!token) return this.json({}, 404);
-      const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
+      const userChurch = await this.repos.userChurch.loadByUserId(au.id, au.churchId);
       if (!userChurch || token.userChurchId !== userChurch.id) return this.json({}, 403);
       await this.repos.oAuthToken.deleteWithPredecessors(id);
       return this.json({}, 200);
@@ -597,7 +600,7 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
   }
 
   @httpGet("/clients")
-  public async getClients(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getClients(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       return await this.repos.oAuthClient.loadAll();
@@ -605,9 +608,9 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
   }
 
   @httpGet("/clients/clientId/:clientId")
-  public async getClientByClientId(@requestParam("clientId") clientId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getClientByClientId(@requestParam("clientId") clientId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (_au) => {
-      const result = (await this.repos.oAuthClient.loadByClientId(clientId)) as any;
+      const result = await this.repos.oAuthClient.loadByClientId(clientId);
       if (!result) return this.json({}, 404);
       result.clientSecret = null;
       return result;
@@ -615,7 +618,7 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
   }
 
   @httpGet("/clients/:id")
-  public async getClient(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getClient(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       return await this.repos.oAuthClient.load(id);
@@ -623,7 +626,7 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
   }
 
   @httpPost("/clients")
-  public async saveClient(req: express.Request<{}, {}, OAuthClient>, res: express.Response): Promise<any> {
+  public async saveClient(req: express.Request<{}, {}, OAuthClient>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       return await this.repos.oAuthClient.save(req.body);
@@ -631,7 +634,7 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
   }
 
   @httpDelete("/clients/:id")
-  public async deleteClient(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteClient(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       await this.repos.oAuthClient.delete(id);

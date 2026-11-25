@@ -13,15 +13,15 @@ export class PrivateMessageController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const gateway = getMembershipModuleGateway();
       const minimumAge = MessagingSafetyHelper.parseMinimumAge(await gateway.loadSetting(au.churchId, "messagingMinimumAge"));
-      if (minimumAge > 0) {
-        const ids = new Set<string>();
-        req.body.forEach((conv) => { if (conv.toPersonId) ids.add(conv.toPersonId); });
-        if (au.personId) ids.add(au.personId);
-        const people = await Promise.all([...ids].map((id) => gateway.loadPerson(au.churchId, id)));
-        // Null loads (unknown/removed ids) are out of scope of this rule — fail open.
-        if (people.some((p) => MessagingSafetyHelper.isRestricted(p, minimumAge))) {
-          return this.json({ errors: ["ageRestricted"] }, 403);
-        }
+      const ids = new Set<string>();
+      req.body.forEach((conv) => { if (conv.toPersonId) ids.add(conv.toPersonId); });
+      if (au.personId) ids.add(au.personId);
+      const people = await Promise.all([...ids].map((id) => gateway.loadPerson(au.churchId, id)));
+      // Either side flagged "Disable private messages" or under the minimum age blocks the new thread.
+      // Null loads (unknown/removed ids) are out of scope of these rules — fail open.
+      for (const p of people) {
+        const reason = MessagingSafetyHelper.restrictionReason(p, minimumAge);
+        if (reason) return this.json({ errors: [reason] }, 403);
       }
       for (const conv of req.body) {
         const existing = await this.repos.privateMessage.loadExisting(au.churchId, au.personId, conv.toPersonId);
@@ -47,7 +47,7 @@ export class PrivateMessageController extends MessagingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const privateMessages: PrivateMessage[] = await this.repos.privateMessage.loadByPersonId(au.churchId, au.personId);
       const messageIds: string[] = [];
@@ -77,9 +77,9 @@ export class PrivateMessageController extends MessagingBaseController {
   }
 
   @httpGet("/existing/:personId")
-  public async getExisting(@requestParam("personId") personId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async getExisting(@requestParam("personId") personId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const existing = (await this.repos.privateMessage.loadExisting(au.churchId, au.personId, personId)) as any;
+      const existing = (await this.repos.privateMessage.loadExisting(au.churchId, au.personId, personId));
       if (!existing) return {};
       if (existing.notifyPersonId === au.personId) {
         existing.notifyPersonId = null;
@@ -94,7 +94,7 @@ export class PrivateMessageController extends MessagingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = (await this.repos.privateMessage.loadById(au.churchId, id)) as any;
+      const result = (await this.repos.privateMessage.loadById(au.churchId, id));
       if (result?.fromPersonId !== au.personId && result?.toPersonId !== au.personId) return this.json({}, 401);
       if (result.notifyPersonId === au.personId) {
         result.notifyPersonId = null;
@@ -109,7 +109,7 @@ export class PrivateMessageController extends MessagingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const pm = (await this.repos.privateMessage.loadById(au.churchId, id)) as any;
+      const pm = (await this.repos.privateMessage.loadById(au.churchId, id));
       if (!pm) {
         return this.json({ error: "Conversation not found" }, 404);
       }

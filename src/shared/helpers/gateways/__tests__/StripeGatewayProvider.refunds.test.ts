@@ -22,6 +22,10 @@ describe("StripeGatewayProvider refunds", () => {
       expect(provider.classifyWebhookEvent("charge.refunded")).toEqual({ action: "donation", status: "refunded" });
     });
 
+    it("classifies charge.dispute.closed as a refunded donation", () => {
+      expect(provider.classifyWebhookEvent("charge.dispute.closed")).toEqual({ action: "donation", status: "refunded" });
+    });
+
     it("still classifies charge.succeeded as complete", () => {
       expect(provider.classifyWebhookEvent("charge.succeeded")).toEqual({ action: "donation", status: "complete" });
     });
@@ -47,6 +51,17 @@ describe("StripeGatewayProvider refunds", () => {
       const result = await provider.refundCharge(config, "ch_1");
       expect(mockStripe.refunds.create).toHaveBeenCalledWith({ charge: "ch_1" });
       expect(result.success).toBe(true);
+    });
+
+    it("sends a partial amount in minor units with the idempotency key", async () => {
+      const result = await provider.refundCharge(config, "pi_1", { amount: 12.34, currency: "usd", idempotencyKey: "key1" });
+      expect(mockStripe.refunds.create).toHaveBeenCalledWith({ payment_intent: "pi_1", amount: 1234 }, { idempotencyKey: "key1" });
+      expect(result.success).toBe(true);
+    });
+
+    it("keeps zero-decimal currencies in whole units", async () => {
+      await provider.refundCharge(config, "pi_1", { amount: 500, currency: "jpy" });
+      expect(mockStripe.refunds.create).toHaveBeenCalledWith({ payment_intent: "pi_1", amount: 500 });
     });
 
     it("refuses ids that are not charges", async () => {

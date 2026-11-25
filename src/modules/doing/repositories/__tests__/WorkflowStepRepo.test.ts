@@ -3,11 +3,12 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "ge
 
 import { WorkflowStepRepo } from "../WorkflowStepRepo.js";
 import { getDb } from "../../db/index.js";
+import type { WorkflowStep } from "../../models/index.js";
 
 describe("WorkflowStepRepo expectedResponseDays", () => {
   it("clears the stored due days when an update leaves them out", async () => {
-    const updated: any[] = [];
-    const updateChain = { set: (v: any) => { updated.push(v); return { where: () => ({ where: () => ({ execute: async () => undefined }) }) }; } };
+    const updated: Partial<WorkflowStep>[] = [];
+    const updateChain = { set: (v: Partial<WorkflowStep>) => { updated.push(v); return { where: () => ({ where: () => ({ execute: async (): Promise<void> => undefined }) }) }; } };
     (getDb as jest.Mock).mockReturnValue({ updateTable: () => updateChain });
 
     await new WorkflowStepRepo().save({ id: "s1", churchId: "c1", workflowId: "w1", name: "Greet", sort: 1 });
@@ -18,8 +19,8 @@ describe("WorkflowStepRepo expectedResponseDays", () => {
 
 describe("WorkflowStepRepo instructions", () => {
   const captureUpdate = () => {
-    const updated: any[] = [];
-    const updateChain = { set: (v: any) => { updated.push(v); return { where: () => ({ where: () => ({ execute: async () => undefined }) }) }; } };
+    const updated: Partial<WorkflowStep>[] = [];
+    const updateChain = { set: (v: Partial<WorkflowStep>) => { updated.push(v); return { where: () => ({ where: () => ({ execute: async (): Promise<void> => undefined }) }) }; } };
     (getDb as jest.Mock).mockReturnValue({ updateTable: () => updateChain });
     return updated;
   };

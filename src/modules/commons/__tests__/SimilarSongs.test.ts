@@ -1,6 +1,8 @@
 import "reflect-metadata";
+import type express from "express";
+import type { SongView } from "../models/index.js";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
-jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../helpers/index", () => ({
   ChordProHelper: { slug: (t: string) => t },
   ContentLibraryHelper: { fileUrls: () => ({}) },
@@ -19,14 +21,17 @@ const LIBRARY = [
 ];
 
 function songController() {
-  const repos: any = { song: { loadPublishedForDuplicates: jest.fn(async () => LIBRARY) } };
+  const repos = { song: { loadPublishedForDuplicates: jest.fn(async (): Promise<SongView[]> => LIBRARY) } };
   const controller = new CommonsSongController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+  Object.assign(controller, {
+    repos,
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => Promise<unknown>) => action()
+  });
   return { controller, repos };
 }
 
-const req = (query: any) => ({ query, params: {}, headers: {} } as any);
+const req = (query: Record<string, string>) => ({ query, params: {}, headers: {} } as express.Request);
+const res = {} as express.Response;
 
 describe("DuplicateHelper", () => {
   it("folds case, punctuation and a leading article out of a title", () => {
@@ -53,19 +58,19 @@ describe("DuplicateHelper", () => {
 describe("GET /commons/songs/similar", () => {
   it("finds the published song behind a retitled submission by its first line", async () => {
     const { controller } = songController();
-    const hits: any = await controller.similar(req({ title: "Grace Astounding", firstLine: "Amazing grace! how sweet the sound," }), {} as any);
+    const hits = await controller.similar(req({ title: "Grace Astounding", firstLine: "Amazing grace! how sweet the sound," }), res);
     expect(hits).toEqual([{ id: "song0000001", title: "Amazing Grace", writer: "John Newton" }]);
   });
 
   it("finds it by title alone and reports nothing for an original song", async () => {
     const { controller } = songController();
-    expect(await controller.similar(req({ title: "the old rugged cross" }), {} as any)).toEqual([{ id: "song0000002", title: "The Old Rugged Cross", writer: "George Bennard" }]);
-    expect(await controller.similar(req({ title: "A Song Nobody Has Written Yet" }), {} as any)).toEqual([]);
+    expect(await controller.similar(req({ title: "the old rugged cross" }), res)).toEqual([{ id: "song0000002", title: "The Old Rugged Cross", writer: "George Bennard" }]);
+    expect(await controller.similar(req({ title: "A Song Nobody Has Written Yet" }), res)).toEqual([]);
   });
 
   it("does not read the library when there is nothing to match on", async () => {
     const { controller, repos } = songController();
-    expect(await controller.similar(req({ writer: "John Newton" }), {} as any)).toEqual([]);
+    expect(await controller.similar(req({ writer: "John Newton" }), res)).toEqual([]);
     expect(repos.song.loadPublishedForDuplicates).not.toHaveBeenCalled();
   });
 });

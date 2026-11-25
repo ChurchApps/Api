@@ -5,16 +5,22 @@ let n = 0;
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => `seedid${String(++n).padStart(5, "0")}` } }));
 
 import { authorLinksJson, buildCatalog, chordproBody, writerFolderSlugs } from "../../../../tools/commons-seed/catalog";
+import type { Asset, AssetFile, Author, Song, Submission } from "../models/index.js";
+
+/** buildCatalog stores the submission payload as its JSON column string */
+type SeedSubmission = Omit<Submission, "payload"> & { payload: string };
+type SeedCatalog = { assets: Asset[]; songs: Song[]; authors: Author[]; assetFiles: AssetFile[]; submissions: SeedSubmission[] };
+type CatalogRow = Record<string, string>;
 
 const REPO = path.join(__dirname, "fixtures", "package-repo");
 const OWN = "songs/en/public-domain/a-child-of-light-fixsong0001";
 const WORK = "works/abide-fixture";
 
 describe("buildCatalog seeds the database from the package, with the catalog row as the fallback", () => {
-  const { assets, songs, authors, assetFiles, submissions } = buildCatalog(REPO) as any;
-  const own = songs.find((s: any) => s.assetId === "fixsong0001");
-  const inherited = songs.find((s: any) => s.assetId === "fixsong0002");
-  const namesFor = (id: string) => assetFiles.filter((f: any) => f.assetId === id).map((f: any) => f.name).sort();
+  const { assets, songs, authors, assetFiles, submissions } = buildCatalog(REPO) as SeedCatalog;
+  const own = songs.find((s) => s.assetId === "fixsong0001");
+  const inherited = songs.find((s) => s.assetId === "fixsong0002");
+  const namesFor = (id: string) => assetFiles.filter((f) => f.assetId === id).map((f) => f.name).sort();
 
   it("builds the song row from masters/song.json and masters/lyrics.chordpro, not the catalog row", () => {
     // song.json says bpm 96 and three themes; the catalog row says 120 and two
@@ -75,9 +81,9 @@ describe("buildCatalog seeds the database from the package, with the catalog row
     expect(namesFor("fixsong0001")).not.toContainEqual(expect.stringContaining("cover-thumb"));
     // lyrics.chordpro is served but not registered: the publish hook owns that row
     expect(namesFor("fixsong0001")).not.toContainEqual(expect.stringContaining("lyrics.chordpro"));
-    expect(assetFiles.every((f: any) => !f.name.includes("\\"))).toBe(true);
-    expect(assetFiles.find((f: any) => f.assetId === "fixsong0001" && f.name === `${OWN}/derivatives/duration.json`).sizeBytes).toBeGreaterThan(0);
-    expect(new Set(assetFiles.map((f: any) => f.id)).size).toBe(assetFiles.length);
+    expect(assetFiles.every((f) => !f.name.includes("\\"))).toBe(true);
+    expect(assetFiles.find((f) => f.assetId === "fixsong0001" && f.name === `${OWN}/derivatives/duration.json`).sizeBytes).toBeGreaterThan(0);
+    expect(new Set(assetFiles.map((f) => f.id)).size).toBe(assetFiles.length);
     expect(buildCatalog(REPO)).not.toHaveProperty("copies");
   });
 
@@ -92,7 +98,7 @@ describe("buildCatalog seeds the database from the package, with the catalog row
   });
 
   it("maps the catalog row's url columns to files by catalog key and carries its confidence onto the songs row", () => {
-    const row = JSON.parse(fs.readFileSync(path.join(REPO, "catalog.json"), "utf8")).rows.find((r: any) => r.id === "fixsong0001");
+    const row: CatalogRow = JSON.parse(fs.readFileSync(path.join(REPO, "catalog.json"), "utf8")).rows.find((r: CatalogRow) => r.id === "fixsong0001");
     for (const col of ["midiUrl", "abcUrl", "artUrl", "lyricsUrl"]) expect(namesFor("fixsong0001")).toContain(row[col]);
     expect(own.confidence).toBe(row.confidence);
     expect(inherited.confidence).toBe("lyrics-only");
@@ -100,13 +106,13 @@ describe("buildCatalog seeds the database from the package, with the catalog row
   });
 
   it("keeps the writer portrait as a key under the commons prefix, and none when no row names one", () => {
-    expect(authors.every((a: any) => a.portraitUrl === null)).toBe(true);
+    expect(authors.every((a) => a.portraitUrl === null)).toBe(true);
   });
 
   it("copies supportLinks from writers/<slug>/writer.json onto the matching author row", () => {
-    const harriet = authors.find((a: any) => a.name === "Harriet Buell");
+    const harriet = authors.find((a) => a.name === "Harriet Buell");
     expect(JSON.parse(harriet.links)).toEqual([{ label: "Site", url: "https://harriet.example", support: true }]);
-    expect(authors.find((a: any) => a.name === "Joshua Stegmann").links).toBeNull();
+    expect(authors.find((a) => a.name === "Joshua Stegmann").links).toBeNull();
   });
 
   it("merges supportLinks from each named person in a composite credit", () => {

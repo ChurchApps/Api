@@ -21,7 +21,7 @@ export class PageHistoryRepo {
       description: model.description,
       userId: model.userId,
       createdDate: model.createdDate
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -33,7 +33,7 @@ export class PageHistoryRepo {
       description: model.description,
       userId: model.userId,
       createdDate: model.createdDate
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -46,7 +46,7 @@ export class PageHistoryRepo {
   }
 
   public async loadAll(churchId: string): Promise<PageHistory[]> {
-    return getDb().selectFrom("pageHistory").selectAll().where("churchId", "=", churchId).orderBy("createdDate", "desc").execute() as any;
+    return getDb().selectFrom("pageHistory").selectAll().where("churchId", "=", churchId).orderBy("createdDate", "desc").execute();
   }
 
   public async loadForPage(churchId: string, pageId: string, limit: number = 50) {
@@ -56,7 +56,7 @@ export class PageHistoryRepo {
       .where("pageId", "=", pageId)
       .orderBy("createdDate", "desc")
       .limit(safeLimit)
-      .execute() as any;
+      .execute();
   }
 
   public async loadForBlock(churchId: string, blockId: string, limit: number = 50) {
@@ -66,21 +66,21 @@ export class PageHistoryRepo {
       .where("blockId", "=", blockId)
       .orderBy("createdDate", "desc")
       .limit(safeLimit)
-      .execute() as any;
+      .execute();
   }
 
   public async deleteOldHistory(churchId: string, pageId: string, daysToKeep: number = 30) {
     await getDb().deleteFrom("pageHistory")
       .where("churchId", "=", churchId)
       .where("pageId", "=", pageId)
-      .where("createdDate", "<", sql`DATE_SUB(NOW(), INTERVAL ${daysToKeep} DAY)` as any)
+      .where("createdDate", "<", sql<Date>`DATE_SUB(NOW(), INTERVAL ${daysToKeep} DAY)`)
       .execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as PageHistory; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as PageHistory[]; }
+  public convertToModel(_churchId: string, data: PageHistory) { return data; }
+  public convertAllToModel(_churchId: string, data: PageHistory[]) { return data || []; }
 
-  protected rowToModel(row: any): PageHistory {
+  protected rowToModel(row: PageHistory): PageHistory {
     return {
       id: row.id,
       churchId: row.churchId,

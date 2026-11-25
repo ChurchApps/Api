@@ -6,19 +6,19 @@ import { getDb } from "../../db/index.js";
 import { PositionRepo } from "../PositionRepo.js";
 
 function recordingDb() {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy = new Proxy<Record<string, unknown>>({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => [];
       if (prop === "executeTakeFirst") return async () => null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
 
-const orderBys = (calls: { method: string; args: any[] }[]) => calls.filter((c) => c.method === "orderBy").map((c) => c.args[0]);
+const orderBys = (calls: { method: string; args: unknown[] }[]) => calls.filter((c) => c.method === "orderBy").map((c) => c.args[0]);
 
 describe("PositionRepo sort order", () => {
   afterEach(() => jest.restoreAllMocks());

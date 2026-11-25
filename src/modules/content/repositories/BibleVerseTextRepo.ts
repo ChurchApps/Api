@@ -17,10 +17,10 @@ export class BibleVerseTextRepo {
       verseNumber: model.verseNumber,
       content: model.content,
       newParagraph: model.newParagraph
-    } as any).onDuplicateKeyUpdate({
+    }).onDuplicateKeyUpdate({
       content: sql`VALUES(content)`,
       newParagraph: sql`VALUES(newParagraph)`
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -42,7 +42,7 @@ export class BibleVerseTextRepo {
 
   // The only index is (translationKey, verseKey). Without a verseKey bound MySQL read every cached verse of the
   // translation; verseKey is "<bookKey>.<chapter>.<verse>", so the prefix keeps the read to one book.
-  private async loadChapters(translationKey: string, bookKey: string, startChapter: number, endChapter: number) {
+  private async loadChapters(translationKey: string, bookKey: string, startChapter: number, endChapter: number): Promise<BibleVerseText[]> {
     return getDb().selectFrom("bibleVerseTexts").selectAll()
       .where("translationKey", "=", translationKey)
       .where("verseKey", "like", bookKey.replace(/[\\%_]/g, "\\$&") + ".%")
@@ -51,7 +51,7 @@ export class BibleVerseTextRepo {
       .where("chapterNumber", "<=", endChapter)
       .orderBy("chapterNumber")
       .orderBy("verseNumber")
-      .execute() as any as BibleVerseText[];
+      .execute();
   }
 
   private filterResults(data: BibleVerseText[], startChapter: number, startVerse: number, endChapter: number, endVerse: number) {
@@ -72,7 +72,7 @@ export class BibleVerseTextRepo {
     const startParts = startVerseKey.split(".");
     const endParts = endVerseKey.split(".");
     if (startParts.length !== 3 || endParts.length !== 3) {
-      const err: any = new Error("Invalid verse key format");
+      const err: Error & { status?: number } = new Error("Invalid verse key format");
       err.status = 400;
       throw err;
     }
@@ -105,10 +105,10 @@ export class BibleVerseTextRepo {
     return true;
   }
 
-  public convertToModel(data: any) { return data as BibleVerseText; }
-  public convertAllToModel(data: any[]) { return (data || []) as BibleVerseText[]; }
+  public convertToModel(data: BibleVerseText) { return data; }
+  public convertAllToModel(data: BibleVerseText[]) { return data || []; }
 
-  protected rowToModel(row: any): BibleVerseText {
+  protected rowToModel(row: BibleVerseText): BibleVerseText {
     return {
       id: row.id,
       translationKey: row.translationKey,

@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { Task } from "../models/index.js";
 import { getDb, withDoingConnection } from "../db/index.js";
+import { mysqlValue } from "./sqlValues.js";
 
 @injectable()
 export class TaskRepo {
@@ -19,8 +20,8 @@ export class TaskRepo {
       churchId: task.churchId,
       taskNumber: taskNumber,
       taskType: task.taskType,
-      dateCreated: sql`now()` as any,
-      dateClosed: (task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed) as any,
+      dateCreated: sql<Date>`now()`,
+      dateClosed: task.dateClosed ? mysqlValue<Date>(DateHelper.toMysqlDate(task.dateClosed)) : task.dateClosed,
       associatedWithType: task.associatedWithType,
       associatedWithId: task.associatedWithId,
       associatedWithLabel: task.associatedWithLabel,
@@ -38,8 +39,8 @@ export class TaskRepo {
       data: task.data,
       workflowId: task.workflowId,
       stepId: task.stepId,
-      dueDate: (task.dueDate ? DateHelper.toMysqlDate(task.dueDate) : task.dueDate) as any,
-      snoozedUntil: (task.snoozedUntil ? DateHelper.toMysqlDate(task.snoozedUntil) : task.snoozedUntil) as any,
+      dueDate: task.dueDate ? mysqlValue<Date>(DateHelper.toMysqlDate(task.dueDate)) : task.dueDate,
+      snoozedUntil: task.snoozedUntil ? mysqlValue<Date>(DateHelper.toMysqlDate(task.snoozedUntil)) : task.snoozedUntil,
       sort: task.sort,
       assignmentId: task.assignmentId,
       followupKey: task.followupKey,
@@ -52,7 +53,7 @@ export class TaskRepo {
     // dateCreated is immutable; don't overwrite on update (client may send ISO string, MySQL DATETIME rejects it).
     let query = getDb().updateTable("tasks").set({
       taskType: task.taskType,
-      dateClosed: (task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed) as any,
+      dateClosed: task.dateClosed ? mysqlValue<Date>(DateHelper.toMysqlDate(task.dateClosed)) : task.dateClosed,
       associatedWithType: task.associatedWithType,
       associatedWithId: task.associatedWithId,
       associatedWithLabel: task.associatedWithLabel,
@@ -70,8 +71,8 @@ export class TaskRepo {
       data: task.data,
       workflowId: task.workflowId,
       stepId: task.stepId,
-      dueDate: (task.dueDate ? DateHelper.toMysqlDate(task.dueDate) : task.dueDate) as any,
-      snoozedUntil: (task.snoozedUntil ? DateHelper.toMysqlDate(task.snoozedUntil) : task.snoozedUntil) as any,
+      dueDate: task.dueDate ? mysqlValue<Date>(DateHelper.toMysqlDate(task.dueDate)) : task.dueDate,
+      snoozedUntil: task.snoozedUntil ? mysqlValue<Date>(DateHelper.toMysqlDate(task.snoozedUntil)) : task.snoozedUntil,
       sort: task.sort,
       assignmentId: task.assignmentId,
       followupKey: task.followupKey,
@@ -179,10 +180,10 @@ export class TaskRepo {
 
   private async loadNextTaskNumber(churchId: string) {
     const result = (await getDb().selectFrom("tasks")
-      .select(sql`max(ifnull(taskNumber, 0)) + 1`.as("taskNumber"))
+      .select(sql<number>`max(ifnull(taskNumber, 0)) + 1`.as("taskNumber"))
       .where("churchId", "=", churchId)
       .executeTakeFirst()) ?? null;
-    return (result as any)?.taskNumber ?? 1;
+    return result?.taskNumber ?? 1;
   }
 
   public async loadForPerson(churchId: string, personId: string, status: string) {
@@ -270,12 +271,12 @@ export class TaskRepo {
 
   public async loadMaxSortForStep(churchId: string, workflowId: string, stepId: string) {
     const result = (await getDb().selectFrom("tasks")
-      .select(sql`max(ifnull(sort, 0)) + 1`.as("sort"))
+      .select(sql<number>`max(ifnull(sort, 0)) + 1`.as("sort"))
       .where("churchId", "=", churchId)
       .where("workflowId", "=", workflowId)
       .where("stepId", "=", stepId)
       .executeTakeFirst()) ?? null;
-    return (result as any)?.sort ?? 1;
+    return result?.sort ?? 1;
   }
 
   public async loadOverdueAllChurches() {
@@ -283,8 +284,8 @@ export class TaskRepo {
       .where("workflowId", "is not", null)
       .where("status", "=", "Open")
       .where("dueDate", "is not", null)
-      .where("dueDate", "<", sql`now()` as any)
-      .where((eb) => eb.or([eb("snoozedUntil", "is", null), eb("snoozedUntil", "<", sql`now()` as any)]))
+      .where("dueDate", "<", sql<Date>`now()`)
+      .where((eb) => eb.or([eb("snoozedUntil", "is", null), eb("snoozedUntil", "<", sql<Date>`now()`)]))
       .execute();
   }
 
@@ -293,7 +294,7 @@ export class TaskRepo {
       .where("workflowId", "is not", null)
       .where("status", "=", "Open")
       .where("snoozedUntil", "is not", null)
-      .where("snoozedUntil", "<=", sql`now()` as any)
+      .where("snoozedUntil", "<=", sql<Date>`now()`)
       .execute();
   }
 
@@ -314,8 +315,8 @@ export class TaskRepo {
       .where("workflowId", "=", workflowId)
       .where("status", "=", "Open")
       .where("dueDate", "is not", null)
-      .where("dueDate", "<", sql`now()` as any)
-      .where((eb) => eb.or([eb("snoozedUntil", "is", null), eb("snoozedUntil", "<", sql`now()` as any)]))
+      .where("dueDate", "<", sql<Date>`now()`)
+      .where((eb) => eb.or([eb("snoozedUntil", "is", null), eb("snoozedUntil", "<", sql<Date>`now()`)]))
       .orderBy("dueDate")
       .execute();
   }
@@ -327,7 +328,7 @@ export class TaskRepo {
       .where("churchId", "=", churchId)
       .where("workflowId", "=", workflowId)
       .where("status", "=", "Closed")
-      .where("dateClosed", ">=", DateHelper.toMysqlDate(since) as any)
+      .where("dateClosed", ">=", mysqlValue<Date>(DateHelper.toMysqlDate(since)))
       .groupBy(sql`date(dateClosed)`)
       .orderBy(sql`date(dateClosed)`)
       .execute();

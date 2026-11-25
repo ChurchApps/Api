@@ -26,7 +26,7 @@ export class RatingRepo {
     await this.write(assetId, userId, { stars, saved: existing?.saved || false });
     const countDelta = (stars == null ? 0 : 1) - (before == null ? 0 : 1);
     const sumDelta = (stars || 0) - (before || 0);
-    await getDb().updateTable("assets").set((eb) => ({ ratingCount: eb("ratingCount", "+", countDelta), ratingSum: eb("ratingSum", "+", sumDelta) } as any)).where("id", "=", assetId).execute();
+    await getDb().updateTable("assets").set((eb) => ({ ratingCount: eb("ratingCount", "+", countDelta), ratingSum: eb("ratingSum", "+", sumDelta) })).where("id", "=", assetId).execute();
   }
 
   public async setSaved(assetId: string, userId: string, saved: boolean): Promise<void> {
@@ -46,14 +46,14 @@ export class RatingRepo {
     let q = getDb().selectFrom("assetRatings").innerJoin("assets", "assets.id", "assetRatings.assetId")
       .select(sql<number>`count(*)`.as("n"))
       .where(publishedBy(userId)).where("assets.assetType", "=", "song").where("assets.status", "=", "published")
-      .where("assetRatings.saved", "=", true as any).where("assetRatings.userId", "!=", userId);
+      .where("assetRatings.saved", "=", true).where("assetRatings.userId", "!=", userId);
     if (withinHours) q = q.where("assetRatings.modifiedAt", ">=", sql<Date>`date_sub(now(), interval ${withinHours} hour)`);
     const row = await q.executeTakeFirst();
     return Number(row?.n || 0);
   }
 
   public async loadSavedAssetIds(userId: string): Promise<string[]> {
-    const rows = await getDb().selectFrom("assetRatings").select("assetId").where("userId", "=", userId).where("saved", "=", true as any).orderBy("modifiedAt", "desc").execute();
+    const rows = await getDb().selectFrom("assetRatings").select("assetId").where("userId", "=", userId).where("saved", "=", true).orderBy("modifiedAt", "desc").execute();
     return rows.map((r) => r.assetId as string);
   }
 

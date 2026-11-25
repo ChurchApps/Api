@@ -2,6 +2,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Resource } from "../models/index.js";
 import { injectable } from "inversify";
+import type { TinyIntActive } from "./types.js";
 
 @injectable()
 export class ResourceRepo {
@@ -20,7 +21,7 @@ export class ResourceRepo {
       approvalGroupId: model.approvalGroupId,
       active: model.active ?? true,
       categoryName: model.categoryName?.trim() || null
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -32,7 +33,7 @@ export class ResourceRepo {
       approvalGroupId: model.approvalGroupId ?? null,
       active: model.active ?? true,
       categoryName: model.categoryName?.trim() || null
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -55,10 +56,10 @@ export class ResourceRepo {
   }
 
   // MySQL returns TINYINT(1) as 0/1.
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: TinyIntActive<Resource>) {
     if (!data) return data as Resource;
     return { ...data, active: data.active === undefined ? true : !!data.active } as Resource;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) { return (data || []).map((d) => this.convertToModel(churchId, d)); }
+  public convertAllToModel(churchId: string, data: TinyIntActive<Resource>[]) { return (data || []).map((d) => this.convertToModel(churchId, d)); }
 }

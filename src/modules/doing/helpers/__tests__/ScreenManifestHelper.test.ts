@@ -1,24 +1,30 @@
 /** Tests the FreePlay screen manifest build: same manifest, one provider-auth lookup per provider instead of one per file. */
 
 jest.mock("@churchapps/content-providers", () => ({
-  setProviderSecret: () => undefined,
-  getProviderConfig: () => null,
-  getProvider: (id: string) => (id === "googledrive" ? { requiresAuth: true } : id === "publicfeed" ? { requiresAuth: false, getPlaylist: async () => [] } : null)
+  setProviderSecret: (): void => undefined,
+  getProviderConfig: (): null => null,
+  getProvider: (id: string) => (id === "googledrive" ? { requiresAuth: true } : id === "publicfeed" ? { requiresAuth: false, getPlaylist: async (): Promise<never[]> => [] } : null)
 }));
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({
     loadChurch: async () => ({ timeZone: "America/Chicago" }),
-    loadGroup: async () => null
+    loadGroup: async (): Promise<null> => null
   })
 }));
 
 import { ScreenManifestHelper } from "../ScreenManifestHelper.js";
 import { ProviderAuthHelper } from "../ProviderAuthHelper.js";
+import type { Repos } from "../../repositories/Repos.js";
+import type { Playlist, PlaylistItem } from "../../models/index.js";
 
-const driveItems = (prefix: string, n: number) =>
+// Test doubles implement only the repo methods a test reads, with loose return shapes.
+type FakeRepos = { [K in keyof Repos]?: { [M in keyof Repos[K]]?: Repos[K][M] extends (...args: infer A) => unknown ? (...args: A) => unknown : Repos[K][M] } };
+const asRepos = (fake: FakeRepos) => fake as Repos;
+
+const driveItems = (prefix: string, n: number): PlaylistItem[] =>
   Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, fileId: `${prefix}F${i}`, title: `${prefix} ${i}`, providerId: "googledrive", providerPath: "/", mediaType: "image", seconds: 8 }));
 
-const playlists: Record<string, any> = {
+const playlists: Record<string, Playlist> = {
   DEF: { id: "DEF", name: "Lobby loop", items: driveItems("d", 4) },
   P1: { id: "P1", name: "Morning", items: [...driveItems("m", 3), { id: "u1", title: "Logo", url: "https://cdn.example.com/logo.png", seconds: 5 }] },
   P2: { id: "P2", name: "Evening", items: driveItems("e", 2) }
@@ -29,11 +35,11 @@ const entries = [
   { id: "B", screenGroupId: "G", targetType: "playlist", targetId: "P2", start: "2026-10-19T18:00:00", end: "2026-10-19T20:00:00", endBehavior: "fallback", enabled: true }
 ];
 
-const repos: any = {
-  screenGroup: { load: async () => ({ id: "G", name: "Lobby", defaultPlaylistId: "DEF" }), convertToModel: (_c: string, d: any) => d },
-  playlist: { load: async (_c: string, id: string) => playlists[id], convertToModel: (_c: string, d: any) => d },
-  scheduleEntry: { loadByScreenGroupId: async () => entries, convertAllToModel: (_c: string, d: any) => d }
-};
+const repos = asRepos({
+  screenGroup: { load: async () => ({ id: "G", name: "Lobby", defaultPlaylistId: "DEF" }), convertToModel: <T>(_c: string, d: T) => d },
+  playlist: { load: async (_c: string, id: string) => playlists[id], convertToModel: <T>(_c: string, d: T) => d },
+  scheduleEntry: { loadByScreenGroupId: async () => entries, convertAllToModel: <T>(_c: string, d: T) => d }
+});
 
 const now = new Date("2026-10-19T12:00:00Z");
 
@@ -42,7 +48,7 @@ describe("ScreenManifestHelper.build", () => {
   beforeEach(() => {
     getAuth = jest.spyOn(ProviderAuthHelper, "getAuth").mockImplementation(async () => {
       await new Promise((r) => setTimeout(r, 1));
-      return { access_token: "tok", refresh_token: "", token_type: "Bearer", created_at: 0, expires_in: 3600, scope: "" } as any;
+      return { access_token: "tok", refresh_token: "", token_type: "Bearer", created_at: 0, expires_in: 3600, scope: "" };
     });
   });
   afterEach(() => getAuth.mockRestore());

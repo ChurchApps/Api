@@ -26,7 +26,7 @@ export class DeviceRepo {
       contentType: model.contentType,
       contentId: model.contentId,
       secret: model.secret
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -167,17 +167,17 @@ export class DeviceRepo {
     await getDb().deleteFrom("devices").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any): Device {
+  public convertToModel(_churchId: string, data: Device): Device {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): Device[] {
+  public convertAllToModel(_churchId: string, data: Device[]): Device[] {
     if (!data) return [];
-    return (Array.isArray(data) ? data : []).map((d: any) => this.rowToModel(d));
+    return (Array.isArray(data) ? data : []).map((d) => this.rowToModel(d));
   }
 
-  protected rowToModel(row: any): Device {
+  protected rowToModel(row: Device): Device {
     return {
       id: row.id,
       appName: row.appName,

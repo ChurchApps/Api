@@ -38,7 +38,8 @@ export interface MembershipModuleGateway {
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string; discussionsEnabled?: boolean | number; announcementsEnabled?: boolean | number } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
   loadPerson(churchId: string, personId: string): Promise<{
-    id: string; householdId: string; email: string; firstName?: string; lastName?: string; displayName?: string; mobilePhone?: string; optedOut?: boolean | number; smsOptedOut?: boolean | number; donorNumber?: string;
+    id: string; householdId: string; email: string; firstName?: string; lastName?: string; displayName?: string; mobilePhone?: string;
+    optedOut?: boolean | number; smsOptedOut?: boolean | number; disablePrivateMessages?: boolean | number; donorNumber?: string;
     membershipStatus?: string; gender?: string; maritalStatus?: string; birthDate?: Date; householdRole?: string;
   } | null>;
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
@@ -46,11 +47,14 @@ export interface MembershipModuleGateway {
   addGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
   // Idempotent: removes the person's membership row(s) for the group.
   removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
+  // field is a built-in people column or "personField_<fieldId>" for one of the church's custom fields.
   setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void>;
   loadPeopleForAutomation(churchId: string): Promise<{ id: string; displayName: string; membershipStatus?: string; gender?: string; maritalStatus?: string }[]>;
   loadList(churchId: string, listId: string): Promise<{ id: string; name: string } | null>;
   loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]>;
   loadSetting(churchId: string, keyName: string): Promise<string | null>;
+  // Saves a church setting that is not public (public stays NULL).
+  saveSetting(churchId: string, keyName: string, value: string): Promise<void>;
   loadGroupsForCheckin(churchId: string, groupIds: string[]): Promise<CheckinGroup[]>;
   loadActiveGroupIds(churchId: string, ids: string[]): Promise<string[]>;
   loadHouseholdAdults(churchId: string, personIds: string[]): Promise<HouseholdAdult[]>;
@@ -111,6 +115,8 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     "zip",
     "maritalStatus"
   ]);
+  // Same prefix list rules and advanced search use to address a custom field.
+  private static readonly CUSTOM_FIELD_PREFIX = "personField_";
   private static readonly ALLOWED_OPERATORS = new Set(["=", "!=", ">", "<", ">=", "<=", "LIKE"]);
   // Text operators offered by the B1Admin condition editor, mapped to LIKE patterns.
   private static readonly TEXT_OPERATORS = new Map<string, (v: string) => string>([
@@ -380,6 +386,11 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     return (row?.value as string) ?? null;
   }
 
+  public async saveSetting(churchId: string, keyName: string, value: string): Promise<void> {
+    const repos = await this.repos();
+    await repos.setting.save({ churchId, keyName, value });
+  }
+
   public async loadActiveGroupIds(churchId: string, ids: string[]): Promise<string[]> {
     if (ids.length === 0) return [];
     const rows = (await this.getDb().selectFrom("groups")
@@ -435,12 +446,27 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
   }
 
   public async setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void> {
+    if (field.startsWith(MembershipModuleGatewayDb.CUSTOM_FIELD_PREFIX)) return this.setCustomPersonField(churchId, personId, field, value);
     if (!MembershipModuleGatewayDb.ALLOWED_FIELDS.has(field)) throw new Error(`Invalid person field: ${field}`);
     await this.getDb().updateTable("people")
       .set({ [field]: value })
       .where("churchId", "=", churchId)
       .where("id", "=", personId)
       .execute();
+  }
+
+  private async setCustomPersonField(churchId: string, personId: string, field: string, value: string): Promise<void> {
+    const repos = await this.repos();
+    const fieldId = field.substring(MembershipModuleGatewayDb.CUSTOM_FIELD_PREFIX.length);
+    const personField = fieldId ? await repos.personField.load(churchId, fieldId) : null;
+    if (!personField) throw new Error(`Invalid person field: ${field}`);
+    // The built-in update only ever touches this church's people; a value row must not be created for anyone else.
+    const person = await this.getDb().selectFrom("people").select("id")
+      .where("churchId", "=", churchId)
+      .where("id", "=", personId)
+      .executeTakeFirst();
+    if (!person) return;
+    await repos.personFieldValue.upsert(churchId, personId, fieldId, value);
   }
 
   public async anonymizePerson(churchId: string, personId: string): Promise<void> {

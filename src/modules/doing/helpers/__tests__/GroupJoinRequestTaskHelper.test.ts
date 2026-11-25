@@ -1,6 +1,7 @@
 import "reflect-metadata";
+import type { Task } from "../../models/index.js";
 
-const save = jest.fn(async (t: any) => ({ ...t, id: t.id || "task-" + t.assignedToId }));
+const save = jest.fn(async (t: Task) => ({ ...t, id: t.id || "task-" + t.assignedToId }));
 const loadOpenByTaskType = jest.fn();
 jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ task: { save, loadOpenByTaskType } })) } }));
 

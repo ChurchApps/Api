@@ -15,5 +15,5 @@ export class Device {
   public contentType?: string;
   public contentId?: string;
   public secret?: string;
-  public status?: any;
+  public status?: unknown;
 }

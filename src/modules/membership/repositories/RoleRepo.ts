@@ -59,7 +59,7 @@ export class RoleRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: any): Role {
+  protected rowToModel(row: Role): Role {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -67,12 +67,12 @@ export class RoleRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Role) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: Role[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

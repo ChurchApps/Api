@@ -1,9 +1,9 @@
 import "reflect-metadata";
 jest.mock("../MembershipBaseController", () => ({
   MembershipBaseController: class {
-    json(obj: any, status: number) { return { obj, status }; }
-    denyAccess(errors: any) { return { errors, status: 401 }; }
-    error(errors: any) { return { errors, status: 500 }; }
+    json(obj: unknown, status: number) { return { obj, status }; }
+    denyAccess(errors: string[]) { return { errors, status: 401 }; }
+    error(errors: string[]) { return { errors, status: 500 }; }
   }
 }));
 jest.mock("../../helpers/index", () => {
@@ -32,24 +32,39 @@ jest.mock("../../auth/index", () => ({ AuthenticatedUser: { login: jest.fn(), lo
 jest.mock("../../models/index", () => ({}));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn() } }));
 jest.mock("../../../../shared/helpers/ChurchEmailLimiter.js", () => ({ ChurchEmailLimiter: { reserve: jest.fn(async () => ["r1"]), settle: jest.fn(async () => {}) } }));
-jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: (arr: any[], k: string, v: any) => (arr || []).find((x: any) => x[k] === v) } }));
+jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: (arr: Record<string, unknown>[], k: string, v: unknown) => (arr || []).find((x) => x[k] === v) } }));
 
 import bcrypt from "bcryptjs";
+import express from "express";
+import type { AuthenticatedUser as ApiUser } from "@churchapps/apihelper";
 import { UserController } from "../UserController.js";
 import { AuthGuidHelper, AuditLogHelper, Environment, UserHelper, UserChurchHelper } from "../../helpers/index.js";
 import { AuthenticatedUser } from "../../auth/index.js";
+import type { User } from "../../models/index.js";
+
+// Each repo is a bag of jest mocks; some tests add more mocks after the controller is built.
+type RepoMocks = Record<string, Record<string, jest.Mock>>;
+type Result = { status?: number; success?: boolean; obj?: Record<string, unknown> & { authGuid?: string; errors?: string[]; jwt?: string } };
+const req = (data: Partial<express.Request>) => data as express.Request;
+const res = {} as express.Response;
+// register answers validation failures through res.status(...).json(...).
+const jsonRes = {} as express.Response;
+jsonRes.status = jest.fn(() => jsonRes);
+jsonRes.json = jest.fn((o) => o);
+const anon = (_req: express.Request, _res: express.Response, action: () => unknown) => action();
+const authed = (au: Partial<ApiUser>) => (_req: express.Request, _res: express.Response, action: (au: ApiUser) => unknown) => action(au as ApiUser);
 
 // Backs the mocked repo with a single mutable "row" so loads hand out independent snapshots
 // (as separate DB reads would) and consumeAuthGuid arbitrates between them like the real UPDATE.
-function userController(initial: any) {
-  const row: any = initial ? { ...initial } : null;
+function userController(initial: User | null) {
+  const row: User = initial ? { ...initial } : null;
   const snapshot = async () => (row ? { ...row } : null);
-  const repos: any = {
+  const repos: RepoMocks = {
     user: {
       loadByAuthGuid: jest.fn(snapshot),
       loadByEmail: jest.fn(snapshot),
       load: jest.fn(snapshot),
-      save: jest.fn(async (u: any) => { if (row) Object.assign(row, u); return u; }),
+      save: jest.fn(async (u: User) => { if (row) Object.assign(row, u); return u; }),
       consumeAuthGuid: jest.fn(async (id: string, expected: string, replacement: string) => {
         if (!row || row.id !== id || row.authGuid !== expected || expected === replacement) return false;
         row.authGuid = replacement;
@@ -61,25 +76,27 @@ function userController(initial: any) {
       clearVerification: jest.fn()
     },
     userChurch: { loadByUserId: jest.fn(), save: jest.fn() },
-    person: { searchEmail: jest.fn(async () => []) },
-    role: { loadAll: jest.fn(async () => []) },
+    person: { searchEmail: jest.fn(async (): Promise<unknown[]> => []) },
+    role: { loadAll: jest.fn(async (): Promise<unknown[]> => []) },
     roleMember: { save: jest.fn() },
     userMfa: { isEnabled: jest.fn(async () => false) }
   };
   const controller = new UserController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ id: "u1", churchId: "c1", checkAccess: () => true, email: "admin@b.c" });
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
-  (controller as any).denyAccess = (errors: any) => ({ errors, status: 401 });
-  (controller as any).getUserChurches = jest.fn(async () => [{ church: { id: "c1" }, person: { id: "p1" } }]);
+  Object.assign(controller, {
+    repos,
+    actionWrapperAnon: anon,
+    actionWrapper: authed({ id: "u1", churchId: "c1", checkAccess: () => true, email: "admin@b.c" }),
+    json: (obj: unknown, status: number) => ({ obj, status }),
+    denyAccess: (errors: string[]) => ({ errors, status: 401 }),
+    getUserChurches: jest.fn(async () => [{ church: { id: "c1" }, person: { id: "p1" } }])
+  });
   return { controller, repos, row };
 }
 
 describe("UserController authGuid", () => {
   beforeEach(() => {
     (AuthenticatedUser.login as jest.Mock).mockReset();
-    (AuthenticatedUser.login as jest.Mock).mockImplementation(async (_c: any, user: any) => ({ user: { id: user.id, email: user.email, firstName: user.firstName }, userChurches: [] }));
+    (AuthenticatedUser.login as jest.Mock).mockImplementation(async (_c: unknown, user: User) => ({ user: { id: user.id, email: user.email, firstName: user.firstName }, userChurches: [] }));
     Environment.isMailConfigured = true;
   });
 
@@ -87,12 +104,12 @@ describe("UserController authGuid", () => {
     const minted = AuthGuidHelper.mint();
     const { controller, repos, row } = userController({ id: "u1", email: "a@b.c", firstName: "A", authGuid: minted.stored });
 
-    const first: any = await (controller as any).login({ body: { authGuid: minted.raw } }, {});
+    const first = await controller.login(req({ body: { authGuid: minted.raw } }), res) as Result;
     expect(first.status).toBe(200);
     expect(AuthGuidHelper.canLogin(row.authGuid)).toBe(false);
     expect(repos.user.save).toHaveBeenCalled();
 
-    const second: any = await (controller as any).login({ body: { authGuid: minted.raw } }, {});
+    const second = await controller.login(req({ body: { authGuid: minted.raw } }), res) as Result;
     expect(second.status).toBe(401);
     expect(AuthenticatedUser.login).toHaveBeenCalledTimes(1);
   });
@@ -102,7 +119,7 @@ describe("UserController authGuid", () => {
     const { controller, repos, row } = userController({ id: "u1", email: "a@b.c", firstName: "A", authGuid: minted.stored });
 
     // All five load the row before any of them writes, so each sees an unused guid.
-    const results: any[] = await Promise.all(Array.from({ length: 5 }, () => (controller as any).login({ body: { authGuid: minted.raw } }, {})));
+    const results = (await Promise.all(Array.from({ length: 5 }, () => controller.login(req({ body: { authGuid: minted.raw } }), res)))) as Result[];
 
     expect(results.filter((r) => r.status === 200)).toHaveLength(1);
     expect(results.filter((r) => r.status === 401)).toHaveLength(4);
@@ -116,10 +133,10 @@ describe("UserController authGuid", () => {
     const { controller, repos, row } = userController({ id: "u1", email: "a@b.c", firstName: "A", authGuid: minted.stored });
     const order: string[] = [];
     const consume = repos.user.consumeAuthGuid.getMockImplementation();
-    repos.user.consumeAuthGuid.mockImplementation(async (...args: any[]) => { order.push("consume"); return consume(...args); });
-    (AuthenticatedUser.login as jest.Mock).mockImplementation(async (_c: any, u: any) => { order.push("issue"); return { user: { id: u.id } }; });
+    repos.user.consumeAuthGuid.mockImplementation(async (...args: unknown[]) => { order.push("consume"); return consume(...args); });
+    (AuthenticatedUser.login as jest.Mock).mockImplementation(async (_c: unknown, u: User) => { order.push("issue"); return { user: { id: u.id } }; });
 
-    const result: any = await (controller as any).login({ body: { authGuid: minted.raw } }, {});
+    const result = await controller.login(req({ body: { authGuid: minted.raw } }), res) as Result;
     expect(result.status).toBe(200);
     expect(order).toEqual(["consume", "issue"]);
     expect(AuthGuidHelper.parse(row.authGuid)?.loginUsed).toBe(true);
@@ -129,14 +146,14 @@ describe("UserController authGuid", () => {
     const minted = AuthGuidHelper.mint();
     const { controller, repos, row } = userController({ id: "u1", email: "a@b.c", firstName: "A", authGuid: minted.stored });
     let saved = false;
-    repos.user.save.mockImplementation(async (u: any) => {
+    repos.user.save.mockImplementation(async (u: User) => {
       await new Promise((resolve) => setTimeout(resolve, 5));
       Object.assign(row, u);
       saved = true;
       return u;
     });
 
-    const result: any = await (controller as any).login({ body: { authGuid: minted.raw } }, {});
+    const result = await controller.login(req({ body: { authGuid: minted.raw } }), res) as Result;
     expect(result.status).toBe(200);
     expect(saved).toBe(true);
     expect(row.lastLogin).toBeInstanceOf(Date);
@@ -147,7 +164,7 @@ describe("UserController authGuid", () => {
     const { controller, repos } = userController({ id: "u1", email: "a@b.c", firstName: "A", authGuid: minted.stored });
     repos.user.consumeAuthGuid.mockResolvedValue(false);
 
-    const result: any = await (controller as any).login({ body: { authGuid: minted.raw } }, {});
+    const result = await controller.login(req({ body: { authGuid: minted.raw } }), res) as Result;
     expect(result.status).toBe(401);
     expect(AuthenticatedUser.login).not.toHaveBeenCalled();
   });
@@ -156,12 +173,12 @@ describe("UserController authGuid", () => {
     const legacy = "11111111-1111-4111-8111-111111111111";
     const { controller, row } = userController({ id: "u1", email: "a@b.c", firstName: "A", authGuid: legacy });
 
-    const first: any = await (controller as any).login({ body: { authGuid: legacy } }, {});
+    const first = await controller.login(req({ body: { authGuid: legacy } }), res) as Result;
     expect(first.status).toBe(200);
     expect(row.authGuid).not.toBe(legacy);
     expect(AuthGuidHelper.parse(row.authGuid)?.hash).toBe(AuthGuidHelper.hash(legacy));
 
-    const second: any = await (controller as any).login({ body: { authGuid: legacy } }, {});
+    const second = await controller.login(req({ body: { authGuid: legacy } }), res) as Result;
     expect(second.status).toBe(401);
     expect(AuthenticatedUser.login).toHaveBeenCalledTimes(1);
   });
@@ -169,7 +186,7 @@ describe("UserController authGuid", () => {
   it("still allows setPasswordGuid after the lookup login", async () => {
     const minted = AuthGuidHelper.mint();
     const { controller, row } = userController({ id: "u1", email: "a@b.c", authGuid: AuthGuidHelper.markLoginUsed(minted.stored, minted.raw) });
-    const result: any = await (controller as any).setPasswordGuid({ body: { authGuid: minted.raw, newPassword: "newpass1" } }, {});
+    const result = await controller.setPasswordGuid(req({ body: { authGuid: minted.raw, newPassword: "newpass1" } }), res) as Result;
     expect(result.success).toBe(true);
     expect(row.authGuid).toBe("");
   });
@@ -177,16 +194,16 @@ describe("UserController authGuid", () => {
   it("rejects an expired guid for login and setPasswordGuid", async () => {
     const minted = AuthGuidHelper.mint();
     const { controller, repos } = userController({ id: "u1", email: "a@b.c", firstName: "A", authGuid: `${AuthGuidHelper.hash(minted.raw)}:${Date.now() - 1}` });
-    const login: any = await (controller as any).login({ body: { authGuid: minted.raw } }, {});
+    const login = await controller.login(req({ body: { authGuid: minted.raw } }), res) as Result;
     expect(login.status).toBe(401);
     expect(repos.user.consumeAuthGuid).not.toHaveBeenCalled();
-    const setPw: any = await (controller as any).setPasswordGuid({ body: { authGuid: minted.raw, newPassword: "newpass1" } }, {});
+    const setPw = await controller.setPasswordGuid(req({ body: { authGuid: minted.raw, newPassword: "newpass1" } }), res) as Result;
     expect(setPw.success).toBe(false);
   });
 
   it("verifyCode returns a fresh raw guid and stores the hash", async () => {
     const { controller, repos, row } = userController({ id: "u1", email: "a@b.c", authGuid: "old-standing", verificationCode: bcrypt.hashSync("123456", 10), verificationExpires: new Date(Date.now() + 60000) });
-    const result: any = await (controller as any).verifyCode({ body: { email: "a@b.c", code: "123456" } }, {});
+    const result = await controller.verifyCode(req({ body: { email: "a@b.c", code: "123456" } }), res) as Result;
     expect(result.status).toBe(200);
     expect(result.obj.authGuid).toMatch(/^[0-9a-f-]{36}$/i);
     expect(row.authGuid).not.toBe(result.obj.authGuid);
@@ -197,7 +214,7 @@ describe("UserController authGuid", () => {
   it("register does not return authGuid when mail is configured", async () => {
     const { controller, repos } = userController(null);
     repos.user.loadByEmail.mockResolvedValue(null);
-    const result: any = await (controller as any).register({ body: { email: "new@b.c", firstName: "N", lastName: "U" } }, { status: () => ({ json: (o: any) => o }) });
+    const result = await controller.register(req({ body: { email: "new@b.c", firstName: "N", lastName: "U" } }), jsonRes) as Result;
     expect(result.status).toBe(200);
     expect(result.obj.authGuid).toBeFalsy();
     expect(result.obj.mailConfigured).toBe(true);
@@ -206,7 +223,7 @@ describe("UserController authGuid", () => {
   it("register fakes success and sends nothing for a too-fast submit", async () => {
     (UserHelper.sendWelcomeEmail as jest.Mock).mockClear();
     const { controller, repos } = userController(null);
-    const result: any = await (controller as any).register({ body: { email: "new@b.c", firstName: "N", lastName: "U", fillMs: 400 } }, {});
+    const result = await controller.register(req({ body: { email: "new@b.c", firstName: "N", lastName: "U", fillMs: 400 } }), res) as Result;
     expect(result.status).toBe(200);
     expect(result.obj.mailConfigured).toBe(true);
     expect(UserHelper.sendWelcomeEmail).not.toHaveBeenCalled();
@@ -216,8 +233,8 @@ describe("UserController authGuid", () => {
   it("register accepts a human-paced signup even when autofill filled the old honeypot", async () => {
     (UserHelper.sendWelcomeEmail as jest.Mock).mockClear();
     const { controller, repos } = userController(null);
-    repos.user.save.mockImplementation(async (u: any) => ({ ...u, id: "new1" }));
-    await (controller as any).register({ body: { email: "new@b.c", firstName: "N", lastName: "U", website: "https://autofilled.example", fillMs: 9000 } }, {});
+    repos.user.save.mockImplementation(async (u: User) => ({ ...u, id: "new1" }));
+    await controller.register(req({ body: { email: "new@b.c", firstName: "N", lastName: "U", website: "https://autofilled.example", fillMs: 9000 } }), res);
     expect(UserHelper.sendWelcomeEmail).toHaveBeenCalled();
     expect(repos.user.save).toHaveBeenCalled();
   });
@@ -226,9 +243,9 @@ describe("UserController authGuid", () => {
     Environment.isMailConfigured = false;
     const { controller, repos } = userController(null);
     repos.user.loadByEmail.mockResolvedValue(null);
-    let saved: any;
-    repos.user.save.mockImplementation(async (u: any) => { saved = u; return { ...u, id: "new1" }; });
-    const result: any = await (controller as any).register({ body: { email: "new@b.c", firstName: "N", lastName: "U" } }, { status: () => ({ json: (o: any) => o }) });
+    let saved: User;
+    repos.user.save.mockImplementation(async (u: User) => { saved = u; return { ...u, id: "new1" }; });
+    const result = await controller.register(req({ body: { email: "new@b.c", firstName: "N", lastName: "U" } }), jsonRes) as Result;
     expect(result.status).toBe(200);
     expect(result.obj.authGuid).toMatch(/^[0-9a-f-]{36}$/i);
     expect(saved.authGuid).not.toBe(result.obj.authGuid);
@@ -236,45 +253,47 @@ describe("UserController authGuid", () => {
   });
 });
 
-function passwordController(opts: any = {}) {
+function passwordController(opts: { user?: User | null; guidUser?: User } = {}) {
   const hashed = bcrypt.hashSync("oldpass", 10);
   const user = opts.user === undefined ? { id: "u1", email: "a@b.c", password: hashed } : opts.user;
-  const saved: any[] = [];
-  const repos: any = {
+  const saved: User[] = [];
+  const repos = {
     user: {
       load: jest.fn(async () => (user ? { ...user } : null)),
       loadByAuthGuid: jest.fn(async (g: string) => (opts.guidUser && opts.guidUser.authGuid === g ? { ...opts.guidUser } : null)),
-      save: jest.fn(async (u: any) => { saved.push({ ...u }); return u; })
+      save: jest.fn(async (u: User) => { saved.push({ ...u }); return u; })
     }
   };
   const au = { id: "u1", churchId: "c1" };
   const controller = new UserController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
-  (controller as any).denyAccess = (errors: string[]) => ({ obj: { errors }, status: 401 });
+  Object.assign(controller, {
+    repos,
+    actionWrapper: authed(au),
+    actionWrapperAnon: anon,
+    json: (obj: unknown, status: number) => ({ obj, status }),
+    denyAccess: (errors: string[]) => ({ obj: { errors }, status: 401 })
+  });
   return { controller, repos, saved };
 }
 
 describe("UserController.updatePassword", () => {
   it("rejects a JWT-only change without currentPassword", async () => {
     const { controller, repos } = passwordController();
-    const result: any = await controller.updatePassword({ body: { newPassword: "newpass" } } as any, {} as any);
+    const result = await controller.updatePassword(req({ body: { newPassword: "newpass" } }), res) as Result;
     expect(result.status).toBe(401);
     expect(repos.user.save).not.toHaveBeenCalled();
   });
 
   it("rejects a wrong currentPassword", async () => {
     const { controller, repos } = passwordController();
-    const result: any = await controller.updatePassword({ body: { newPassword: "newpass", currentPassword: "wrong" } } as any, {} as any);
+    const result = await controller.updatePassword(req({ body: { newPassword: "newpass", currentPassword: "wrong" } }), res) as Result;
     expect(result.status).toBe(401);
     expect(repos.user.save).not.toHaveBeenCalled();
   });
 
   it("changes the password when currentPassword matches", async () => {
     const { controller, repos, saved } = passwordController();
-    const result: any = await controller.updatePassword({ body: { newPassword: "newpass", currentPassword: "oldpass" } } as any, {} as any);
+    const result = await controller.updatePassword(req({ body: { newPassword: "newpass", currentPassword: "oldpass" } }), res) as Result;
     expect(result.status).toBe(200);
     expect(repos.user.save).toHaveBeenCalled();
     expect(bcrypt.compareSync("newpass", saved[0].password)).toBe(true);
@@ -284,7 +303,7 @@ describe("UserController.updatePassword", () => {
 
   it("invalidates any standing authGuid on password change", async () => {
     const { controller, saved } = passwordController({ user: { id: "u1", email: "a@b.c", password: bcrypt.hashSync("oldpass", 10), authGuid: AuthGuidHelper.mint().stored } });
-    const result: any = await controller.updatePassword({ body: { newPassword: "newpass", currentPassword: "oldpass" } } as any, {} as any);
+    const result = await controller.updatePassword(req({ body: { newPassword: "newpass", currentPassword: "oldpass" } }), res) as Result;
     expect(result.status).toBe(200);
     expect(saved[0].authGuid).toBe("");
   });
@@ -294,7 +313,7 @@ describe("UserController.setPasswordGuid", () => {
   it("resets the password with authGuid and no current password", async () => {
     const guidUser = { id: "u2", email: "b@c.d", authGuid: "reset-guid", password: bcrypt.hashSync("oldpass", 10) };
     const { controller, repos, saved } = passwordController({ guidUser });
-    const result: any = await controller.setPasswordGuid({ body: { authGuid: "reset-guid", newPassword: "freshpass" } } as any, {} as any);
+    const result = await controller.setPasswordGuid(req({ body: { authGuid: "reset-guid", newPassword: "freshpass" } }), res) as Result;
     expect(result.success).toBe(true);
     expect(repos.user.save).toHaveBeenCalled();
     expect(saved[0].authGuid).toBe("");
@@ -303,7 +322,7 @@ describe("UserController.setPasswordGuid", () => {
 
   it("fails for an unknown authGuid", async () => {
     const { controller, repos } = passwordController();
-    const result: any = await controller.setPasswordGuid({ body: { authGuid: "nope", newPassword: "freshpass" } } as any, {} as any);
+    const result = await controller.setPasswordGuid(req({ body: { authGuid: "nope", newPassword: "freshpass" } }), res) as Result;
     expect(result.success).toBe(false);
     expect(repos.user.save).not.toHaveBeenCalled();
   });
@@ -318,9 +337,9 @@ describe("UserController.loadOrCreate", () => {
   // did the person ask for an account, so a "finish creating your account" code is unexpected mail.
   it("provisions a new user without emailing a verification code", async () => {
     const { controller, repos } = userController(null);
-    repos.user.save.mockImplementation(async (u: any) => ({ ...u, id: "u9" }));
+    repos.user.save.mockImplementation(async (u: User) => ({ ...u, id: "u9" }));
 
-    const result: any = await (controller as any).loadOrCreate({ body: { userEmail: "new@b.c", firstName: "New", lastName: "User" }, headers: {} }, {});
+    const result = await controller.loadOrCreate(req({ body: { userEmail: "new@b.c", firstName: "New", lastName: "User" }, headers: {} }), res) as Result;
 
     expect(result.status).toBe(200);
     expect(result.obj.isNewUser).toBe(true);
@@ -330,9 +349,9 @@ describe("UserController.loadOrCreate", () => {
 
   it("still links the new user to a church", async () => {
     const { controller, repos } = userController(null);
-    repos.user.save.mockImplementation(async (u: any) => ({ ...u, id: "u9" }));
+    repos.user.save.mockImplementation(async (u: User) => ({ ...u, id: "u9" }));
 
-    await (controller as any).loadOrCreate({ body: { userEmail: "new@b.c", firstName: "New", lastName: "User" }, headers: {} }, {});
+    await controller.loadOrCreate(req({ body: { userEmail: "new@b.c", firstName: "New", lastName: "User" }, headers: {} }), res);
 
     expect(UserChurchHelper.createForNewUser).toHaveBeenCalledWith("u9", "new@b.c");
   });
@@ -340,7 +359,7 @@ describe("UserController.loadOrCreate", () => {
   it("does not email an existing user", async () => {
     const { controller } = userController({ id: "u1", email: "a@b.c", firstName: "A", lastName: "B" });
 
-    const result: any = await (controller as any).loadOrCreate({ body: { userEmail: "a@b.c", firstName: "A", lastName: "B" }, headers: {} }, {});
+    const result = await controller.loadOrCreate(req({ body: { userEmail: "a@b.c", firstName: "A", lastName: "B" }, headers: {} }), res) as Result;
 
     expect(result.status).toBe(200);
     expect(result.obj.isNewUser).toBe(false);
@@ -349,31 +368,32 @@ describe("UserController.loadOrCreate", () => {
 });
 
 describe("UserController security scoping", () => {
-  function scopedController(user: any, perms: string[], opts: { inChurch?: boolean } = {}) {
+  function scopedController(user: User | null, perms: unknown[], opts: { inChurch?: boolean } = {}) {
     const { controller, repos } = userController(user);
     repos.userChurch.loadByUserId.mockResolvedValue(opts.inChurch ? { id: "uc1" } : null);
     repos.roleMember.existsForUser = jest.fn(async () => false);
-    const au = { id: "staff1", churchId: "c1", checkAccess: (p: string) => perms.includes(p) };
-    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
+    // The mocked Permissions are plain strings, so checkAccess receives strings here.
+    const au: Partial<ApiUser> = { id: "staff1", churchId: "c1", checkAccess: (p) => perms.includes(p) };
+    Object.assign(controller, { actionWrapper: authed(au) });
     return { controller, repos };
   }
 
   it("blocks church staff from loading a user outside their church by id", async () => {
     const { controller } = scopedController({ id: "u5", email: "x@y.z", firstName: "X", lastName: "Y" }, ["peopleEdit"]);
-    const result: any = await (controller as any).loadOrCreate({ body: { userId: "u5" }, headers: {} }, {});
+    const result = await controller.loadOrCreate(req({ body: { userId: "u5" }, headers: {} }), res) as Result;
     expect(result.status).toBe(401);
   });
 
   it("lets church staff load a user linked to their church by id", async () => {
     const { controller } = scopedController({ id: "u5", email: "x@y.z", firstName: "X", lastName: "Y" }, ["peopleEdit"], { inChurch: true });
-    const result: any = await (controller as any).loadOrCreate({ body: { userId: "u5" }, headers: {} }, {});
+    const result = await controller.loadOrCreate(req({ body: { userId: "u5" }, headers: {} }), res) as Result;
     expect(result.status).toBe(200);
     expect(result.obj.firstName).toBe("X");
   });
 
   it("hides an existing unlinked user's name from church staff looking up by email", async () => {
     const { controller } = scopedController({ id: "u5", email: "x@y.z", firstName: "X", lastName: "Y" }, ["peopleEdit"]);
-    const result: any = await (controller as any).loadOrCreate({ body: { userEmail: "x@y.z", firstName: "A", lastName: "B" }, headers: {} }, {});
+    const result = await controller.loadOrCreate(req({ body: { userEmail: "x@y.z", firstName: "A", lastName: "B" }, headers: {} }), res) as Result;
     expect(result.status).toBe(200);
     expect(result.obj).toEqual({ id: "u5", email: "x@y.z", isNewUser: false });
   });
@@ -382,7 +402,7 @@ describe("UserController security scoping", () => {
     const { PublicPersonRateLimiter } = jest.requireMock("../../helpers/index");
     PublicPersonRateLimiter.allow.mockResolvedValueOnce(false);
     const { controller, repos } = scopedController(null, []);
-    const result: any = await (controller as any).register({ body: { email: "n@b.c", firstName: "N", lastName: "B" }, headers: {} }, {});
+    const result = await controller.register(req({ body: { email: "n@b.c", firstName: "N", lastName: "B" }, headers: {} }), res) as Result;
     expect(result.status).toBe(429);
     expect(repos.user.save).not.toHaveBeenCalled();
     expect(UserHelper.sendWelcomeEmail).not.toHaveBeenCalled();
@@ -392,16 +412,16 @@ describe("UserController security scoping", () => {
     const { PublicPersonRateLimiter } = jest.requireMock("../../helpers/index");
     PublicPersonRateLimiter.allow.mockResolvedValueOnce(false);
     const { controller, repos } = scopedController(null, []);
-    const result: any = await (controller as any).checkEmail({ body: { email: "n@b.c" }, headers: {} }, {});
+    const result = await controller.checkEmail(req({ body: { email: "n@b.c" }, headers: {} }), res) as Result;
     expect(result.status).toBe(429);
     expect(repos.user.loadByEmail).not.toHaveBeenCalled();
   });
 
   it("audit-logs server-admin impersonation", async () => {
     (AuditLogHelper.log as jest.Mock).mockClear();
-    (AuthenticatedUser as any).getUserJwt = jest.fn(() => "jwt");
+    AuthenticatedUser.getUserJwt = jest.fn(() => "jwt");
     const { controller } = scopedController({ id: "u5", email: "x@y.z" }, ["serverAdmin"]);
-    const result: any = await (controller as any).impersonate({ params: { id: "u5" }, headers: {} }, {});
+    const result = await controller.impersonate({ params: { id: "u5" }, headers: {} } as express.Request<{ id: string }>, res) as Result;
     expect(result.obj.jwt).toBe("jwt");
     expect(AuditLogHelper.log).toHaveBeenCalledWith(expect.anything(), "c1", "staff1", "security", "impersonate", "user", "u5", expect.anything(), "1.1.1.1");
   });
@@ -411,11 +431,11 @@ describe("UserController.sendInviteEmail", () => {
   const send = UserHelper.sendInviteEmail as jest.Mock;
   beforeEach(() => send.mockClear());
 
-  async function invite(user: any) {
+  async function invite(user: User | null) {
     const { controller, repos, row } = userController(user);
     repos.person.searchEmail.mockResolvedValue([{ email: "new@b.c" }]);
     repos.church = { loadById: jest.fn(async () => ({ name: "Grace" })) };
-    const result: any = await (controller as any).sendInviteEmail({ body: { email: "new@b.c", personName: "New", contextName: "Staff" }, headers: {} }, {});
+    const result = await controller.sendInviteEmail(req({ body: { email: "new@b.c", personName: "New", contextName: "Staff" }, headers: {} }), res) as Result;
     return { result, repos, row };
   }
 
@@ -469,8 +489,8 @@ describe("UserController.sendInviteEmail", () => {
     const { controller, repos } = userController(null);
     repos.person.searchEmail.mockResolvedValue([{ email: "new@b .c" }]);
     repos.church = { loadById: jest.fn(async () => ({ name: "Grace" })) };
-    const res: any = { status: jest.fn(function (this: any, code: number) { this.code = code; return this; }), json: jest.fn(function (this: any) { return this; }) };
-    await (controller as any).sendInviteEmail({ body: { email: "new@b .c", personName: "New", contextName: "Staff" }, headers: {} }, res);
+    const res = Object.assign({} as express.Response, { status: jest.fn(function (this: Record<string, unknown>, code: number) { this.code = code; return this; }), json: jest.fn(function (this: Record<string, unknown>) { return this; }) });
+    await controller.sendInviteEmail(req({ body: { email: "new@b .c", personName: "New", contextName: "Staff" }, headers: {} }), res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(send).not.toHaveBeenCalled();
   });
@@ -489,7 +509,7 @@ describe("UserController.Delete (#1627)", () => {
 
   it("refuses to delete the only Domain Admin's account and names the church", async () => {
     const { controller, repos } = deleteController(["c1"]);
-    const result: any = await (controller as any).Delete({}, {});
+    const result = await controller.Delete(req({}), res) as Result;
     expect(result.status).toBe(400);
     expect(result.obj.errors[0]).toContain("Grace Church");
     expect(repos.user.delete).not.toHaveBeenCalled();
@@ -499,7 +519,7 @@ describe("UserController.Delete (#1627)", () => {
 
   it("deletes the account when every church has another Domain Admin", async () => {
     const { controller, repos } = deleteController([]);
-    await (controller as any).Delete({}, {});
+    await controller.Delete(req({}), res);
     expect(repos.user.delete).toHaveBeenCalledWith("u1");
     expect(repos.roleMember.deleteUser).toHaveBeenCalledWith("u1");
   });

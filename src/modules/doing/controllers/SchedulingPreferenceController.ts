@@ -7,14 +7,14 @@ import { Permissions } from "../../../shared/helpers/index.js";
 @controller("/doing/schedulingPreferences")
 export class SchedulingPreferenceController extends DoingBaseController {
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.schedulingPreference.loadForPerson(au.churchId, au.personId);
     });
   }
 
   @httpGet("/people")
-  public async getForPeople(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPeople(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = typeof req.query.ids === "string" ? req.query.ids : "";
       if (!idsString) return [];
@@ -23,14 +23,14 @@ export class SchedulingPreferenceController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.schedulingPreference.load(au.churchId, id);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, SchedulingPreference[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, SchedulingPreference[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const canEditOthers = au.checkAccess(Permissions.plans.edit);
       const promises: Promise<SchedulingPreference>[] = [];
@@ -47,7 +47,7 @@ export class SchedulingPreferenceController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const pref = (await this.repos.schedulingPreference.load(au.churchId, id)) as SchedulingPreference;
       if (!pref) return {};

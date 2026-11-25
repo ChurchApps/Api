@@ -1,4 +1,5 @@
 import type { AssetRepo } from "../repositories/AssetRepo.js";
+import type { IncomingHttpHeaders } from "http";
 import { ipHash } from "./RequestHelper.js";
 
 /**
@@ -8,7 +9,7 @@ import { ipHash } from "./RequestHelper.js";
 export async function recordAssetDownload(
   repo: AssetRepo,
   asset: { id?: string; downloadCount?: number },
-  req: { headers: Record<string, any>; socket?: { remoteAddress?: string } }
+  req: { headers: IncomingHttpHeaders; socket?: { remoteAddress?: string } }
 ): Promise<number> {
   const id = asset.id || "";
   const counted = await repo.recordDownload(id, ipHash(req));

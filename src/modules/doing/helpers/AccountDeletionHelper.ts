@@ -17,6 +17,15 @@ interface TaskRepos {
   };
 }
 
+// The JSON kept in an account deletion task's data.
+interface AccountDeletionData {
+  outcome?: string;
+  reason?: string;
+  reminderCount?: number;
+  remindedAt?: string;
+  [key: string]: unknown;
+}
+
 export interface AccountDeletionDecision {
   outcome?: string;
   reason?: string;
@@ -46,7 +55,7 @@ export class AccountDeletionHelper {
     if (!groupId) return { error: "This church has not configured an approval group for account deletion requests" };
 
     const [group, person] = await Promise.all([gateway.loadGroup(au.churchId, groupId), gateway.loadPerson(au.churchId, au.personId)]);
-    const displayName = (person as any)?.displayName || [au.firstName, au.lastName].filter(Boolean).join(" ") || "Member";
+    const displayName = person?.displayName || [au.firstName, au.lastName].filter(Boolean).join(" ") || "Member";
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + this.dueDays);
 
@@ -65,7 +74,7 @@ export class AccountDeletionHelper {
     task.createdByLabel = displayName;
     task.assignedToType = "group";
     task.assignedToId = groupId;
-    task.assignedToLabel = (group as any)?.name || "";
+    task.assignedToLabel = group?.name || "";
     task.title = "Account deletion request from " + displayName;
     task.dueDate = dueDate;
     task.data = JSON.stringify({ outcome: "pending" });
@@ -99,7 +108,7 @@ export class AccountDeletionHelper {
     if (!personId) return { error: "Request is missing the person to erase" };
     const gateway = getMembershipModuleGateway();
     const person = await gateway.loadPerson(task.churchId || "", personId);
-    const email = (person as any)?.email || (person as any)?.contactInfo?.email || "";
+    const email = person?.email || (person as { contactInfo?: { email?: string } } | null)?.contactInfo?.email || "";
     try {
       await gateway.anonymizePerson(task.churchId || "", personId);
     } catch (e) {
@@ -146,7 +155,7 @@ export class AccountDeletionHelper {
     return task;
   }
 
-  private static parseData(task: Task): Record<string, any> {
+  private static parseData(task: Task): AccountDeletionData {
     try { return JSON.parse(task.data || "{}") || {}; } catch { return {}; }
   }
 

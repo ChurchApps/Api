@@ -9,7 +9,7 @@ import { Session } from "../models/index.js";
 export class SessionController extends AttendanceBaseController {
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       const data = await this.repos.session.load(au.churchId, id);
@@ -25,12 +25,12 @@ export class SessionController extends AttendanceBaseController {
       const isGroupMember = groupId && (au.leaderGroupIds?.includes(groupId) || au.groupIds?.includes(groupId));
       if (!au.checkAccess(Permissions.attendance.view) && !isGroupMember) return this.json({}, 401);
       else {
-        let result;
+        let result: Session[];
         if (groupId === undefined) result = await this.repos.session.loadAll(au.churchId);
         else {
           result = await this.repos.session.loadByGroupIdWithNames(au.churchId, groupId);
         }
-        return this.repos.session.convertAllToModel(au.churchId, result as any);
+        return this.repos.session.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -68,7 +68,7 @@ export class SessionController extends AttendanceBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       await this.repos.session.delete(au.churchId, id);

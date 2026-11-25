@@ -1,35 +1,45 @@
 import "reflect-metadata";
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+import express from "express";
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({ Permissions: { content: { edit: "contentEdit" } } }));
 jest.mock("../../helpers/StorageResolver", () => ({ StorageResolver: { forFile: jest.fn(), keyFromUrl: jest.fn((u: string) => (u || "").split("?")[0]) } }));
 
 import { ArrangementController } from "../ArrangementController.js";
 import { StorageResolver } from "../../helpers/StorageResolver.js";
+import { Arrangement, File } from "../../models/index.js";
 
-function makeController(opts: any = {}) {
+type JsonResult = { obj: unknown; status: number };
+interface Opts { files?: File[]; existing?: Arrangement; remaining?: Arrangement[]; freeShowIds?: string[]; checkAccess?: boolean }
+
+const req = {} as express.Request;
+const res = {} as express.Response;
+
+function makeController(opts: Opts = {}) {
   const files = opts.files ?? [];
-  const remove = jest.fn(async () => undefined);
+  const remove = jest.fn(async (_key: string): Promise<void> => undefined);
   const repos = {
     arrangement: {
       load: jest.fn(async () => opts.existing ?? null),
-      delete: jest.fn(async () => undefined),
+      delete: jest.fn(async (): Promise<void> => undefined),
       loadBySongId: jest.fn(async () => opts.remaining ?? [{ id: "other" }]),
       loadAll: jest.fn(async () => (opts.freeShowIds ?? []).map((freeShowId: string) => ({ id: "a-" + freeShowId, lyrics: "long lyrics", freeShowId }))),
       loadFreeShowIds: jest.fn(async () => opts.freeShowIds ?? [])
     },
-    arrangementKey: { deleteForArrangement: jest.fn(async () => undefined) },
+    arrangementKey: { deleteForArrangement: jest.fn(async (): Promise<void> => undefined) },
     file: {
       loadForContent: jest.fn(async () => files),
-      deleteForContent: jest.fn(async () => undefined)
+      deleteForContent: jest.fn(async (): Promise<void> => undefined)
     },
-    song: { delete: jest.fn(async () => undefined) },
+    song: { delete: jest.fn(async (): Promise<void> => undefined) },
     storageProvider: {}
   };
   const au = { churchId: "c1", checkAccess: () => opts.checkAccess ?? true };
   const controller = new ArrangementController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   (StorageResolver.forFile as jest.Mock).mockResolvedValue({ provider: { remove } });
   return { controller, repos, remove };
 }
@@ -42,7 +52,7 @@ describe("ArrangementController.delete", () => {
 
   it("rejects without content-edit permission", async () => {
     const { controller, repos } = makeController({ checkAccess: false });
-    const result: any = await (controller as any).delete("a1", {}, {});
+    const result = (await controller.delete("a1", req, res)) as JsonResult;
     expect(result.status).toBe(401);
     expect(repos.arrangement.delete).not.toHaveBeenCalled();
   });
@@ -53,7 +63,7 @@ describe("ArrangementController.delete", () => {
       { id: "f2", contentPath: "https://cdn.test/f2.mp3?dt=1" }
     ];
     const { controller, repos, remove } = makeController({ existing: { id: "a1", songId: "s1" }, files });
-    await (controller as any).delete("a1", {}, {});
+    await controller.delete("a1", req, res);
     expect(repos.arrangementKey.deleteForArrangement).toHaveBeenCalledWith("c1", "a1");
     expect(repos.file.loadForContent).toHaveBeenCalledWith("c1", "arrangement", "a1");
     expect(remove).toHaveBeenCalledTimes(2);
@@ -65,14 +75,14 @@ describe("ArrangementController.delete", () => {
 
   it("skips file cleanup when the arrangement has no files", async () => {
     const { controller, repos, remove } = makeController({ existing: { id: "a1", songId: "s1" }, files: [] });
-    await (controller as any).delete("a1", {}, {});
+    await controller.delete("a1", req, res);
     expect(remove).not.toHaveBeenCalled();
     expect(repos.file.deleteForContent).not.toHaveBeenCalled();
   });
 });
 
 describe("ArrangementController.getMissingFreeShowArrangements", () => {
-  const post = (controller: any, freeShowIds: any) => controller.getMissingFreeShowArrangements({ body: { freeShowIds } }, {});
+  const post = async (controller: ArrangementController, freeShowIds: unknown) => (await controller.getMissingFreeShowArrangements({ body: { freeShowIds } } as express.Request, res)) as JsonResult;
 
   it("returns the requested ids the church does not have, in request order with duplicates kept", async () => {
     const { controller } = makeController({ freeShowIds: ["b", "d"] });

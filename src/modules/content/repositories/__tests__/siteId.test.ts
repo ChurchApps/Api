@@ -3,7 +3,7 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({
   __esModule: true,
   UniqueIdHelper: { shortId: () => "gen" },
-  ArrayHelper: { getAll: (arr: any[], prop: string, val: any) => (arr || []).filter((a) => a[prop] === val) }
+  ArrayHelper: { getAll: (arr: Record<string, unknown>[], prop: string, val: unknown) => (arr || []).filter((a) => a[prop] === val) }
 }));
 
 import { getDb } from "../../db/index.js";
@@ -12,22 +12,23 @@ import { LinkRepo } from "../LinkRepo.js";
 import { GlobalStyleRepo } from "../GlobalStyleRepo.js";
 import { BlockRepo } from "../BlockRepo.js";
 
-function recordingDb(opts: { execute?: any; executeTakeFirst?: any; takeFirstQueue?: any[] } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
+function recordingDb(opts: { execute?: unknown; executeTakeFirst?: unknown; takeFirstQueue?: unknown[] } = {}) {
+  const calls: { method: string; args: unknown[] }[] = [];
   const queue = opts.takeFirstQueue ? [...opts.takeFirstQueue] : null;
-  const proxy: any = new Proxy({}, {
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => opts.execute ?? [];
       if (prop === "executeTakeFirst") return async () => (queue ? queue.shift() : (opts.executeTakeFirst ?? null));
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
-const firstArg = (calls: any[], method: string) => calls.find((c) => c.method === method)?.args[0];
-const whereCalls = (calls: any[]) => calls.filter((c) => c.method === "where");
-const siteWheres = (calls: any[]) => whereCalls(calls).filter((c) => c.args[0] === "siteId");
+type Call = { method: string; args: unknown[] };
+const firstArg = (calls: Call[], method: string) => calls.find((c) => c.method === method)?.args[0] as Record<string, unknown>;
+const whereCalls = (calls: Call[]) => calls.filter((c) => c.method === "where");
+const siteWheres = (calls: Call[]) => whereCalls(calls).filter((c) => c.args[0] === "siteId");
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -58,7 +59,7 @@ describe("LinkRepo siteId", () => {
   it("sort scopes its reorder query by siteId", async () => {
     const { proxy, calls } = recordingDb({ execute: [] });
     (getDb as jest.Mock).mockReturnValue(proxy);
-    await new LinkRepo().sort("c1", "footer", null as any, "s1");
+    await new LinkRepo().sort("c1", "footer", null, "s1");
     expect(siteWheres(calls).some((c) => c.args[2] === "s1")).toBe(true);
   });
 });

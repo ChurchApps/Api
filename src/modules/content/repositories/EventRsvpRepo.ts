@@ -15,7 +15,7 @@ export class EventRsvpRepo {
       await getDb().updateTable("eventRsvps").set({
         response: model.response,
         timeUpdated: sql`NOW()`
-      } as any).where("id", "=", existing.id).where("churchId", "=", model.churchId).execute();
+      }).where("id", "=", existing.id).where("churchId", "=", model.churchId).execute();
       return model;
     }
     model.id = UniqueIdHelper.shortId();
@@ -28,7 +28,7 @@ export class EventRsvpRepo {
       response: model.response,
       timeAdded: sql`NOW()`,
       timeUpdated: sql`NOW()`
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -37,7 +37,7 @@ export class EventRsvpRepo {
       .where("churchId", "=", churchId)
       .where("eventId", "=", eventId)
       .where("personId", "=", personId)
-      .where("occurrenceStart", "=", DateHelper.toMysqlDate(occurrenceStart) as any)
+      .where(sql.ref<string>("occurrenceStart"), "=", DateHelper.toMysqlDate(occurrenceStart))
       .executeTakeFirst()) ?? null;
   }
 
@@ -46,7 +46,7 @@ export class EventRsvpRepo {
       .where("churchId", "=", churchId)
       .where("eventId", "=", eventId)
       .where("personId", "=", personId)
-      .where("occurrenceStart", "=", DateHelper.toMysqlDate(occurrenceStart) as any)
+      .where(sql.ref<string>("occurrenceStart"), "=", DateHelper.toMysqlDate(occurrenceStart))
       .execute();
   }
 
@@ -55,7 +55,7 @@ export class EventRsvpRepo {
       .select(["id", "personId", "response", "occurrenceStart"])
       .where("churchId", "=", churchId)
       .where("eventId", "=", eventId)
-      .where("occurrenceStart", "=", DateHelper.toMysqlDate(occurrenceStart) as any)
+      .where(sql.ref<string>("occurrenceStart"), "=", DateHelper.toMysqlDate(occurrenceStart))
       .execute();
   }
 
@@ -67,11 +67,11 @@ export class EventRsvpRepo {
       .select(["eventRsvps.eventId as eventId", "eventRsvps.occurrenceStart as occurrenceStart", "eventRsvps.personId as personId", "eventRsvps.response as response"])
       .where("eventRsvps.churchId", "=", churchId)
       .where("events.groupId", "=", groupId)
-      .where("eventRsvps.occurrenceStart", ">=", DateHelper.toMysqlDate(from) as any)
-      .where("eventRsvps.occurrenceStart", "<=", DateHelper.toMysqlDate(to) as any)
+      .where(sql.ref<string>("eventRsvps.occurrenceStart"), ">=", DateHelper.toMysqlDate(from))
+      .where(sql.ref<string>("eventRsvps.occurrenceStart"), "<=", DateHelper.toMysqlDate(to))
       .execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as EventRsvp; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as EventRsvp[]; }
+  public convertToModel(_churchId: string, data: EventRsvp) { return data; }
+  public convertAllToModel(_churchId: string, data: EventRsvp[]) { return data || []; }
 }

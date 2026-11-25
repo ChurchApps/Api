@@ -6,7 +6,7 @@ import axios from "axios";
 import { YouTubeHelper } from "../YouTubeHelper.js";
 
 describe("YouTubeHelper.getVideoPage", () => {
-  const mockGet = (axios as any).get as jest.Mock;
+  const mockGet = axios.get as jest.Mock;
 
   beforeEach(() => mockGet.mockReset());
 

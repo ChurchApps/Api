@@ -7,7 +7,7 @@ import { PlanAuth } from "../../../shared/helpers/index.js";
 @controller("/doing/times")
 export class TimeController extends DoingBaseController {
   @httpGet("/plans")
-  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = req.query.planIds as string;
       const planIds = idsString.split(",");
@@ -16,32 +16,32 @@ export class TimeController extends DoingBaseController {
   }
 
   @httpGet("/all")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.time.loadAll(au.churchId);
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.time.load(au.churchId, id);
     });
   }
 
   @httpGet("/plan/:planId")
-  public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.time.loadByPlanId(au.churchId, planId);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Time[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Time[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       for (const time of req.body) {
         if (!await PlanAuth.canEditPlan(au, time.planId)) return this.json({}, 401);
-        const existing: any = time.id ? await this.repos.time.load(au.churchId, time.id) : null;
+        const existing: Time | null = time.id ? await this.repos.time.load(au.churchId, time.id) : null;
         if (existing && !await PlanAuth.canEditPlan(au, existing.planId)) return this.json({}, 401);
       }
       const promises: Promise<Time>[] = [];
@@ -55,9 +55,9 @@ export class TimeController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const time: any = await this.repos.time.load(au.churchId, id);
+      const time: Time | null = await this.repos.time.load(au.churchId, id);
       if (!await PlanAuth.canEditPlan(au, time?.planId)) return this.json({}, 401);
       await this.repos.planItemTime.deleteByTimeId(au.churchId, id);
       await this.repos.time.delete(au.churchId, id);

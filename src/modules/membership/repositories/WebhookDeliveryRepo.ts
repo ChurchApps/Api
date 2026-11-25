@@ -18,8 +18,8 @@ export class WebhookDeliveryRepo {
       attemptCount: model.attemptCount ?? 0,
       responseStatus: model.responseStatus ?? null,
       responseBody: model.responseBody ?? null,
-      nextAttemptAt: model.nextAttemptAt ?? (sql`NOW()` as any),
-      dateCreated: sql`NOW()` as any
+      nextAttemptAt: model.nextAttemptAt ?? sql<Date>`NOW()`,
+      dateCreated: sql<Date>`NOW()`
     }).execute();
     return model;
   }
@@ -53,7 +53,7 @@ export class WebhookDeliveryRepo {
   public async loadDuePending(limit = 100): Promise<WebhookDelivery[]> {
     return getDb().selectFrom("webhookDeliveries").selectAll()
       .where("status", "in", ["pending", "failed"])
-      .where("nextAttemptAt", "<=", sql`NOW()` as any)
+      .where("nextAttemptAt", "<=", sql<Date>`NOW()`)
       .orderBy("nextAttemptAt", "asc")
       .limit(limit)
       .execute();
@@ -62,14 +62,14 @@ export class WebhookDeliveryRepo {
   // Pushes nextAttemptAt forward so an overlapping worker run can't pick up the same delivery.
   public async claim(id: string, leaseMinutes = 5): Promise<boolean> {
     const result = await getDb().updateTable("webhookDeliveries")
-      .set({ nextAttemptAt: sql`DATE_ADD(NOW(), INTERVAL ${sql.lit(leaseMinutes)} MINUTE)` as any })
+      .set({ nextAttemptAt: sql<Date>`DATE_ADD(NOW(), INTERVAL ${sql.lit(leaseMinutes)} MINUTE)` })
       .where("id", "=", id)
       .where("status", "in", ["pending", "failed"])
-      .where("nextAttemptAt", "<=", sql`NOW()` as any)
+      .where("nextAttemptAt", "<=", sql<Date>`NOW()`)
       .executeTakeFirst();
     return Number(result?.numUpdatedRows ?? 0) > 0;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: WebhookDelivery) { return data; }
+  public convertAllToModel(_churchId: string, data: WebhookDelivery[]) { return data || []; }
 }

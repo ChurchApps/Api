@@ -1,6 +1,17 @@
+import type { CustomerRepo } from "../repositories/CustomerRepo.js";
+import type { GatewayPaymentMethodRepo } from "../repositories/GatewayPaymentMethodRepo.js";
+
+// The saved-payment-method fields of a donation or subscription request body.
+export interface SavedMethodRequest {
+  id?: string | number;
+  customerId?: string;
+  paymentMethodId?: string;
+  saveCard?: boolean;
+}
+
 export class DonationRequestGuard {
   // Fund splits may be below the charged total (donor-covered fees) but never above it.
-  static validateFunds(amount: any, funds: any): string | null {
+  static validateFunds(amount: unknown, funds: unknown): string | null {
     const total = Number(amount);
     if (!Number.isFinite(total) || total <= 0) return "Invalid amount";
     if (!Array.isArray(funds) || funds.length === 0) return "At least one fund is required";
@@ -17,7 +28,7 @@ export class DonationRequestGuard {
 
   // Guests always tokenize a fresh method. Saved KF vaults / Paystack authorizations are keyed by person, which a guest
   // can claim by id, so they're login-only. Stripe guests legitimately pass the customerId minted by /addcard.
-  static stripGuestSavedMethod(data: any, provider: string): boolean {
+  static stripGuestSavedMethod(data: SavedMethodRequest, provider: string): boolean {
     const p = (provider || "").toLowerCase();
     delete data.saveCard;
     delete data.paymentMethodId;
@@ -34,18 +45,18 @@ export class DonationRequestGuard {
   // Without donations.edit a request may only charge a saved method/customer the caller owns. Stripe guests have no
   // owned customer, so they may use one the gateway created moments ago (the /addcard or ach-setup-intent-anon they just ran).
   static async savedMethodAllowed(
-    data: any,
+    data: SavedMethodRequest,
     gateway: { id?: string; churchId?: string; provider?: string },
     au: { id?: string; personId?: string },
     canEditDonations: boolean,
-    repos: any,
+    repos: { customer: Pick<CustomerRepo, "load">; gatewayPaymentMethod: Pick<GatewayPaymentMethodRepo, "loadByExternalId"> },
     customerCreatedAt: (customerId: string) => Promise<Date | null>
   ): Promise<boolean> {
     if (canEditDonations) return true;
     const churchId = gateway.churchId as string;
     const ownsCustomer = async (customerId: string) => {
       if (!au?.personId || !customerId) return false;
-      const customer: any = await repos.customer.load(churchId, String(customerId));
+      const customer = await repos.customer.load(churchId, String(customerId));
       return !!customer && customer.personId === au.personId;
     };
     const p = (gateway.provider || "").toLowerCase();
@@ -59,7 +70,7 @@ export class DonationRequestGuard {
     const id = String(data.id || "");
     const savedId = data.paymentMethodId || ((p === "kingdomfunding" && /^\d+$/.test(id)) || (p === "paystack" && /^AUTH_/.test(id)) ? id : "");
     if (!savedId) return true;
-    const record: any = await repos.gatewayPaymentMethod.loadByExternalId(churchId, gateway.id, String(savedId));
+    const record = await repos.gatewayPaymentMethod.loadByExternalId(churchId, gateway.id, String(savedId));
     return !!record && await ownsCustomer(record.customerId);
   }
 

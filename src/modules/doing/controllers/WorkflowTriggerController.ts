@@ -16,7 +16,7 @@ export class WorkflowTriggerController extends DoingBaseController {
 
   // Gated by INTERNAL_API_KEY (fails closed if missing); manual fallback for lambda timer.
   @httpGet("/check")
-  public async check(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async check(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const requiredKey = process.env.INTERNAL_API_KEY;
       if (!requiredKey || !WorkflowTriggerController.keyMatches(req.header("x-internal-key"), requiredKey)) return this.json({}, 401);
@@ -26,7 +26,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpGet("/fields")
-  public async getFields(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getFields(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return EventTriggerHelper.fieldDefs();
@@ -34,7 +34,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpGet("/workflow/:workflowId")
-  public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflowTrigger.loadByWorkflow(au.churchId, workflowId);
@@ -42,7 +42,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpGet("/executions/workflow/:workflowId")
-  public async getExecutionsForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getExecutionsForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.automationExecution.loadForWorkflow(au.churchId, workflowId);
@@ -50,7 +50,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpGet("/:id/executions")
-  public async getExecutionsForTrigger(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getExecutionsForTrigger(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.automationExecution.loadForTrigger(au.churchId, id);
@@ -58,7 +58,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpPost("/executions/:id/retry")
-  public async retryExecution(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async retryExecution(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const execution = (await this.repos.automationExecution.load(au.churchId, id)) as AutomationExecution;
@@ -73,7 +73,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpPost("/executions/:id/pause")
-  public async pauseExecution(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async pauseExecution(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const execution = (await this.repos.automationExecution.load(au.churchId, id)) as AutomationExecution;
@@ -86,7 +86,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpPost("/executions/:id/resume")
-  public async resumeExecution(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async resumeExecution(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const execution = (await this.repos.automationExecution.load(au.churchId, id)) as AutomationExecution;
@@ -99,7 +99,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpPost("/:id/pauseAll")
-  public async pauseAll(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async pauseAll(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const trigger = (await this.repos.workflowTrigger.load(au.churchId, id)) as WorkflowTrigger;
@@ -113,7 +113,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpPost("/:id/resumeAll")
-  public async resumeAll(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async resumeAll(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const trigger = (await this.repos.workflowTrigger.load(au.churchId, id)) as WorkflowTrigger;
@@ -127,7 +127,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpPost("/:id/runNow")
-  public async runNow(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async runNow(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const trigger = (await this.repos.workflowTrigger.load(au.churchId, id)) as WorkflowTrigger;
@@ -141,7 +141,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflowTrigger.loadAll(au.churchId);
@@ -149,7 +149,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, WorkflowTrigger[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, WorkflowTrigger[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const result: WorkflowTrigger[] = [];
@@ -171,7 +171,7 @@ export class WorkflowTriggerController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const conditions = (await this.repos.condition.loadForTrigger(au.churchId, id)) as Condition[];

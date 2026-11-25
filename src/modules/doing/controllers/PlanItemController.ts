@@ -9,7 +9,7 @@ import { AuthenticatedUser } from "@churchapps/apihelper";
 @controller("/doing/planItems")
 export class PlanItemController extends DoingBaseController {
   @httpGet("/ids")
-  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = typeof req.query.ids === "string" ? req.query.ids : req.query.ids ? String(req.query.ids) : "";
       if (!idsString) return this.json({ error: "Missing required parameter: ids" });
@@ -18,18 +18,30 @@ export class PlanItemController extends DoingBaseController {
     });
   }
 
+  // Declared before "/:id" so the id route does not swallow it.
+  @httpGet("/songs")
+  public async getSongsByDateRange(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit) && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const { startDate, endDate } = req.query as Record<string, string | undefined>;
+      const isDate = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
+      if (!isDate(startDate) || !isDate(endDate)) return this.json({ error: "startDate and endDate are required (YYYY-MM-DD)" }, 400);
+      return await this.repos.planItem.loadSongsByDateRange(au.churchId, startDate!, endDate!);
+    });
+  }
+
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.planItem.load(au.churchId, id);
     });
   }
 
   @httpGet("/presenter/:churchId/:planId")
-  public async getForPresenter(@requestParam("churchId") churchId: string, @requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPresenter(@requestParam("churchId") churchId: string, @requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const result = (await this.repos.planItem.loadForPlan(churchId, planId)) as PlanItem[];
-      const tree = this.buildTree(result, null as any);
+      const tree = this.buildTree(result, null);
       // Stays anonymous for presenters; a Plans editor of this church additionally gets assignee names on positioned items.
       let au: AuthenticatedUser | null = null;
       try { au = this.authUser(); } catch { au = null; }
@@ -39,15 +51,15 @@ export class PlanItemController extends DoingBaseController {
   }
 
   @httpGet("/plan/:planId")
-  public async getByPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result = (await this.repos.planItem.loadForPlan(au.churchId, planId)) as PlanItem[];
-      return this.buildTree(result, null as any);
+      return this.buildTree(result, null);
     });
   }
 
   @httpPost("/sort")
-  public async sort(req: express.Request<{}, {}, PlanItem>, res: express.Response): Promise<any> {
+  public async sort(req: express.Request<{}, {}, PlanItem>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, req.body.planId)) return this.json({}, 401);
       if (!await this.canEditExisting(au, req.body.id)) return this.json({}, 401);
@@ -72,7 +84,7 @@ export class PlanItemController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, PlanItem[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, PlanItem[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       for (const planItem of req.body) {
         if (!await PlanAuth.canEditPlan(au, planItem.planId)) return this.json({}, 401);
@@ -90,9 +102,9 @@ export class PlanItemController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const planItem: any = await this.repos.planItem.load(au.churchId, id);
+      const planItem: PlanItem | null = await this.repos.planItem.load(au.churchId, id);
       if (!planItem) return {};
       if (!await PlanAuth.canEditPlan(au, planItem?.planId)) return this.json({}, 401);
 

@@ -17,7 +17,7 @@ export class SongDetailLinkRepo {
       service: model.service,
       serviceKey: model.serviceKey,
       url: model.url
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -42,7 +42,18 @@ export class SongDetailLinkRepo {
   public async loadForSongDetail(songDetailId: string) {
     return getDb().selectFrom("songDetailLinks").selectAll()
       .where("songDetailId", "=", songDetailId)
-      .orderBy("service").execute() as any;
+      .orderBy("service").execute();
+  }
+
+  // One service's links (e.g. CCLI) for every song in the church's library, for the song exports.
+  public async loadForChurchByService(churchId: string, service: string) {
+    return getDb().selectFrom("songDetailLinks as l")
+      .innerJoin("songs as s", "s.songDetailId", "l.songDetailId")
+      .selectAll("l")
+      .where("s.churchId", "=", churchId)
+      .where("l.service", "=", service)
+      .distinct()
+      .execute();
   }
 
   public async loadByServiceAndKey(service: string, serviceKey: string) {
@@ -52,10 +63,10 @@ export class SongDetailLinkRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public convertToModel(data: any) { return data as SongDetailLink; }
-  public convertAllToModel(data: any[]) { return (data || []) as SongDetailLink[]; }
+  public convertToModel(data: SongDetailLink) { return data; }
+  public convertAllToModel(data: SongDetailLink[]) { return data || []; }
 
-  protected rowToModel(row: any): SongDetailLink {
+  protected rowToModel(row: SongDetailLink): SongDetailLink {
     return {
       id: row.id,
       songDetailId: row.songDetailId,

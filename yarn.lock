@@ -1334,9 +1334,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/apihelper@npm:^1.1.5":
-  version: 1.1.5
-  resolution: "@churchapps/apihelper@npm:1.1.5"
+"@churchapps/apihelper@npm:^1.1.6":
+  version: 1.1.6
+  resolution: "@churchapps/apihelper@npm:1.1.6"
   dependencies:
     "@aws-sdk/client-s3": "npm:^3.862.0"
     "@aws-sdk/client-ses": "npm:^3.862.0"
@@ -1353,7 +1353,7 @@ __metadata:
     winston-cloudwatch: "npm:^6.3.0"
   peerDependencies:
     "@churchapps/helpers": ^2.0.0
-  checksum: 10c0/c125e23ae8e5e3d9eda90d4eae102166e03e3c895d93b8063e9ad5294edaba18f225475efa69ae08804d73081c61ebee80ef68a92deb30182f875b9df914573b
+  checksum: 10c0/15b6e45d0e40bf0cde3ea548a061d97105ca0f3a5fdfcee728949432997c70de79340bbc897acff528f72c055bd155add1027cee8dc434b53e5d473e545cdcea
   languageName: node
   linkType: hard
 
@@ -1364,9 +1364,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/helpers@npm:^2.16.1":
-  version: 2.16.1
-  resolution: "@churchapps/helpers@npm:2.16.1"
+"@churchapps/helpers@npm:^2.18.0":
+  version: 2.18.0
+  resolution: "@churchapps/helpers@npm:2.18.0"
   dependencies:
     dayjs: "npm:^1.11.20"
   peerDependencies:
@@ -1374,7 +1374,7 @@ __metadata:
   peerDependenciesMeta:
     rrule:
       optional: true
-  checksum: 10c0/09fecb251965278239b0830229ca5611020e6b0b1961be282927ab0c1200110d0be695b6a69612ec735123702a09d63195f6b02745b1bfdc5ffa48bc926d0afd
+  checksum: 10c0/5e05d15bd6f11e5da2b99e3bf9b6936dab5c64cda3a985f7ec534d086ae12310ff4fd1ccb9e95a96acb90ac45bdfb7ca7f305fcbdfcc86ed662bafcad0304e5a
   languageName: node
   linkType: hard
 
@@ -3861,9 +3861,9 @@ __metadata:
     "@aws-sdk/client-ssm": "npm:^3.862.0"
     "@aws-sdk/lib-storage": "npm:^3.862.0"
     "@aws-sdk/s3-request-presigner": "npm:3.1057.0"
-    "@churchapps/apihelper": "npm:^1.1.5"
+    "@churchapps/apihelper": "npm:^1.1.6"
     "@churchapps/content-providers": "npm:^0.17.0"
-    "@churchapps/helpers": "npm:^2.16.1"
+    "@churchapps/helpers": "npm:^2.18.0"
     "@churchapps/texting": "npm:^0.6.0"
     "@codegenie/serverless-express": "npm:^4.15.0"
     "@hubspot/api-client": "npm:^13.1.0"

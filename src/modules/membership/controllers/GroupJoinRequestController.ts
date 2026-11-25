@@ -10,7 +10,7 @@ import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 @controller("/membership/groupjoinrequests")
 export class GroupJoinRequestController extends MembershipBaseController {
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.groupJoinRequest.loadForPerson(au.churchId, au.personId);
       return this.repos.groupJoinRequest.convertAllToModel(au.churchId, data);
@@ -18,7 +18,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
   }
 
   @httpGet("/group/:groupId")
-  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const isLeader = au.leaderGroupIds && au.leaderGroupIds.includes(groupId);
       if (!au.checkAccess(Permissions.groupMembers.edit) && !isLeader) return this.json({}, 401);
@@ -28,7 +28,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
   }
 
   @httpGet("/pending")
-  public async getPending(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPending(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const data = await this.repos.groupJoinRequest.loadPendingForChurch(au.churchId);
@@ -37,17 +37,17 @@ export class GroupJoinRequestController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, { groupId: string; message?: string }>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, { groupId: string; message?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const { groupId, message } = req.body || ({} as any);
+      const { groupId, message } = req.body || ({} as { groupId?: string; message?: string });
       if (!groupId) return this.json({ error: "groupId required" }, 400);
 
-      const group: any = await this.repos.group.load(au.churchId, groupId);
+      const group = await this.repos.group.load(au.churchId, groupId);
       if (!group || group.archived) return this.json({ error: "Group not found" }, 404);
       if (group.joinPolicy !== "request") return this.json({ error: "Group does not accept join requests" }, 400);
 
-      const existingMembers = await this.repos.groupMember.loadForPerson(au.churchId, au.personId) as any[];
-      if (existingMembers.some((m: any) => m.groupId === groupId)) return this.json({ error: "Already a member" }, 409);
+      const existingMembers = await this.repos.groupMember.loadForPerson(au.churchId, au.personId);
+      if (existingMembers.some((m) => m.groupId === groupId)) return this.json({ error: "Already a member" }, 409);
 
       const existingPending = await this.repos.groupJoinRequest.loadExistingPending(au.churchId, groupId, au.personId);
       if (existingPending) return this.repos.groupJoinRequest.convertToModel(au.churchId, existingPending);
@@ -63,10 +63,10 @@ export class GroupJoinRequestController extends MembershipBaseController {
       await WebhookDispatcher.emit(au.churchId, "group.member.requested", saved);
 
       try {
-        const leaders = (await this.repos.groupMember.loadLeadersForGroup(au.churchId, groupId)) as any[];
-        const leaderIds = leaders.map((l: any) => l.personId).filter(Boolean);
+        const leaders = await this.repos.groupMember.loadLeadersForGroup(au.churchId, groupId);
+        const leaderIds = leaders.map((l) => l.personId).filter(Boolean);
         if (leaderIds.length) {
-          const requesterDisplay = (await this.repos.person.load(au.churchId, au.personId) as any)?.displayName || "Someone";
+          const requesterDisplay = (await this.repos.person.load(au.churchId, au.personId))?.displayName || "Someone";
           await NotificationService.createNotifications(
             leaderIds,
             au.churchId,
@@ -86,9 +86,9 @@ export class GroupJoinRequestController extends MembershipBaseController {
   }
 
   @httpPost("/:id/approve")
-  public async approve(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async approve(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const request: any = await this.repos.groupJoinRequest.load(au.churchId, id);
+      const request: GroupJoinRequest = await this.repos.groupJoinRequest.load(au.churchId, id);
       if (!request) return this.json({}, 404);
       if (request.status !== "pending") return this.json({ error: "Request not pending" }, 400);
 
@@ -113,7 +113,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
       await InternalEventBus.publish(au.churchId, "group.joinRequest.decided", request);
 
       try {
-        const group: any = await this.repos.group.load(au.churchId, request.groupId);
+        const group = await this.repos.group.load(au.churchId, request.groupId);
         await NotificationService.createNotifications(
           [request.personId],
           au.churchId,
@@ -132,9 +132,9 @@ export class GroupJoinRequestController extends MembershipBaseController {
   }
 
   @httpPost("/:id/decline")
-  public async decline(@requestParam("id") id: string, req: express.Request<{}, {}, { declineReason?: string }>, res: express.Response): Promise<any> {
+  public async decline(@requestParam("id") id: string, req: express.Request<{}, {}, { declineReason?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const request: any = await this.repos.groupJoinRequest.load(au.churchId, id);
+      const request: GroupJoinRequest = await this.repos.groupJoinRequest.load(au.churchId, id);
       if (!request) return this.json({}, 404);
       if (request.status !== "pending") return this.json({ error: "Request not pending" }, 400);
 
@@ -149,7 +149,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
       await InternalEventBus.publish(au.churchId, "group.joinRequest.decided", request);
 
       try {
-        const group: any = await this.repos.group.load(au.churchId, request.groupId);
+        const group = await this.repos.group.load(au.churchId, request.groupId);
         const baseMessage = `Your request to join ${group?.name ?? "the group"} was declined`;
         const fullMessage = request.declineReason ? `${baseMessage}: ${request.declineReason}` : baseMessage;
         await NotificationService.createNotifications(
@@ -170,9 +170,9 @@ export class GroupJoinRequestController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async cancel(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async cancel(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const request: any = await this.repos.groupJoinRequest.load(au.churchId, id);
+      const request: GroupJoinRequest = await this.repos.groupJoinRequest.load(au.churchId, id);
       if (!request) return this.json({}, 404);
       const isOwner = request.personId === au.personId;
       if (!isOwner && !au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);

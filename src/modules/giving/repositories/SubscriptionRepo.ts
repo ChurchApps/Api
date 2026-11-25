@@ -1,13 +1,27 @@
 import { injectable } from "inversify";
 import { getDb } from "../db/index.js";
-import { Subscription } from "../models/index.js";
+import { Subscription, SubscriptionFund } from "../models/index.js";
+import { SubscriptionFundsRepo } from "./SubscriptionFundsRepo.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @injectable()
 export class SubscriptionRepo {
 
-  // Subscriptions are typically immutable - save always creates
-  public async save(subscription: Subscription) {
-    return this.create(subscription);
+  // Subscriptions are typically immutable - save always creates, so subscription.created fires once
+  // per new subscription. Changes to an existing one go to the gateway, never through here.
+  public async save(subscription: Subscription, subscriptionFunds?: SubscriptionFund[]) {
+    const saved = await this.create(subscription);
+    // Fund rows are written before the emit, as with donation.created, so trigger conditions see them.
+    if (subscriptionFunds?.length) {
+      const fundsRepo = new SubscriptionFundsRepo();
+      for (const sf of subscriptionFunds) {
+        sf.churchId = saved.churchId;
+        sf.subscriptionId = saved.id;
+        await fundsRepo.save(sf);
+      }
+    }
+    await WebhookDispatcher.emit(saved.churchId, "subscription.created", { ...saved, subscriptionFunds: subscriptionFunds || [] });
+    return saved;
   }
 
   // External ID from payment provider, don't auto-generate
@@ -50,7 +64,7 @@ export class SubscriptionRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  private rowToModel(row: any): Subscription {
+  private rowToModel(row: Subscription): Subscription {
     return { id: row.id, churchId: row.churchId, personId: row.personId, customerId: row.customerId, currency: row.currency };
   }
 }

@@ -24,7 +24,7 @@ export interface GivingModuleGateway {
   loadSubscriptionsByPerson(churchId: string, personId: string): Promise<SubscriptionWithFunds[]>;
   // Non-sensitive descriptors only — never gateway tokens or raw payment details.
   loadPaymentMethodsByPerson(churchId: string, personId: string): Promise<PaymentMethodSummary[]>;
-  loadFundDonations(churchId: string, donationId: string): Promise<{ fundId: string; amount: number }[]>;
+  loadFundDonations(churchId: string, donationId: string): Promise<{ fundId?: string; amount?: number }[]>;
   // One gift with its fund names, for the workflow gift merge fields.
   loadDonationSummary(churchId: string, donationId: string): Promise<DonationReceiptSummary | null>;
   // The same fund/amount table the online giving receipt email shows.

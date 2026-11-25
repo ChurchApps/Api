@@ -2,6 +2,8 @@ import { controller, httpGet } from "inversify-express-utils";
 import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
+import type { AttendanceRecordRow } from "../repositories/AttendanceRepo.js";
+import { CheckedInByHelper } from "../helpers/CheckedInByHelper.js";
 
 @controller("/attendance/attendancerecords")
 export class AttendanceRecordController extends AttendanceBaseController {
@@ -13,7 +15,7 @@ export class AttendanceRecordController extends AttendanceBaseController {
       const since = new Date();
       since.setFullYear(since.getFullYear() - 1);
       const data = await this.repos.attendance.loadForPerson(au.churchId, au.personId, since);
-      return this.repos.attendance.convertAllToModel(au.churchId, data as any);
+      return this.repos.attendance.convertAllToModel(au.churchId, data);
     });
   }
 
@@ -21,7 +23,7 @@ export class AttendanceRecordController extends AttendanceBaseController {
   public async tree(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.attendance.loadTree(au.churchId);
-      return this.repos.attendance.convertAllToModel(au.churchId, data as any);
+      return this.repos.attendance.convertAllToModel(au.churchId, data);
     });
   }
 
@@ -58,7 +60,7 @@ export class AttendanceRecordController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.viewSummary)) return this.json({}, 401);
       const weeks = Math.max(parseInt(req.query.weeks?.toString() || "", 10) || 13, 1);
-      const rows = (await this.repos.attendance.loadGroupSummary(au.churchId, weeks)) as any[];
+      const rows = await this.repos.attendance.loadGroupSummary(au.churchId, weeks);
       return rows.map((r) => ({
         groupId: r.groupId,
         sessionCount: Number(r.sessionCount),
@@ -76,7 +78,7 @@ export class AttendanceRecordController extends AttendanceBaseController {
       const serviceTimeId = req.query.serviceTimeId?.toString() || "";
       const date = req.query.date?.toString() || "";
       if (!serviceTimeId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return this.json({ error: "serviceTimeId and date (YYYY-MM-DD) are required" }, 400);
-      const rows = (await this.repos.attendance.loadSessionStatus(au.churchId, serviceTimeId, date)) as any[];
+      const rows = await this.repos.attendance.loadSessionStatus(au.churchId, serviceTimeId, date);
       return rows.map((r) => ({ groupId: r.groupId, sessionId: r.sessionId || null, attendanceCount: Number(r.attendanceCount) }));
     });
   }
@@ -116,7 +118,7 @@ export class AttendanceRecordController extends AttendanceBaseController {
   public async load(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const personId = req.query.personId === undefined ? "" : req.query.personId.toString();
-      let result = null;
+      let result: AttendanceRecordRow[] = null;
 
       if (personId !== "") {
         if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
@@ -124,7 +126,9 @@ export class AttendanceRecordController extends AttendanceBaseController {
           result = await this.repos.attendance.loadForPerson(au.churchId, personId);
         }
       }
-      return this.repos.attendance.convertAllToModel(au.churchId, result as any);
+      const records = this.repos.attendance.convertAllToModel(au.churchId, result);
+      if (records) await CheckedInByHelper.attachNames(au.churchId, records);
+      return records;
     });
   }
 }

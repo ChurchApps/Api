@@ -2,7 +2,14 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
-import { VisitSession } from "../models/index.js";
+import { Visit, VisitSession } from "../models/index.js";
+import type { VisitRow } from "./VisitRepo.js";
+
+// The visit columns loadForSession joins onto each visitSessions row and nests under `visit`.
+type VisitDetail = Pick<Visit, "personId" | "checkinType" | "checkinTime" | "checkoutTime" | "checkedOutBy" | "checkedInById">;
+
+// A visitSessions row, optionally joined with the visit's details (loadForSession).
+export type VisitSessionRow = Omit<VisitSession, "visit" | "session"> & VisitDetail;
 
 @injectable()
 export class VisitSessionRepo {
@@ -68,27 +75,35 @@ export class VisitSessionRepo {
   }
 
   public async loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
-    const rows = await sql<any>`SELECT v.* FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId INNER JOIN visits v on(v.serviceId = st.serviceId or v.groupId = s.groupId) and v.visitDate = s.sessionDate WHERE v.churchId=${churchId} AND s.id = ${sessionId} AND v.personId=${personId} LIMIT 1`.execute(getDb());
+    const rows = await sql<VisitRow>`SELECT v.* FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId INNER JOIN visits v on(v.serviceId = st.serviceId or v.groupId = s.groupId) and v.visitDate = s.sessionDate WHERE v.churchId=${churchId} AND s.id = ${sessionId} AND v.personId=${personId} LIMIT 1`.execute(getDb());
     return rows.rows.length > 0 ? rows.rows[0] : null;
   }
 
   public async loadForSession(churchId: string, sessionId: string) {
-    const rows = await sql<any>`SELECT vs.*, v.personId, v.checkinType FROM visitSessions vs INNER JOIN visits v on v.id = vs.visitId WHERE vs.churchId=${churchId} AND vs.sessionId = ${sessionId}`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    const rows = await sql<VisitSessionRow>`SELECT vs.*, v.personId, v.checkinType, v.checkinTime, v.checkoutTime, v.checkedOutBy, v.checkedInById FROM visitSessions vs INNER JOIN visits v on v.id = vs.visitId WHERE vs.churchId=${churchId} AND vs.sessionId = ${sessionId}`.execute(getDb());
+    return rows.rows.map((row) => this.rowToModel(row));
   }
 
-  public convertToModel(_churchId: string, data: any): VisitSession {
+  public convertToModel(_churchId: string, data: VisitSessionRow): VisitSession {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): VisitSession[] {
+  public convertAllToModel(_churchId: string, data: VisitSessionRow[]): VisitSession[] {
     return data.map((row) => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): VisitSession {
+  protected rowToModel(row: VisitSessionRow): VisitSession {
     const result: VisitSession = { id: row.id, visitId: row.visitId, sessionId: row.sessionId };
     if (row.personId !== undefined) {
-      result.visit = { id: result.visitId, personId: row.personId, checkinType: row.checkinType };
+      result.visit = {
+        id: result.visitId,
+        personId: row.personId,
+        checkinType: row.checkinType,
+        checkinTime: row.checkinTime,
+        checkoutTime: row.checkoutTime,
+        checkedOutBy: row.checkedOutBy,
+        checkedInById: row.checkedInById
+      };
     }
     return result;
   }

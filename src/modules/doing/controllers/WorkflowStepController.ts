@@ -2,14 +2,14 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
-import { WorkflowStep } from "../models/index.js";
+import { Task, WorkflowStep } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WorkflowHelper } from "../helpers/index.js";
 
 @controller("/doing/workflowSteps")
 export class WorkflowStepController extends DoingBaseController {
   @httpGet("/workflow/:workflowId")
-  public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflowStep.loadForWorkflow(au.churchId, workflowId);
@@ -17,7 +17,7 @@ export class WorkflowStepController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflowStep.load(au.churchId, id);
@@ -25,7 +25,7 @@ export class WorkflowStepController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, WorkflowStep[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, WorkflowStep[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const promises: Promise<WorkflowStep>[] = [];
@@ -38,13 +38,13 @@ export class WorkflowStepController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const step = (await this.repos.workflowStep.load(au.churchId, id)) as WorkflowStep;
       if (step?.workflowId) {
         const remaining = ((await this.repos.workflowStep.loadForWorkflow(au.churchId, step.workflowId)) as WorkflowStep[]).filter((s) => s.id !== id);
-        const cards = ((await this.repos.task.loadByWorkflow(au.churchId, step.workflowId, "Open")) as any[]).filter((c) => c.stepId === id);
+        const cards = ((await this.repos.task.loadByWorkflow(au.churchId, step.workflowId, "Open")) as Task[]).filter((c) => c.stepId === id);
         for (const card of cards) {
           if (card.assignmentId) {
             await this.repos.task.withAssignmentLock(au.churchId, card.assignmentId, async () => { const current = await this.repos.task.load(au.churchId, card.id); if (current?.status === "Open") await AssignmentWorkflowHelper.close(current, "Workflow step removed", this.repos); });

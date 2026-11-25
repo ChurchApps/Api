@@ -1,9 +1,17 @@
 import { injectable } from "inversify";
+import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Setting } from "../models/index.js";
 
-function isDuplicateKeyError(err: any): boolean {
+interface DbError {
+  errno?: number;
+  code?: string;
+  message?: string;
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  const err = error as DbError | undefined;
   return err?.errno === 1062 || err?.code === "ER_DUP_ENTRY" || /duplicate entry/i.test(err?.message || "");
 }
 
@@ -64,9 +72,9 @@ export class SettingRepo {
   }
 
   // Duplicate (churchId, keyName) rows make public settings last-write-win; keep the lowest id so admin and the public gate agree.
-  private keepOnePerKey(rows: any[]) {
+  private keepOnePerKey<T extends Setting>(rows: T[]): T[] {
     if (!rows?.length) return rows || [];
-    const best = new Map<string, any>();
+    const best = new Map<string, T>();
     for (const row of rows) {
       const key = `${row.churchId}\t${row.keyName}`;
       const existing = best.get(key);
@@ -88,7 +96,7 @@ export class SettingRepo {
   }
 
   public async loadPublicSettings(churchId: string) {
-    return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll().where("churchId", "=", churchId).where("public", "=", true as any).execute());
+    return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll().where("churchId", "=", churchId).where(sql.ref<boolean>("public"), "=", true).execute());
   }
 
   public async loadMulipleChurches(keyNames: string[], churchIds: string[]) {
@@ -96,7 +104,7 @@ export class SettingRepo {
     return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
       .where("keyName", "in", keyNames)
       .where("churchId", "in", churchIds)
-      .where("public", "=", true as any)
+      .where(sql.ref<boolean>("public"), "=", true)
       .execute());
   }
 
@@ -115,7 +123,7 @@ export class SettingRepo {
     return this.save({ ...model, id: undefined });
   }
 
-  protected rowToModel(row: any): Setting {
+  protected rowToModel(row: Setting): Setting {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -125,12 +133,12 @@ export class SettingRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Setting) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: Setting[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }

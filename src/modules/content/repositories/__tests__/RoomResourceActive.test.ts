@@ -2,23 +2,24 @@ import "reflect-metadata";
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, DateHelper: {}, UniqueIdHelper: { shortId: () => "gen_id" } }));
 
-import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
+import { CompiledQuery, DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler, QueryResult } from "kysely";
+import type { ContentDatabase } from "../../db/DatabaseTypes.js";
 import { RoomRepo } from "../RoomRepo";
 import { ResourceRepo } from "../ResourceRepo";
 
 const { getDb } = jest.requireMock("../../db/index");
 
-function capturingDb(rows: any[] = []) {
+function capturingDb(rows: unknown[] = []) {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
   driver.acquireConnection = async () => ({
-    executeQuery: async (q: any) => {
+    executeQuery: async <R>(q: CompiledQuery): Promise<QueryResult<R>> => {
       queries.push({ sql: q.sql, parameters: q.parameters });
-      return { rows } as any;
+      return { rows: rows as R[] };
     },
     streamQuery: async function* () {}
   });
-  const db = new Kysely<any>({
+  const db = new Kysely<ContentDatabase>({
     dialect: {
       createAdapter: () => new MysqlAdapter(),
       createDriver: () => driver,
@@ -52,6 +53,6 @@ describe.each([
   it("returns active as a boolean so inactive items can be filtered", async () => {
     capturingDb([{ id: "R1", name: "Chapel", active: 0 }, { id: "R2", name: "Gym", active: 1 }]);
     const list = await makeRepo().loadAll("C1");
-    expect(list.map((r: any) => r.active)).toEqual([false, true]);
+    expect(list.map((r) => r.active)).toEqual([false, true]);
   });
 });

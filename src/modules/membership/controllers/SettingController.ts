@@ -7,17 +7,17 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 @controller("/membership/settings")
 export class MembershipSettingController extends MembershipBaseController {
   @httpGet("/")
-  public async get(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
-        return this.repos.setting.convertAllToModel(au.churchId, (await this.repos.setting.loadAll(au.churchId)) as any[]);
+        return this.repos.setting.convertAllToModel(au.churchId, await this.repos.setting.loadAll(au.churchId));
       }
     });
   }
 
   @httpPost("/")
-  public async post(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<any> {
+  public async post(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
@@ -33,7 +33,7 @@ export class MembershipSettingController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       await this.repos.setting.delete(au.churchId, id);
@@ -42,11 +42,11 @@ export class MembershipSettingController extends MembershipBaseController {
   }
 
   @httpGet("/public/:churchId/app-theme")
-  public async appTheme(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async appTheme(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const publicSettings = await this.repos.setting.loadPublicSettings(churchId);
       if (!publicSettings || !Array.isArray(publicSettings)) return {};
-      const settings = this.repos.setting.convertAllToModel(churchId, publicSettings as any[]);
+      const settings = this.repos.setting.convertAllToModel(churchId, publicSettings);
       if (!settings || !Array.isArray(settings)) return {};
       const themeSetting = settings.find((s: Setting) => s.keyName === "appTheme");
       if (!themeSetting?.value) return {};
@@ -55,11 +55,11 @@ export class MembershipSettingController extends MembershipBaseController {
   }
 
   @httpGet("/public/:churchId/checkin-theme")
-  public async checkinTheme(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async checkinTheme(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const publicSettings = await this.repos.setting.loadPublicSettings(churchId);
       if (!publicSettings || !Array.isArray(publicSettings)) return {};
-      const settings = this.repos.setting.convertAllToModel(churchId, publicSettings as any[]);
+      const settings = this.repos.setting.convertAllToModel(churchId, publicSettings);
       if (!settings || !Array.isArray(settings)) return {};
       const themeSetting = settings.find((s: Setting) => s.keyName === "checkinTheme");
       if (!themeSetting?.value) return {};
@@ -68,7 +68,7 @@ export class MembershipSettingController extends MembershipBaseController {
   }
 
   @httpGet("/public/:churchId")
-  public async publicRoute(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async publicRoute(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const publicSettings = await this.repos.setting.loadPublicSettings(churchId);
 
@@ -77,14 +77,14 @@ export class MembershipSettingController extends MembershipBaseController {
         return {};
       }
 
-      const settings = this.repos.setting.convertAllToModel(churchId, publicSettings as any[]);
+      const settings = this.repos.setting.convertAllToModel(churchId, publicSettings);
 
       // Handle case where settings conversion fails
       if (!settings || !Array.isArray(settings)) {
         return {};
       }
 
-      const result: any = {};
+      const result: Record<string, string> = {};
       settings.forEach((s) => {
         result[s.keyName] = s.value;
       });

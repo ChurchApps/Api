@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import path from "path";
 import type { IStorageProvider, PresignedPostData } from "@churchapps/apihelper";
 import { StorageProvider } from "../models/index.js";
@@ -120,8 +120,8 @@ export class GoogleDriveStorageProvider implements IStorageProvider {
     const token = await this.token();
     try {
       await axios.delete(API + "/files/" + key, { headers: this.headers(token) });
-    } catch (e: any) {
-      if (e?.response?.status !== 404) throw e;
+    } catch (e) {
+      if ((e as AxiosError)?.response?.status !== 404) throw e;
     }
   }
 

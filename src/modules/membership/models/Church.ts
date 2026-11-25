@@ -1,3 +1,5 @@
+import { Setting } from "./Setting.js";
+
 export class Church {
   public id?: string;
   public name: string;
@@ -16,5 +18,5 @@ export class Church {
   public timeZone?: string;
   public firstDayOfWeek?: number;
 
-  public settings?: any;
+  public settings?: Setting[];
 }

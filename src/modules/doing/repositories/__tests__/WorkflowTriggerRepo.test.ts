@@ -4,15 +4,16 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "ge
 import { WorkflowTriggerRepo } from "../WorkflowTriggerRepo.js";
 import { TaskRepo } from "../TaskRepo.js";
 import { getDb } from "../../db/index.js";
+import type { WorkflowTrigger } from "../../models/index.js";
 
 describe("WorkflowTriggerRepo allowRepeatAfterClose", () => {
   const repo = new WorkflowTriggerRepo();
 
   it("writes the flag on create (default off) and on update", async () => {
-    const inserted: any[] = [];
-    const updated: any[] = [];
-    const insertChain = { values: (v: any) => { inserted.push(v); return { execute: async () => undefined }; } };
-    const updateChain = { set: (v: any) => { updated.push(v); return { where: () => ({ where: () => ({ execute: async () => undefined }) }) }; } };
+    const inserted: Partial<WorkflowTrigger>[] = [];
+    const updated: Partial<WorkflowTrigger>[] = [];
+    const insertChain = { values: (v: Partial<WorkflowTrigger>) => { inserted.push(v); return { execute: async () => undefined }; } };
+    const updateChain = { set: (v: Partial<WorkflowTrigger>) => { updated.push(v); return { where: () => ({ where: () => ({ execute: async () => undefined }) }) }; } };
     (getDb as jest.Mock).mockReturnValue({ insertInto: () => insertChain, updateTable: () => updateChain });
 
     await repo.save({ churchId: "c1", name: "Returning visitor", workflowId: "w1" });
@@ -27,10 +28,11 @@ describe("WorkflowTriggerRepo allowRepeatAfterClose", () => {
 
 describe("TaskRepo.loadOpenBySubjectInWorkflow", () => {
   it("ignores closed cards", async () => {
-    const wheres: [string, string, any][] = [];
-    const chain: any = {
+    const wheres: [string, string, unknown][] = [];
+    interface SelectChain { selectAll: () => SelectChain; where: (col: string, op: string, val: unknown) => SelectChain; executeTakeFirst: () => Promise<undefined> }
+    const chain: SelectChain = {
       selectAll: () => chain,
-      where: (col: string, op: string, val: any) => { wheres.push([col, op, val]); return chain; },
+      where: (col: string, op: string, val: unknown) => { wheres.push([col, op, val]); return chain; },
       executeTakeFirst: async () => undefined
     };
     (getDb as jest.Mock).mockReturnValue({ selectFrom: () => chain });

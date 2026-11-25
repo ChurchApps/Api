@@ -2,7 +2,7 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
-import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { mysqlDate } from "./MysqlDate.js";
 import { ReminderOccurrence } from "../models/index.js";
 
 const LEASE_MINUTES = 30; // a 'processing' row older than this is re-surfaced (crash recovery)
@@ -14,11 +14,11 @@ export class ReminderOccurrenceRepo {
     const existing = await getDb().selectFrom("reminderOccurrences").select(["id", "status"])
       .where("occurrenceKey", "=", model.occurrenceKey).executeTakeFirst();
     if (existing) {
-      const status = (existing as any).status;
+      const status = existing.status;
       if (status === "pending" || status === "cancelled") {
         await getDb().updateTable("reminderOccurrences")
-          .set({ fireAt: DateHelper.toMysqlDate(model.fireAt) as any, category: model.category, message: model.message, status: "pending" })
-          .where("id", "=", (existing as any).id).execute();
+          .set({ fireAt: mysqlDate(model.fireAt), category: model.category, message: model.message, status: "pending" })
+          .where("id", "=", existing.id).execute();
       }
       return;
     }
@@ -32,11 +32,11 @@ export class ReminderOccurrenceRepo {
       message: model.message,
       occurrenceKey: model.occurrenceKey,
       occLocalISO: model.occLocalISO,
-      fireAt: DateHelper.toMysqlDate(model.fireAt) as any,
+      fireAt: mysqlDate(model.fireAt),
       status: "pending",
       attemptCount: 0
       // A concurrent expansion can insert the same key after the select above; its row stands.
-    }).onDuplicateKeyUpdate({ id: sql`id` as any }).execute();
+    }).onDuplicateKeyUpdate({ id: sql`id` }).execute();
   }
 
   public async loadByKey(occurrenceKey: string) {
@@ -46,8 +46,8 @@ export class ReminderOccurrenceRepo {
   public async loadDue(limit = 100) {
     return getDb().selectFrom("reminderOccurrences").selectAll()
       .where((eb) => eb.or([
-        eb.and([eb("status", "=", "pending"), eb("fireAt", "<=", sql`NOW()` as any)]),
-        eb.and([eb("status", "=", "processing"), eb("claimedAt", "<", sql`DATE_SUB(NOW(), INTERVAL ${LEASE_MINUTES} MINUTE)` as any)])
+        eb.and([eb("status", "=", "pending"), eb("fireAt", "<=", sql<Date>`NOW()`)]),
+        eb.and([eb("status", "=", "processing"), eb("claimedAt", "<", sql<Date>`DATE_SUB(NOW(), INTERVAL ${LEASE_MINUTES} MINUTE)`)])
       ]))
       .orderBy("fireAt")
       .limit(limit)
@@ -57,11 +57,11 @@ export class ReminderOccurrenceRepo {
   // Atomic claim: only the worker that flips pending->processing proceeds.
   public async claim(id: string): Promise<boolean> {
     const result = await getDb().updateTable("reminderOccurrences")
-      .set({ status: "processing", claimedAt: sql`NOW()` as any, attemptCount: sql`attemptCount + 1` as any })
+      .set({ status: "processing", claimedAt: sql<Date>`NOW()`, attemptCount: sql`attemptCount + 1` })
       .where("id", "=", id)
       .where((eb) => eb.or([
         eb("status", "=", "pending"),
-        eb.and([eb("status", "=", "processing"), eb("claimedAt", "<", sql`DATE_SUB(NOW(), INTERVAL ${LEASE_MINUTES} MINUTE)` as any)])
+        eb.and([eb("status", "=", "processing"), eb("claimedAt", "<", sql<Date>`DATE_SUB(NOW(), INTERVAL ${LEASE_MINUTES} MINUTE)`)])
       ]))
       .executeTakeFirst();
     return Number(result?.numUpdatedRows ?? 0) > 0;
@@ -69,7 +69,7 @@ export class ReminderOccurrenceRepo {
 
   public async markSent(id: string, recipientCount: number) {
     await getDb().updateTable("reminderOccurrences")
-      .set({ status: "sent", sentAt: sql`NOW()` as any, recipientCount }).where("id", "=", id).execute();
+      .set({ status: "sent", sentAt: sql<Date>`NOW()`, recipientCount }).where("id", "=", id).execute();
   }
 
   public async markCancelled(id: string) {
@@ -100,7 +100,7 @@ export class ReminderOccurrenceRepo {
   public async cancelFuturePendingForDefinition(definitionId: string) {
     await getDb().updateTable("reminderOccurrences").set({ status: "cancelled" })
       .where("definitionId", "=", definitionId).where("status", "=", "pending")
-      .where("fireAt", ">", sql`NOW()` as any).execute();
+      .where("fireAt", ">", sql<Date>`NOW()`).execute();
   }
 
   public async loadRecent(churchId: string, limit = 50) {

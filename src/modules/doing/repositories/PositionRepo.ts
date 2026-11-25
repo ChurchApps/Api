@@ -51,18 +51,18 @@ export class PositionRepo {
   }
 
   public async loadSignupByPlanId(churchId: string, planId: string) {
-    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("planId", "=", planId).where("allowSelfSignup", "=", true as any).orderBy("categoryName").orderBy("name").execute();
+    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("planId", "=", planId).where("allowSelfSignup", "=", true).orderBy("categoryName").orderBy("name").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Position) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: Position[]) {
     return (data || []).map(row => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): Position {
+  protected rowToModel(row: Position): Position {
     return {
       id: row.id,
       churchId: row.churchId,

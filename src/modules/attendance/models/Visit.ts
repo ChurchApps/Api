@@ -15,5 +15,7 @@ export class Visit {
   public checkedOutById?: string;
   public checkinType?: string;
   public checkedInById?: string;
+  // Display name for checkedInById, filled on read; never saved.
+  public checkedInBy?: string;
   public visitSessions?: VisitSession[];
 }

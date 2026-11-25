@@ -5,21 +5,26 @@ jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { 
 import { getDb } from "../../db/index.js";
 import { DomainRepo } from "../DomainRepo.js";
 
-function recordingDb(opts: { execute?: any; executeTakeFirst?: any; takeFirstQueue?: any[] } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
+interface Call {
+  method: string;
+  args: unknown[];
+}
+
+function recordingDb(opts: { execute?: unknown; executeTakeFirst?: unknown; takeFirstQueue?: unknown[] } = {}) {
+  const calls: Call[] = [];
   const queue = opts.takeFirstQueue ? [...opts.takeFirstQueue] : null;
-  const proxy: any = new Proxy({}, {
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => opts.execute ?? [];
       if (prop === "executeTakeFirst") return async () => (queue ? queue.shift() : (opts.executeTakeFirst ?? null));
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
-const firstArg = (calls: any[], method: string) => calls.find((c) => c.method === method)?.args[0];
-const whereCalls = (calls: any[]) => calls.filter((c) => c.method === "where");
+const firstArg = (calls: Call[], method: string) => calls.find((c) => c.method === method)?.args[0] as Record<string, unknown>;
+const whereCalls = (calls: Call[]) => calls.filter((c) => c.method === "where");
 
 describe("DomainRepo siteId persistence", () => {
   afterEach(() => jest.restoreAllMocks());
@@ -59,7 +64,7 @@ describe("DomainRepo.loadPairs", () => {
     await new DomainRepo().loadPairs();
     expect(calls.some((c) => c.method === "leftJoin" && c.args[0] === "sites as s")).toBe(true);
     const selectCall = calls.find((c) => c.method === "select");
-    const serialized = (selectCall!.args[0] as any[])
+    const serialized = (selectCall!.args[0] as Array<{ toOperationNode?: () => unknown }>)
       .filter((a) => a && typeof a === "object" && typeof a.toOperationNode === "function")
       .map((a) => JSON.stringify(a.toOperationNode()))
       .join(" ");

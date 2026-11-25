@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
 import { getDb } from "../db/index.js";
+import type { PledgeRow } from "./types.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Pledge } from "../models/index.js";
 
@@ -18,7 +19,7 @@ export class PledgeRepo {
       campaignId: pledge.campaignId,
       personId: pledge.personId,
       amount: pledge.amount
-    } as any).execute();
+    }).execute();
     return pledge;
   }
 
@@ -27,7 +28,7 @@ export class PledgeRepo {
       campaignId: pledge.campaignId,
       personId: pledge.personId,
       amount: pledge.amount
-    } as any).where("id", "=", pledge.id).where("churchId", "=", pledge.churchId).execute();
+    }).where("id", "=", pledge.id).where("churchId", "=", pledge.churchId).execute();
     return pledge;
   }
 
@@ -74,7 +75,7 @@ export class PledgeRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  private rowToModel(data: any): Pledge {
+  private rowToModel(data: PledgeRow): Pledge {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -84,11 +85,11 @@ export class PledgeRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: PledgeRow) {
     return data ? this.rowToModel(data) : null;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(_churchId: string, data: PledgeRow[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

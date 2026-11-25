@@ -6,31 +6,37 @@ jest.mock("../../repositories/index", () => ({ Repos: class {} }));
 jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: jest.fn() } }));
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: jest.fn() }));
 jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, texting: { send: "textingSend" } } }));
-jest.mock("../../helpers/ReminderEngine.js", () => ({ ReminderEngine: { reExpandForEntity: jest.fn(async () => undefined), reExpandForScope: jest.fn(async () => undefined) } }));
+jest.mock("../../helpers/ReminderEngine.js", () => ({ ReminderEngine: { reExpandForEntity: jest.fn(async (): Promise<void> => undefined), reExpandForScope: jest.fn(async (): Promise<void> => undefined) } }));
 jest.mock("../../helpers/ReminderAdapter.js", () => ({ ReminderAdapterRegistry: { get: () => ({ category: "eventReminder" }), has: () => true } }));
 jest.mock("../../helpers/ReminderBootstrap.js", () => ({ ensureRemindersReady: jest.fn() }));
 jest.mock("../../helpers/TimezoneHelper.js", () => ({ TimezoneHelper: {} }));
 
+import express from "express";
 import { ReminderController } from "../ReminderController.js";
+import { ReminderDefinition } from "../../models/index.js";
 
-const principal = (access: string[]) => ({ id: "u1", churchId: "c1", personId: "p1", checkAccess: (perm: any) => access.includes(perm) });
+type SaveReq = Parameters<ReminderController["saveForEntity"]>[2];
 
-function makeController(access: string[], existing: any[] = []) {
+const principal = (access: string[]) => ({ id: "u1", churchId: "c1", personId: "p1", checkAccess: (perm: string) => access.includes(perm) });
+
+function makeController(access: string[], existing: ReminderDefinition[] = []) {
   const reminderDefinition = {
     loadForEntity: jest.fn(async () => existing),
     loadForScope: jest.fn(async () => existing),
-    save: jest.fn(async (d: any) => ({ ...d, id: d.id || "def1" }))
+    save: jest.fn(async (d: ReminderDefinition) => ({ ...d, id: d.id || "def1" }))
   };
   const controller = new ReminderController();
-  (controller as any).repos = { reminderDefinition };
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(principal(access));
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos: { reminderDefinition },
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: ReturnType<typeof principal>) => unknown) => action(principal(access)),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, reminderDefinition };
 }
 
-const call = (c: any, route: "entity" | "scope", channels: any) => route === "entity"
-  ? c.saveForEntity("event", "e1", { body: { offsets: [60], channels } }, {})
-  : c.saveForScope("plan", "pt1", { body: { offsets: [60], channels } }, {});
+const call = async (c: ReminderController, route: "entity" | "scope", channels: string | string[]) => (await (route === "entity"
+  ? c.saveForEntity("event", "e1", { body: { offsets: [60], channels } } as SaveReq, {} as express.Response)
+  : c.saveForScope("plan", "pt1", { body: { offsets: [60], channels } } as SaveReq, {} as express.Response))) as { status?: number };
 
 describe.each(["entity", "scope"] as const)("ReminderController %s save with the sms channel", (route) => {
   it("refuses content.edit without texting.send", async () => {

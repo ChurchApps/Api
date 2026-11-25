@@ -4,7 +4,7 @@ import path from "path";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { File } from "../models/index.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
-import { EnvironmentBase, inferContentTypeFromKey, resolveMaxUploadBytes, type IStorageProvider } from "@churchapps/apihelper";
+import { AuthenticatedUser, EnvironmentBase, inferContentTypeFromKey, resolveMaxUploadBytes, type IStorageProvider } from "@churchapps/apihelper";
 // hoisted transitive dep of @churchapps/apihelper
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { S3Client } from "@aws-sdk/client-s3";
@@ -18,14 +18,46 @@ import { PersonFileStorage, PERSON_CONTENT_TYPE, PERSON_MAX_TOTAL_BYTES } from "
 // Providers whose public URLs are short-lived; contentPath points at the stable /download route instead.
 const REDIRECT_PROVIDERS = ["googledrive", "dropbox", "onedrive"];
 
-// Arrangement audio: matches Planning Center's player-supported formats and keeps the free tier
-// from taking WAV-sized files (4-10x an equivalent MP3). Free-tier ceiling; adjust here if needed.
+// Arrangement audio: browser-playable compressed formats only, which keeps the free tier from taking
+// WAV-sized files (4-10x an equivalent MP3). Free-tier ceiling; adjust here if needed.
 const ARRANGEMENT_MAX_FILE_BYTES = 26214400;
 const ARRANGEMENT_ALLOWED_MIME_TYPES = ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/aac"];
+// A chord chart PDF beside the audio. It is sent inline, never presigned, so the bytes can be checked
+// before they are stored; 4 MB keeps the base64 body under the Lambda's 6 MB request limit.
+const ARRANGEMENT_PDF_MIME_TYPE = "application/pdf";
+const ARRANGEMENT_PDF_MAX_FILE_BYTES = 4194304;
+
+const arrangementUploadError = (fileType: string | undefined, size: number, fileName: string | undefined): string | null => {
+  if (fileType === ARRANGEMENT_PDF_MIME_TYPE) {
+    if (!/\.pdf$/i.test(fileName || "")) return "invalid_pdf";
+    return size > ARRANGEMENT_PDF_MAX_FILE_BYTES ? "pdf_too_large" : null;
+  }
+  if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(fileType || "")) return "unsupported_audio_format";
+  return size > ARRANGEMENT_MAX_FILE_BYTES ? "file_too_large" : null;
+};
+
+const arrangementPdfError = (fileContents: string | undefined): string | null => {
+  if (!fileContents) return "invalid_pdf";
+  const bytes = Buffer.from(fileContents.split(",").pop() || "", "base64");
+  if (bytes.subarray(0, 5).toString("latin1") !== "%PDF-") return "invalid_pdf";
+  return bytes.length > ARRANGEMENT_PDF_MAX_FILE_BYTES ? "pdf_too_large" : null;
+};
 
 // Group members upload to the public CDN; never let them serve active content from it.
 const ACTIVE_MIME_TYPES = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|text\/javascript|application\/(x-)?javascript|application\/ecmascript|text\/ecmascript)/i;
 const safeMemberMimeType = (mimeType: string) => (!mimeType || ACTIVE_MIME_TYPES.test(mimeType.trim()) ? "application/octet-stream" : mimeType);
+
+// Shape of an axios-style error from a storage provider (Dropbox, Google, Microsoft) as read by providerErrorDetail.
+interface ProviderHttpError {
+  response?: {
+    data?: string | {
+      error_summary?: string;
+      error?: string | { message?: string };
+      error_description?: string;
+      required_scope?: string;
+    };
+  };
+}
 
 @controller("/content/files")
 export class FileController extends ContentBaseController {
@@ -34,7 +66,7 @@ export class FileController extends ContentBaseController {
   private static MINT_CACHE_MS = 30 * 60 * 1000;
 
   @httpGet("/download/:id")
-  public async download(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async download(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const file = await this.repos.file.loadById(id);
       if (!file) return this.json({}, 404);
@@ -64,7 +96,7 @@ export class FileController extends ContentBaseController {
 
   // Private files are never served from the raw route; staff with access get a short-lived signed link instead.
   @httpGet("/download/:id/link")
-  public async downloadLink(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async downloadLink(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const file = await this.repos.file.load(au.churchId, id);
       if (!file) return this.json({}, 404);
@@ -75,7 +107,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const file = await this.repos.file.load(au.churchId, id);
       if (isPrivateFile(file) && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
@@ -84,7 +116,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpGet("/:contentType/:contentId")
-  public async getByContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (isPrivateFile({ contentType }) && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
       return await this.repos.file.loadForContent(au.churchId, contentType, contentId);
@@ -92,7 +124,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.file.loadForWebsite(au.churchId);
     });
@@ -100,7 +132,7 @@ export class FileController extends ContentBaseController {
 
   // Known bug - This post accepts multiple File modals but only a single file upload.  It's not a problem because the app restricts users to one upload at a time (for now).
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, File[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, File[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (Array.isArray(req.body) && req.body.some((f) => isPrivateFile(f))) return this.savePersonFiles(au, req.body);
       const isEditor = au.checkAccess(Permissions.content.edit);
@@ -108,9 +140,9 @@ export class FileController extends ContentBaseController {
         return this.json({}, 401);
       } else {
         if (!isEditor) for (const f of req.body) f.fileType = safeMemberMimeType(f.fileType);
-        if (req.body[0].contentType === "arrangement") {
-          if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(req.body[0].fileType || "")) return this.json({ error: "unsupported_audio_format" }, 400);
-          if ((req.body[0].size || 0) > ARRANGEMENT_MAX_FILE_BYTES) return this.json({ error: "file_too_large" }, 400);
+        for (const f of req.body.filter((x) => x.contentType === "arrangement")) {
+          const error = arrangementUploadError(f.fileType, f.size || 0, f.fileName) || (f.fileType === ARRANGEMENT_PDF_MIME_TYPE ? arrangementPdfError(f.fileContents) : null);
+          if (error) return this.json({ error }, 400);
         }
         const storage = await StorageResolver.forChurch(this.repos.storageProvider, au.churchId);
         if (storage.name === "churchapps") {
@@ -151,7 +183,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpPost("/postUrl")
-  public async getUploadUrl(req: express.Request<{}, {}, { resourceId: string; fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }>, res: express.Response): Promise<any> {
+  public async getUploadUrl(req: express.Request<{}, {}, { resourceId: string; fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (isPrivateFile(req.body)) return this.personUploadUrl(au, req.body);
       const isEditor = au.checkAccess(Permissions.content.edit);
@@ -159,8 +191,10 @@ export class FileController extends ContentBaseController {
       else {
         let size = req.body.size || 0;
         if (req.body.contentType === "arrangement") {
-          if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(req.body.mimeType || "")) return this.json({ error: "unsupported_audio_format" }, 400);
-          if (size > ARRANGEMENT_MAX_FILE_BYTES) return this.json({ error: "file_too_large" }, 400);
+          const error = arrangementUploadError(req.body.mimeType, size, req.body.fileName);
+          if (error) return this.json({ error }, 400);
+          // no presign: the client falls back to an inline upload that save() can inspect
+          if (req.body.mimeType === ARRANGEMENT_PDF_MIME_TYPE) return {};
           // an omitted size would otherwise fall through to the provider's generic upload cap
           size = size > 0 ? size : ARRANGEMENT_MAX_FILE_BYTES;
         }
@@ -193,7 +227,7 @@ export class FileController extends ContentBaseController {
   // /{churchId}/files/group/{teamId}/{fileName} path. external=true: the church's own storage, with the url
   // and md5/modified markers to use instead (url absent until the first upload lands).
   @httpGet("/sync/:teamId/:fileName")
-  public async syncFileInfo(@requestParam("teamId") teamId: string, @requestParam("fileName") fileName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async syncFileInfo(@requestParam("teamId") teamId: string, @requestParam("fileName") fileName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const body = { contentType: "group", contentId: teamId, fileName };
       if (!this.isSyncFile(body)) return this.json({ error: "unsupported_file" }, 400);
@@ -212,7 +246,7 @@ export class FileController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existingFile = await this.repos.file.load(au.churchId, id);
       if (!existingFile) return this.json({}, 404);
@@ -236,7 +270,7 @@ export class FileController extends ContentBaseController {
   }
 
   // Person documents: Edit People only, always new rows, private bytes on the default store.
-  private async savePersonFiles(au: any, files: File[]): Promise<any> {
+  private async savePersonFiles(au: AuthenticatedUser, files: File[]): Promise<unknown> {
     if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
     if (!files.every((f) => f.contentType === PERSON_CONTENT_TYPE && PersonFileStorage.isValidPersonId(f.contentId) && f.fileName)) return this.json({ error: "invalid_file" }, 400);
     const results: File[] = [];
@@ -264,7 +298,7 @@ export class FileController extends ContentBaseController {
     return results;
   }
 
-  private async personUploadUrl(au: any, body: { fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }): Promise<any> {
+  private async personUploadUrl(au: AuthenticatedUser, body: { fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }): Promise<unknown> {
     if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
     if (!PersonFileStorage.isValidPersonId(body.contentId) || !body.fileName) return this.json({ error: "invalid_file" }, 400);
     const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, body.contentType, body.contentId);
@@ -276,8 +310,8 @@ export class FileController extends ContentBaseController {
   }
 
   // Signed link only: the browser opens it directly, so it carries no JWT.
-  private async downloadPrivate(file: File, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    const query: any = req.query || {};
+  private async downloadPrivate(file: File, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    const query: express.Request["query"] = req.query || {};
     if (!PersonFileStorage.verifyLink(file.id, query.exp?.toString(), query.sig?.toString())) return this.json({}, 401);
     res.set("Cache-Control", "private, no-store");
     const key = file.externalId || this.buildKey(file.churchId, file.contentType, file.contentId, file.fileName);
@@ -293,7 +327,7 @@ export class FileController extends ContentBaseController {
     res.send(contents);
   }
 
-  private async canGroupMemberSave(au: any, files: File[]): Promise<boolean> {
+  private async canGroupMemberSave(au: AuthenticatedUser, files: File[]): Promise<boolean> {
     if (!Array.isArray(files) || files.length === 0) return false;
     for (const file of files) {
       if (au.groupIds.indexOf(file.contentId) === -1 || file.contentType !== "group") return false;
@@ -306,11 +340,11 @@ export class FileController extends ContentBaseController {
   }
 
   // Surfaces the provider's own error text (Dropbox error_summary, Google/Microsoft error payloads) to the admin.
-  private providerErrorDetail(e: any): string | null {
-    const data = e?.response?.data;
+  private providerErrorDetail(e: unknown): string | null {
+    const data = (e as ProviderHttpError | undefined)?.response?.data;
     if (!data) return null;
     if (typeof data === "string") return data.substring(0, 300);
-    const summary = data.error_summary || data.error?.message || data.error_description || (typeof data.error === "string" ? data.error : null);
+    const summary = data.error_summary || (data.error as { message?: string })?.message || data.error_description || (typeof data.error === "string" ? data.error : null);
     return summary && data.required_scope ? summary + " (required scope: " + data.required_scope + ")" : summary;
   }
 

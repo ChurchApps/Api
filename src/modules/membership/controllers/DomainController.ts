@@ -7,7 +7,7 @@ import { DomainHealthHelper } from "../helpers/DomainHealthHelper.js";
 
 @controller("/membership/domains")
 export class DomainController extends MembershipBaseController {
-  private requireAdmin(req: express.Request, res: express.Response, action: () => Promise<any>) {
+  private requireAdmin(req: express.Request, res: express.Response, action: () => Promise<unknown>) {
     const key = process.env.INTERNAL_API_KEY;
     if (key && req.header("x-internal-key") === key) return this.actionWrapperAnon(req, res, action);
     return this.actionWrapper(req, res, async (au) => {
@@ -17,7 +17,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/caddy")
-  public async caddy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async caddy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.requireAdmin(req, res, async () => {
       const jsonData = await CaddyHelper.generateJsonData();
       await CaddyHelper.updateCaddy();
@@ -26,14 +26,14 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/caddy/init")
-  public async caddyInit(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async caddyInit(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.requireAdmin(req, res, async () => {
       return await CaddyHelper.initializeCaddy();
     });
   }
 
   @httpGet("/authorize")
-  public async authorize(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async authorize(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const domain = typeof req.query.domain === "string" ? req.query.domain.toLowerCase().trim() : "";
       if (!domain) return this.json({}, 404);
@@ -44,7 +44,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/hostmap")
-  public async hostmap(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async hostmap(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     const run = async () => {
       const pairs = (await this.repos.domain.loadPairs()) as { host: string; dial: string }[];
       const seen = new Set<string>();
@@ -64,7 +64,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/lookup/:domainName")
-  public async getByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const row = await this.repos.domain.loadByName(domainName) as { churchId?: string } | null;
       if (row && row.churchId !== au.churchId && !au.checkAccess(Permissions.server.admin)) return null;
@@ -73,7 +73,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/public/lookup/:domainName")
-  public async getPublicByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const row = await this.repos.domain.loadByName(domainName) as { subDomain?: string } | null;
       return row?.subDomain ? { subDomain: row.subDomain } : {};
@@ -81,7 +81,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/public/owner/:domainName")
-  public async getPublicOwnership(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicOwnership(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public yes/no oracle for the donate widget; the churchId is only compared, never used to scope a read
       const churchId = typeof req.query.churchId === "string" ? req.query.churchId : "";
@@ -93,7 +93,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.domain.load(au.churchId, id);
       return this.repos.domain.convertToModel(au.churchId, data);
@@ -101,7 +101,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.domain.loadAll(au.churchId);
       return this.repos.domain.convertAllToModel(au.churchId, data);
@@ -109,7 +109,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Domain[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Domain[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
@@ -135,7 +135,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       await this.repos.domain.delete(au.churchId, id);
@@ -149,7 +149,7 @@ export class DomainController extends MembershipBaseController {
   }
 
   @httpGet("/health/check")
-  public async runHealthCheck(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async runHealthCheck(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.requireAdmin(req, res, async () => {
       return await DomainHealthHelper.checkUncheckedDomains();
     });

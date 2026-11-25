@@ -9,11 +9,11 @@ jest.mock("@churchapps/apihelper", () => ({
   UniqueIdHelper: { shortId: () => Math.random().toString(36).slice(2, 13) },
   DateHelper: { addDays: (date: Date, days: number) => new Date(date.getTime() + days * 86400000), toMysqlDate: (d: Date) => new Date(d).toISOString().slice(0, 19).replace("T", " ") }
 }));
-const send = jest.fn(async () => "sent");
+const send = jest.fn(async (..._args: unknown[]) => "sent");
 jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { getRepos: jest.fn() } }));
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({ loadPerson: async (_c: string, id: string) => ({ id, displayName: "Sample Volunteer", email: "volunteer@example.test" }), loadChurch: async () => ({ name: "Sample Church", timeZone: "UTC" }), loadGroupLeaderPersonIds: async () => [] }),
-  getMessagingModuleGateway: () => ({ sendServingWorkflowMessage: (...args: any[]) => send(...args) })
+  getMessagingModuleGateway: () => ({ sendServingWorkflowMessage: (...args: unknown[]) => send(...args) })
 }));
 jest.mock("../../../../shared/helpers/NotificationService.js", () => ({ NotificationService: { createNotifications: async () => [] } }));
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { jwtSecret: "synthetic-test-secret", doingApi: "http://localhost/doing" } }));
@@ -38,23 +38,31 @@ import { up as unify } from "../../../../../tools/migrations/doing/2026-06-07_un
 import { up as actions } from "../../../../../tools/migrations/doing/2026-06-08_workflow_automations.js";
 import { up as scheduling } from "../../../../../tools/migrations/doing/2026-06-11_auto_scheduling.js";
 import { up, down } from "../../../../../tools/migrations/doing/2026-10-22_assignment_confirmation_workflows.js";
+import { up as declineReason } from "../../../../../tools/migrations/doing/2026-11-24_assignment_decline_reason.js";
+import type { DoingDatabase } from "../../db/DatabaseTypes.js";
+import type { Repos } from "../Repos.js";
+
+// The parts of mysql2's typeCast field this test reads (mysql2 does not export the type from its root).
+interface TypeCastField { type: string; length: number; buffer: () => Buffer | null }
 
 const databaseTests = process.env.CONFIRMATION_TEST_MYSQL === "1" ? describe : describe.skip;
 databaseTests("assignment confirmation migrations and repositories (MySQL 8)", () => {
-  let db: Kysely<any>;
-  let server: Kysely<any>;
+  let db: Kysely<DoingDatabase>;
+  let server: Kysely<Record<string, never>>;
   const tasks = new TaskRepo();
   const assignments = new AssignmentRepo();
   const database = "churchapps_confirmation_test";
   beforeAll(async () => {
-    const config = { host: "127.0.0.1", port: Number(process.env.CONFIRMATION_TEST_PORT || 33307), user: "root", password: "", connectionLimit: 2, typeCast(field: any, next: () => unknown) { if (field.type === "BIT" && field.length === 1) { const bytes = field.buffer(); return bytes ? bytes[0] === 1 : null; } return next(); } };
+    const config = { host: "127.0.0.1", port: Number(process.env.CONFIRMATION_TEST_PORT || 33307), user: "root", password: "", connectionLimit: 2, typeCast(field: TypeCastField, next: () => unknown) { if (field.type === "BIT" && field.length === 1) { const bytes = field.buffer(); return bytes ? bytes[0] === 1 : null; } return next(); } };
     server = new Kysely({ dialect: new MysqlDialect({ pool: createPool(config) }) });
     // The hard-coded disposable name and localhost prevent pointing this test at church data.
     await sql`drop database if exists ${sql.id(database)}`.execute(server);
     await sql`create database ${sql.id(database)}`.execute(server);
     db = new Kysely({ dialect: new MysqlDialect({ pool: createPool({ ...config, database }) }) });
     (KyselyPool.getDb as jest.Mock).mockReturnValue(db);
-    for (const migration of [initial, workflows, triggers, unify, actions, scheduling, up]) await migration(db);
+    for (const migration of [
+      initial, workflows, triggers, unify, actions, scheduling, up, declineReason
+    ]) await migration(db);
     await sql`insert into plans (id, churchId, name, serviceDate, prepared) values ('plan1', 'c1', 'Sample service', '2030-04-07', 0)`.execute(db);
     await sql`insert into positions (id, churchId, planId, name) values ('pos1', 'c1', 'plan1', 'Greeter')`.execute(db);
   }, 30000);
@@ -122,7 +130,7 @@ databaseTests("assignment confirmation migrations and repositories (MySQL 8)", (
 
   it("runs the editable default sequence through real repositories, waits, routing and response closure", async () => {
     send.mockClear();
-    const repos: any = {
+    const repos = {
       time: new TimeRepo(),
       task: tasks,
       assignment: assignments,
@@ -132,7 +140,7 @@ databaseTests("assignment confirmation migrations and repositories (MySQL 8)", (
       workflowStep: new WorkflowStepRepo(),
       workflowStepAction: new WorkflowStepActionRepo(),
       workflowStepRoute: new WorkflowStepRouteRepo()
-    };
+    } as Repos;
     const workflow = await WorkflowHelper.createFromTemplate("c1", WorkflowTemplates.get("assignmentConfirmation"), undefined, repos);
     await db.updateTable("plans").set({ confirmationWorkflowId: workflow.id }).where("id", "=", "plan1").execute();
     const assignment = await assignments.save({ churchId: "c1", personId: "p1", positionId: "pos1", status: "Unconfirmed" });
@@ -157,7 +165,7 @@ databaseTests("assignment confirmation migrations and repositories (MySQL 8)", (
   it("reverses the additive migration without deleting assignments or tasks", async () => {
     const a = await assignments.save({ churchId: "c1", personId: "p1", positionId: "pos1", status: "Accepted" });
     await down(db);
-    const columns = await sql<any>`show columns from tasks like 'assignmentId'`.execute(db);
+    const columns = await sql<{ Field: string }>`show columns from tasks like 'assignmentId'`.execute(db);
     expect(columns.rows).toHaveLength(0);
     expect((await db.selectFrom("assignments").select("id").execute())[0].id).toBe(a.id);
     await up(db);

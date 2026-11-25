@@ -11,7 +11,7 @@ import crypto from "crypto";
 @controller("/membership/rolemembers")
 export class RoleMemberController extends MembershipBaseController {
   @httpGet("/roles/:id")
-  public async loadByRole(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadByRole(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const members = await this.repos.roleMember.loadByRoleId(id, au.churchId);
       const hasAccess = await this.checkAccess(members, Permissions.roles.view, au);
@@ -38,7 +38,7 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, RoleMember[] | RoleMember>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, RoleMember[] | RoleMember>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       let members: RoleMember[] = Array.isArray(req.body) ? req.body : [req.body];
       const hasAccess = await this.checkAccess(members, Permissions.roles.edit, au);
@@ -74,7 +74,7 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const member = await this.repos.roleMember.loadById(id, au.churchId);
       const hasAccess = await this.checkAccess([member], Permissions.roles.edit, au);
@@ -91,7 +91,7 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   @httpDelete("/self/:churchId/:userId")
-  public async deleteSelf(@requestParam("churchId") churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async deleteSelf(@requestParam("churchId") churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Users may leave any church they belong to; admins may only act within their own church.
       const isSelf = userId === au.id;

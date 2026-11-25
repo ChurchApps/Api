@@ -38,7 +38,7 @@ export class BlockedIpRepo {
       .where("churchId", "=", churchId)
       .where("conversationId", "=", conversationId)
       .execute();
-    return data.map((d: any) => d.ipAddress);
+    return data.map((d) => d.ipAddress);
   }
 
   public async loadByServiceId(churchId: string, serviceId: string) {
@@ -68,17 +68,17 @@ export class BlockedIpRepo {
     return getDb().selectFrom("blockedIps").selectAll().where("churchId", "=", churchId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any): BlockedIp {
+  public convertToModel(_churchId: string, data: BlockedIp): BlockedIp {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): BlockedIp[] {
+  public convertAllToModel(_churchId: string, data: BlockedIp[]): BlockedIp[] {
     if (!data) return [];
-    return (Array.isArray(data) ? data : []).map((d: any) => this.rowToModel(d));
+    return (Array.isArray(data) ? data : []).map((d) => this.rowToModel(d));
   }
 
-  protected rowToModel(row: any): BlockedIp {
+  protected rowToModel(row: BlockedIp): BlockedIp {
     return {
       id: row.id,
       churchId: row.churchId,

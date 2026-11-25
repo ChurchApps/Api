@@ -2,9 +2,26 @@ import { Sermon, StreamingService } from "../models/index.js";
 import { Link } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
+export interface StreamingConfig {
+  churchId: string;
+  buttons: { text: string; url: string }[];
+  tabs: { text: string; url: string; type: string; data: string; icon: string }[];
+  services: {
+    videoUrl: string;
+    serviceTime: Date;
+    earlyStart: string;
+    chatBefore: string;
+    chatAfter: string;
+    provider: string;
+    providerKey: string;
+    id: string;
+    sermon: Sermon;
+  }[];
+}
+
 export class StreamingConfigHelper {
   static generateJson = (churchId: string, tabs: Link[], links: Link[], services: StreamingService[], sermons: Sermon[]) => {
-    const result: any = {};
+    const result = {} as StreamingConfig;
     result.churchId = churchId;
     result.buttons = [];
     result.tabs = [];

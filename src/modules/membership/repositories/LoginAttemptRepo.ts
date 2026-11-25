@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import { LoginAttempt } from "../models/index.js";
 
 /**
  * Failed-login counters, one row per rate-limit key (account or IP).
@@ -17,9 +18,9 @@ export class LoginAttemptRepo {
       .selectFrom("loginAttempts")
       .select("attemptCount")
       .where("attemptKey", "=", attemptKey)
-      .where("windowStart", ">", sql`DATE_SUB(NOW(), INTERVAL ${windowSeconds} SECOND)` as any)
+      .where("windowStart", ">", sql<Date>`DATE_SUB(NOW(), INTERVAL ${windowSeconds} SECOND)`)
       .executeTakeFirst();
-    return Number((row as any)?.attemptCount ?? 0);
+    return Number(row?.attemptCount ?? 0);
   }
 
   /**
@@ -47,10 +48,10 @@ export class LoginAttemptRepo {
   public async deleteOld(days: number = 1): Promise<void> {
     await getDb()
       .deleteFrom("loginAttempts")
-      .where("windowStart", "<", sql`DATE_SUB(NOW(), INTERVAL ${days} DAY)` as any)
+      .where("windowStart", "<", sql<Date>`DATE_SUB(NOW(), INTERVAL ${days} DAY)`)
       .execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data; }
-  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
+  public convertToModel(_churchId: string, data: LoginAttempt) { return data; }
+  public convertAllToModel(_churchId: string, data: LoginAttempt[]) { return data || []; }
 }

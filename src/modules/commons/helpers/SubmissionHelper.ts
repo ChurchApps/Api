@@ -39,7 +39,7 @@ export class SubmissionHelper {
         description: payload.description,
         tags: payload.tags,
         language: payload.language || "English",
-        license: licensesFor(def, au.id, Environment.commonsLicenseGrants || "").includes(payload.license as any) ? payload.license : def.defaultLicense,
+        license: licensesFor(def, au.id, Environment.commonsLicenseGrants || "").includes(payload.license) ? payload.license : def.defaultLicense,
         publisherUserId: au.id,
         publisherChurchId: au.churchId,
         status: "pending"
@@ -148,9 +148,9 @@ export class SubmissionHelper {
       });
       triageScore = scored.qualityScore ?? null;
       if (scored.qualityDetail) {
-        let qualityDetail: any = scored.qualityDetail;
+        let qualityDetail: string | Record<string, unknown> | undefined = scored.qualityDetail;
         if (typeof qualityDetail === "string") {
-          try { qualityDetail = JSON.parse(qualityDetail); } catch { qualityDetail = undefined; }
+          try { qualityDetail = JSON.parse(qualityDetail) as Record<string, unknown>; } catch { qualityDetail = undefined; }
         }
         if (qualityDetail) payload.qualityDetail = qualityDetail;
       }

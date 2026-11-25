@@ -1,10 +1,11 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { CuratedEvent, EventBooking } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { ApprovalHelper } from "../helpers/ApprovalHelper.js";
-import { ConflictHelper } from "../helpers/ConflictHelper.js";
+import { Conflict, ConflictHelper } from "../helpers/ConflictHelper.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { decisionMessage } from "../helpers/DecisionMessage.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
@@ -18,17 +19,30 @@ interface RejectBody {
   reason?: string;
 }
 
+// Row shape from eventBooking.loadPending / loadResolved: the booking joined with its event, room and resource.
+interface ApprovalBookingRow extends EventBooking {
+  eventTitle?: string;
+  eventStart?: Date;
+  eventEnd?: Date;
+  eventRecurrenceRule?: string;
+  roomName?: string;
+  roomApprovalGroupId?: string;
+  resourceName?: string;
+  resourceApprovalGroupId?: string;
+  conflicts?: Conflict[];
+}
+
 @controller("/content/eventBookings")
 export class EventBookingController extends ContentBaseController {
   @httpGet("/event/:eventId")
-  public async getForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.eventBooking.loadForEvent(au.churchId, eventId);
     });
   }
 
   @httpGet("/calendar")
-  public async getCalendar(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getCalendar(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const start = req.query.startTime ? new Date(req.query.startTime.toString()) : new Date();
       const end = req.query.endTime ? new Date(req.query.endTime.toString()) : new Date(start.getFullYear() + 1, start.getMonth(), start.getDate());
@@ -41,12 +55,12 @@ export class EventBookingController extends ContentBaseController {
   // Approvals inbox. Conflict resolvers (or content editors) see everything;
   // approval-group members see the requests routed to their groups.
   @httpGet("/pending")
-  public async getPending(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPending(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      let pending = await this.repos.eventBooking.loadPending(au.churchId);
+      let pending: ApprovalBookingRow[] = await this.repos.eventBooking.loadPending(au.churchId);
       if (!this.canResolve(au)) {
         const groupIds = await this.loadRequesterGroupIds(au.churchId, au.personId);
-        pending = pending.filter((row: any) => groupIds.includes(row.roomId ? row.roomApprovalGroupId : row.resourceApprovalGroupId));
+        pending = pending.filter((row) => groupIds.includes(row.roomId ? row.roomApprovalGroupId : row.resourceApprovalGroupId));
       }
       const timeZone = (await getMembershipModuleGateway().loadChurch(au.churchId))?.timeZone;
       for (const row of pending) row.conflicts = await this.computeConflicts(au.churchId, row, timeZone);
@@ -56,19 +70,19 @@ export class EventBookingController extends ContentBaseController {
 
   // Approvals history: decided requests, scoped the same way as /pending.
   @httpGet("/resolved")
-  public async getResolved(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getResolved(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      let resolved = await this.repos.eventBooking.loadResolved(au.churchId);
+      let resolved: ApprovalBookingRow[] = await this.repos.eventBooking.loadResolved(au.churchId);
       if (!this.canResolve(au)) {
         const groupIds = await this.loadRequesterGroupIds(au.churchId, au.personId);
-        resolved = resolved.filter((row: any) => groupIds.includes(row.roomId ? row.roomApprovalGroupId : row.resourceApprovalGroupId));
+        resolved = resolved.filter((row) => groupIds.includes(row.roomId ? row.roomApprovalGroupId : row.resourceApprovalGroupId));
       }
       return resolved;
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, EventBooking[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, EventBooking[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const requesterGroupIds = await this.loadRequesterGroupIds(au.churchId, au.personId);
       const isResolver = this.canResolve(au);
@@ -107,18 +121,18 @@ export class EventBookingController extends ContentBaseController {
 
   // authz-exempt: gated by resolveBooking(...) → canResolve(au)/approval-group membership
   @httpPost("/:id/approve")
-  public async approve(@requestParam("id") id: string, req: express.Request<{}, {}, ApproveBody>, res: express.Response): Promise<any> {
+  public async approve(@requestParam("id") id: string, req: express.Request<{}, {}, ApproveBody>, res: express.Response): Promise<unknown> {
     return this.resolveBooking(req, res, id, "approved", req.body);
   }
 
   // authz-exempt: gated by resolveBooking(...) → canResolve(au)/approval-group membership
   @httpPost("/:id/reject")
-  public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, RejectBody>, res: express.Response): Promise<any> {
+  public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, RejectBody>, res: express.Response): Promise<unknown> {
     return this.resolveBooking(req, res, id, "rejected", undefined, req.body?.reason);
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const booking = await this.repos.eventBooking.load(au.churchId, id);
       if (!booking) return this.json({}, 404);
@@ -169,13 +183,13 @@ export class EventBookingController extends ContentBaseController {
     if (!alreadyListed) await this.repos.curatedEvent.save({ churchId, curatedCalendarId, groupId: event.groupId, eventId });
   }
 
-  private async leadsEvent(au: any, eventId: string): Promise<boolean> {
+  private async leadsEvent(au: AuthenticatedUser, eventId: string): Promise<boolean> {
     if (!eventId) return false;
     const event = await this.repos.event.load(au.churchId, eventId);
     return !!event?.groupId && !!au.leaderGroupIds?.includes(event.groupId);
   }
 
-  private canResolve(au: any): boolean {
+  private canResolve(au: AuthenticatedUser): boolean {
     return au.checkAccess(Permissions.content.edit) || au.checkAccess(Permissions.calendars.admin);
   }
 
@@ -205,7 +219,7 @@ export class EventBookingController extends ContentBaseController {
 
   // Conflicts surfaced on each pending row so the inbox can flag double-bookings before approval.
   // timeZone is loaded once by the caller and threaded in to avoid a per-row church lookup.
-  private async computeConflicts(churchId: string, row: any, timeZone?: string) {
+  private async computeConflicts(churchId: string, row: ApprovalBookingRow, timeZone?: string) {
     const { windowStart, windowEnd } = ConflictHelper.computeWindow(row.eventStart);
     const roomIds = row.roomId ? [row.roomId] : [];
     const resources = row.resourceId ? [{ resourceId: row.resourceId, quantity: row.quantity || 1 }] : [];

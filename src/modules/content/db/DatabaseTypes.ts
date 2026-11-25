@@ -1,3 +1,4 @@
+import type { ColumnType } from "kysely";
 import type {
   Arrangement, ArrangementKey, BibleBook, BibleChapter, BibleLookup,
   BibleTranslation, BibleVerse, BibleVerseText, Block, CalendarBlockout,
@@ -8,6 +9,12 @@ import type {
   Room, Section, Sermon, Setting, Song, SongDetail, SongDetailLink,
   StorageProvider, StreamingService
 } from "../models/index.js";
+
+// Repositories write DATETIME columns as MySQL date strings (DateHelper.toMysqlDate),
+// so those columns accept a string on insert/update while still reading back as Date.
+type MysqlDateWrites<T, K extends keyof T> = Omit<T, K> & {
+  [P in K]: ColumnType<T[P], T[P] | string | null, T[P] | string | null>;
+};
 
 export interface ContentDatabase {
   arrangements: Arrangement;
@@ -22,35 +29,35 @@ export interface ContentDatabase {
   curatedCalendars: CuratedCalendar;
   curatedEvents: CuratedEvent;
   elements: Omit<Element, "answers" | "styles" | "animations" | "elements">;
-  events: Omit<Event, "exceptionDates">;
-  eventRsvps: EventRsvp;
-  eventExceptions: EventException;
-  eventBookings: EventBooking;
+  events: MysqlDateWrites<Omit<Event, "exceptionDates">, "start" | "end" | "registrationOpenDate" | "registrationCloseDate" | "resolvedDate">;
+  eventRsvps: MysqlDateWrites<EventRsvp, "occurrenceStart">;
+  eventExceptions: MysqlDateWrites<EventException, "exceptionDate">;
+  eventBookings: MysqlDateWrites<EventBooking, "startTime" | "endTime" | "requestedDate" | "resolvedDate" | "notifiedDate">;
   eventTemplates: EventTemplate;
   rooms: Room;
   resources: Resource;
-  calendarBlockouts: CalendarBlockout;
+  calendarBlockouts: MysqlDateWrites<CalendarBlockout, "startTime" | "endTime">;
   files: Omit<File, "fileContents">;
   globalStyles: GlobalStyle;
   links: Link;
   pages: Omit<Page, "sections">;
   pageHistory: PageHistory;
   posts: Post;
-  playlists: Playlist;
+  playlists: MysqlDateWrites<Playlist, "publishDate">;
   redirects: Redirect;
-  registrations: Omit<Registration, "members">;
+  registrations: MysqlDateWrites<Omit<Registration, "members">, "registeredDate" | "cancelledDate" | "waitlistNotifiedDate">;
   registrationMembers: RegistrationMember;
   registrationTypes: RegistrationType;
   registrationSelections: RegistrationSelection;
   registrationSelectionChoices: RegistrationSelectionChoice;
-  registrationPayments: RegistrationPayment;
-  registrationCoupons: RegistrationCoupon;
+  registrationPayments: MysqlDateWrites<RegistrationPayment, "createdDate">;
+  registrationCoupons: MysqlDateWrites<RegistrationCoupon, "startDate" | "endDate">;
   sections: Omit<Section, "answers" | "styles" | "animations" | "elements" | "sections">;
-  sermons: Sermon;
+  sermons: MysqlDateWrites<Sermon, "publishDate">;
   settings: Setting;
-  songs: Song;
+  songs: MysqlDateWrites<Song, "dateAdded">;
   songDetails: SongDetail;
   songDetailLinks: SongDetailLink;
   storageProviders: StorageProvider;
-  streamingServices: StreamingService;
+  streamingServices: MysqlDateWrites<StreamingService, "serviceTime">;
 }

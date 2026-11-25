@@ -1,5 +1,5 @@
 export class Utils {
-  static isEmpty(value: any) {
+  static isEmpty(value: unknown) {
     return value === undefined || value === null || value === "";
   }
 

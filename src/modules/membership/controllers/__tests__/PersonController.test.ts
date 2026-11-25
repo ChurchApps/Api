@@ -1,8 +1,8 @@
 import "reflect-metadata";
-jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 const sendTransactional = jest.fn();
-const throttleAllow = jest.fn(async () => true);
-const throttleRecord = jest.fn(async () => {});
+const throttleAllow = jest.fn(async (..._args: unknown[]) => true);
+const throttleRecord = jest.fn(async (..._args: unknown[]) => {});
 jest.mock("../../helpers/index", () => ({
   Permissions: { people: { edit: "peopleEdit", editSelf: "peopleEditSelf", view: "peopleView", viewNames: "peopleViewNames" }, attendance: { checkin: "attendanceCheckin" }, server: { admin: "serverAdmin" } },
   UserChurchHelper: { createForPersonEmailUpdate: jest.fn() },
@@ -11,32 +11,103 @@ jest.mock("../../helpers/index", () => ({
   AuditLogHelper: { getClientIp: () => "1.2.3.4" },
   LoginRateLimiter: { getClientIp: () => "1.2.3.4" },
   PublicPersonRateLimiter: { allow: jest.fn(() => true), reset: jest.fn() },
-  PublicEmailThrottle: { allow: (...args: any[]) => throttleAllow(...args), record: (...args: any[]) => throttleRecord(...args) },
-  PublicChurchContext: { bind: jest.fn(() => ({ churchId: null, mismatch: false })) }
+  PublicEmailThrottle: { allow: (...args: unknown[]) => throttleAllow(...args), record: (...args: unknown[]) => throttleRecord(...args) },
+  PublicChurchContext: { bind: jest.fn(() => ({ churchId: null as string, mismatch: false })) }
 }));
-jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: (...args: any[]) => sendTransactional(...args) } }));
+jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: (...args: unknown[]) => sendTransactional(...args) } }));
 jest.mock("../../models/requests", () => ({}));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
-jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getIds: () => [], getUnique: (a: any[]) => a }, FileStorageHelper: { store: jest.fn() } }));
+jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getIds: (): string[] => [], getUnique: (a: unknown[]) => a }, FileStorageHelper: { store: jest.fn() } }));
 
 import { PersonController } from "../PersonController.js";
 import { PersonHelper, PublicChurchContext, PublicPersonRateLimiter } from "../../helpers/index.js";
+import type express from "express";
+import { ContactInfo, Name, Person } from "../../models/index.js";
 
-function personController(opts: any = {}) {
-  const repos: any = {
+// Loose DB-style person row used as repo output in these tests.
+interface PersonRow {
+  id?: string;
+  churchId?: string;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  name?: Name;
+  photo?: string;
+  contactInfo?: ContactInfo;
+  membershipStatus?: string;
+  birthDate?: string;
+  anniversary?: string;
+  optedOut?: boolean;
+  householdId?: string;
+  householdRole?: string;
+  email?: string;
+  campusId?: string;
+  conversationId?: string;
+  donorNumber?: string;
+  importKey?: string;
+  disablePrivateMessages?: boolean;
+}
+
+interface SettingRow { keyName: string; value: string; public?: number }
+
+interface ControllerOpts {
+  person?: PersonRow;
+  duplicates?: PersonRow[];
+  duplicatePairs?: { personId1: string; personId2: string; matchedOn: string[] }[];
+  rowsByIds?: PersonRow[];
+  isPublicGroupLeader?: boolean;
+  church?: { id: string; archivedDate?: Date };
+  settings?: SettingRow[];
+  churchId?: string;
+  userId?: string;
+  personId?: string;
+  permissions?: string[];
+  membershipStatus?: string;
+  access?: string[];
+}
+
+interface FakeUser {
+  churchId: string;
+  id: string;
+  personId: string;
+  permissions?: string[];
+  membershipStatus: string;
+  groupIds?: string[];
+  leaderGroupIds?: string[];
+  checkAccess: (perm: string) => boolean;
+}
+
+type MockRepos = Record<string, Record<string, jest.Mock>>;
+
+interface JsonOut { obj: unknown; status: number }
+
+const req = {} as express.Request;
+const res = {} as express.Response;
+
+function makeReq(r: Partial<express.Request>): express.Request {
+  return r as express.Request;
+}
+
+function wireActions(controller: PersonController, au: FakeUser) {
+  const actionWrapper = (_req: express.Request, _res: express.Response, action: (user: FakeUser) => Promise<unknown>) => action(au);
+  Object.assign(controller, { actionWrapper });
+}
+
+function personController(opts: ControllerOpts = {}) {
+  const repos: MockRepos = {
     person: {
-      save: jest.fn(async (p: any) => { if (!p.id) p.id = "genP"; return p; }),
-      convertAllToModelWithPermissions: (_c: string, arr: any[]) => arr,
-      convertToModelWithPermissions: (_c: string, data: any) => data,
-      convertToModel: (_c: string, data: any) => data,
-      convertToPreferenceModel: (_c: string, data: any) => data,
+      save: jest.fn(async (p: Person) => { if (!p.id) p.id = "genP"; return p; }),
+      convertAllToModelWithPermissions: jest.fn((_c: string, arr: PersonRow[]) => arr),
+      convertToModelWithPermissions: jest.fn((_c: string, data: PersonRow) => data),
+      convertToModel: jest.fn((_c: string, data: PersonRow) => data),
+      convertToPreferenceModel: jest.fn((_c: string, data: PersonRow) => data),
       load: jest.fn(async () => opts.person ?? null),
       delete: jest.fn(),
       deleteByIds: jest.fn(),
       findPossibleDuplicates: jest.fn(async () => opts.duplicates ?? []),
       findPossibleDuplicatePairs: jest.fn(async () => opts.duplicatePairs ?? []),
       loadByIds: jest.fn(async () => opts.rowsByIds ?? []),
-      convertAllToBasicModel: (_c: string, rows: any[]) => rows.map((r) => ({
+      convertAllToBasicModel: jest.fn((_c: string, rows: PersonRow[]) => rows.map((r) => ({
         id: r.id,
         name: { display: r.displayName ?? r.name?.display ?? "" },
         photo: r.photo,
@@ -44,54 +115,56 @@ function personController(opts: any = {}) {
         membershipStatus: r.membershipStatus,
         birthDate: r.birthDate,
         anniversary: r.anniversary
-      }))
+      })))
     },
-    groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false), loadForPeople: jest.fn(async () => []), loadForPerson: jest.fn(async () => []) },
+    groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false), loadForPeople: jest.fn(async (): Promise<unknown[]> => []), loadForPerson: jest.fn(async (): Promise<unknown[]> => []) },
     auditLog: { loadCount: jest.fn(async () => 0), create: jest.fn() },
-    household: { deleteUnused: jest.fn(), save: jest.fn(async (h: any) => { h.id = "genH"; return h; }) },
-    formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) },
-    visibilityPreference: { loadForPerson: jest.fn(async () => null), loadForPeople: jest.fn(async () => []) },
+    household: { deleteUnused: jest.fn(), save: jest.fn(async (h: { id?: string }) => { h.id = "genH"; return h; }) },
+    formSubmission: { convertAllToModel: jest.fn((_c: string, rows: unknown[]) => rows), loadForContent: jest.fn(async (): Promise<unknown[]> => []) },
+    visibilityPreference: { loadForPerson: jest.fn(async (): Promise<unknown> => null), loadForPeople: jest.fn(async (): Promise<unknown[]> => []) },
     church: { loadById: jest.fn(async () => opts.church ?? { id: "c1" }) },
     setting: {
-      loadPublicSettings: jest.fn(async () => (opts.settings ?? []).filter((r: any) => r.public !== 0)),
+      loadPublicSettings: jest.fn(async () => (opts.settings ?? []).filter((r) => r.public !== 0)),
       loadAll: jest.fn(async () => opts.settings ?? []),
-      convertAllToModel: (_c: string, rows: any[]) => rows
+      convertAllToModel: jest.fn((_c: string, rows: SettingRow[]) => rows)
     }
   };
-  const au = { churchId: opts.churchId ?? "c1", id: opts.userId === undefined ? "u1" : opts.userId, personId: opts.personId ?? "p1", permissions: opts.permissions ?? [], membershipStatus: opts.membershipStatus ?? "Guest", checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
+  const au: FakeUser = { churchId: opts.churchId ?? "c1", id: opts.userId === undefined ? "u1" : opts.userId, personId: opts.personId ?? "p1", permissions: opts.permissions ?? [], membershipStatus: opts.membershipStatus ?? "Guest", checkAccess: (perm: string) => (opts.access ?? []).includes(perm) };
   const controller = new PersonController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
-  (controller as any).denyAccess = (errors: any) => ({ obj: { errors }, status: 401 });
+  Object.assign(controller, {
+    repos,
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => Promise<unknown>) => action(),
+    json: (obj: unknown, status: number) => ({ obj, status }),
+    denyAccess: (errors: string[]) => ({ obj: { errors }, status: 401 })
+  });
+  wireActions(controller, au);
   return { controller, repos };
 }
 
 // Every client sends a name (PersonRepo.save needs one); mutate in place so tests can read back householdId.
-function saveReq(body: any[]) {
+function saveReq(body: Person[]) {
   body.forEach((p) => { if (!p.name) p.name = { first: "Sample" }; });
-  return { body };
+  return makeReq({ body });
 }
 
 describe("PersonController.save authorization", () => {
   it("blocks a caller with neither people.edit nor a matching editSelf (401, nothing saved)", async () => {
     const { controller, repos } = personController({ access: [] });
-    const result: any = await (controller as any).save(saveReq([{ id: "p2" }]), {});
+    const result = (await controller.save(saveReq([{ id: "p2" }]) as express.Request, res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.save).not.toHaveBeenCalled();
   });
 
   it("allows a caller with people.edit to save others", async () => {
     const { controller, repos } = personController({ access: ["peopleEdit"] });
-    await (controller as any).save(saveReq([{ id: "p2" }]), {});
+    await controller.save(saveReq([{ id: "p2" }]) as express.Request, res);
     expect(repos.person.save).toHaveBeenCalledTimes(1);
   });
 
   it("gives a new person a household named from the last name when none is supplied", async () => {
     const { controller, repos } = personController({ access: ["peopleEdit"] });
-    const person: any = { name: { first: "Zacchaeus", last: "Smith" } };
-    await (controller as any).save(saveReq([person]), {});
+    const person: Person = { name: { first: "Zacchaeus", last: "Smith" } };
+    await controller.save(saveReq([person]) as express.Request, res);
     expect(repos.household.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1", name: "Smith" }));
     expect(person.householdId).toBe("genH");
     expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ householdId: "genH" }));
@@ -99,39 +172,55 @@ describe("PersonController.save authorization", () => {
 
   it("keeps a supplied householdId and never creates one for an existing person", async () => {
     const { controller, repos } = personController({ access: ["peopleEdit"] });
-    await (controller as any).save(saveReq([{ name: { last: "Smith" }, householdId: "h9" }, { id: "p2", name: { last: "Jones" } }]), {});
+    await controller.save(saveReq([{ name: { last: "Smith" }, householdId: "h9" }, { id: "p2", name: { last: "Jones" } }]) as express.Request, res);
     expect(repos.household.save).not.toHaveBeenCalled();
   });
 
   it("allows editSelf when body[0].id matches the caller's personId", async () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: { id: "p1", membershipStatus: "Guest", householdId: "h1", householdRole: "Head" } });
-    await (controller as any).save(saveReq([{ id: "p1" }]), {});
+    await controller.save(saveReq([{ id: "p1" }]) as express.Request, res);
     expect(repos.person.save).toHaveBeenCalledTimes(1);
   });
 
   it("keeps membershipStatus and household when a member edits themselves", async () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: { id: "p1", membershipStatus: "Guest", householdId: "h1", householdRole: "Head" } });
-    await (controller as any).save(saveReq([{ id: "p1", membershipStatus: "Staff", householdId: "victimHousehold", householdRole: "Spouse" }]), {});
+    await controller.save(saveReq([{ id: "p1", membershipStatus: "Staff", householdId: "victimHousehold", householdRole: "Spouse" }]) as express.Request, res);
     expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ membershipStatus: "Guest", householdId: "h1", householdRole: "Head" }));
   });
 
   it("keeps internal fields when a member edits themselves", async () => {
     const existing = { id: "p1", campusId: "cam1", conversationId: "conv1", donorNumber: "42", importKey: "imp1" };
     const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: existing });
-    await (controller as any).save(saveReq([{ id: "p1", campusId: "cam2", conversationId: "victimConv", donorNumber: "7", importKey: "x" }]), {});
+    await controller.save(saveReq([{ id: "p1", campusId: "cam2", conversationId: "victimConv", donorNumber: "7", importKey: "x" }]) as express.Request, res);
     expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ campusId: "cam1", conversationId: "conv1", donorNumber: "42", importKey: "imp1" }));
+  });
+
+  it("keeps an admin's Disable private messages flag when a member edits themselves (#1680)", async () => {
+    for (const sent of [false, null, undefined]) {
+      const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: { id: "p1", disablePrivateMessages: true } });
+      const body: Person = { id: "p1" };
+      if (sent !== undefined) (body as unknown as Record<string, unknown>).disablePrivateMessages = sent;
+      await controller.save(saveReq([body]) as express.Request, res);
+      expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ disablePrivateMessages: true }));
+    }
+  });
+
+  it("lets people.edit set and clear Disable private messages", async () => {
+    const { controller, repos } = personController({ access: ["peopleEdit"], person: { id: "p2", disablePrivateMessages: true } });
+    await controller.save(saveReq([{ id: "p2", disablePrivateMessages: false }]) as express.Request, res);
+    expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ disablePrivateMessages: false }));
   });
 
   it("blocks editSelf when body[0].id does not match the caller's personId", async () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1" });
-    const result: any = await (controller as any).save(saveReq([{ id: "someoneElse" }]), {});
+    const result = (await controller.save(saveReq([{ id: "someoneElse" }]) as express.Request, res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.save).not.toHaveBeenCalled();
   });
 
   it("blocks editSelf when a second, unrelated person is smuggled in the same array", async () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1" });
-    const result: any = await (controller as any).save(saveReq([{ id: "p1" }, { id: "someoneElse" }]), {});
+    const result = (await controller.save(saveReq([{ id: "p1" }, { id: "someoneElse" }]) as express.Request, res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.save).not.toHaveBeenCalled();
   });
@@ -140,27 +229,27 @@ describe("PersonController.save authorization", () => {
 describe("PersonController.get authorization", () => {
   it("lets a caller load their own record with no view permission and no member status", async () => {
     const { controller, repos } = personController({ personId: "p1", access: [], membershipStatus: "Guest", person: { id: "p1", name: {} } });
-    const result = await (controller as any).get("p1", {}, {});
+    const result = (await controller.get("p1", req, res)) as Person;
     expect(repos.person.load).toHaveBeenCalled();
     expect(result).toMatchObject({ id: "p1" });
   });
 
   it("blocks a non-self caller without view permission or member status (401)", async () => {
     const { controller, repos } = personController({ personId: "p1", access: [], membershipStatus: "Guest" });
-    const result: any = await (controller as any).get("p2", {}, {});
+    const result = (await controller.get("p2", req, res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.load).not.toHaveBeenCalled();
   });
 
   it("allows a non-self caller with people.view", async () => {
     const { controller, repos } = personController({ personId: "p1", access: ["peopleView"], person: { id: "p2", name: {} } });
-    await (controller as any).get("p2", {}, {});
+    await controller.get("p2", req, res);
     expect(repos.person.load).toHaveBeenCalled();
   });
 
   it("uses directory visibility for a member without people.view and does not attach form submissions", async () => {
     const { controller, repos } = personController({ personId: "p1", access: [], membershipStatus: "Member", person: { id: "p2", name: {}, contactInfo: {} } });
-    await (controller as any).get("p2", {}, {});
+    await controller.get("p2", req, res);
     expect(repos.formSubmission.loadForContent).not.toHaveBeenCalled();
   });
 });
@@ -168,21 +257,21 @@ describe("PersonController.get authorization", () => {
 describe("PersonController.apiEmails", () => {
   it("is not registered", () => {
     expect(Object.getOwnPropertyNames(PersonController.prototype)).not.toContain("apiEmails");
-    expect((new PersonController() as any).apiEmails).toBeUndefined();
+    expect(Reflect.get(new PersonController(), "apiEmails")).toBeUndefined();
   });
 });
 
 describe("PersonController.delete / bulkDelete authorization", () => {
   it("delete blocks a caller without people.edit (401, nothing deleted)", async () => {
     const { controller, repos } = personController({ access: [] });
-    const result: any = await (controller as any).delete("p1", {}, {});
+    const result = (await controller.delete("p1", req, res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.delete).not.toHaveBeenCalled();
   });
 
   it("bulkDelete blocks a caller without people.edit (401)", async () => {
     const { controller, repos } = personController({ access: [] });
-    const result: any = await (controller as any).bulkDelete({ body: { personIds: ["p1"] } }, {});
+    const result = (await controller.bulkDelete(makeReq({ body: { personIds: ["p1"] } }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.deleteByIds).not.toHaveBeenCalled();
   });
@@ -200,7 +289,7 @@ describe("PersonController.guestRegister", () => {
 
   it("rejects when guest registration is not enabled", async () => {
     const { controller, repos } = personController({ settings: [] });
-    const result: any = await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
+    const result = (await controller.guestRegister(makeReq({ body: guestBody, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(PersonHelper.registerGuestHousehold).not.toHaveBeenCalled();
     expect(repos.church.loadById).toHaveBeenCalledWith("c1");
@@ -208,7 +297,7 @@ describe("PersonController.guestRegister", () => {
 
   it("rejects an archived church", async () => {
     const { controller } = personController({ church: { id: "c1", archivedDate: new Date() }, settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
-    const result: any = await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
+    const result = (await controller.guestRegister(makeReq({ body: guestBody, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(PersonHelper.registerGuestHousehold).not.toHaveBeenCalled();
   });
@@ -216,14 +305,14 @@ describe("PersonController.guestRegister", () => {
   it("rate-limits after the church is bound", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
     (PublicPersonRateLimiter.allow as jest.Mock).mockReturnValue(false);
-    const result: any = await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
+    const result = (await controller.guestRegister(makeReq({ body: guestBody, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(429);
     expect(PersonHelper.registerGuestHousehold).not.toHaveBeenCalled();
   });
 
   it("registers when the church enabled QR guest registration", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
-    const result = await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
+    const result = await controller.guestRegister(makeReq({ body: guestBody, headers: {} }), res);
     expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members }, undefined, false);
     expect(result).toEqual({ householdId: "h1", people: [] });
   });
@@ -231,14 +320,14 @@ describe("PersonController.guestRegister", () => {
   it("uses a signed site/JWT church and ignores the opt-in setting", async () => {
     (PublicChurchContext.bind as jest.Mock).mockReturnValue({ churchId: "c1", mismatch: false });
     const { controller } = personController({ settings: [] });
-    await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
+    await controller.guestRegister(makeReq({ body: guestBody, headers: {} }), res);
     expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members }, undefined, false);
   });
 
   it("rejects a claimed churchId that does not match the signed context", async () => {
     (PublicChurchContext.bind as jest.Mock).mockReturnValue({ churchId: null, mismatch: true });
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
-    const result: any = await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
+    const result = (await controller.guestRegister(makeReq({ body: guestBody, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(PersonHelper.registerGuestHousehold).not.toHaveBeenCalled();
   });
@@ -246,10 +335,10 @@ describe("PersonController.guestRegister", () => {
 
 describe("PersonController.guestRegister profile fields", () => {
   const enabled = { keyName: "enableQRGuestRegistration", value: "true" };
-  const fields = (modes: any) => ({ keyName: "guestRegistrationFields", value: JSON.stringify(modes) });
-  const register = (settings: any[], body: any) => {
+  const fields = (modes: Record<string, string>) => ({ keyName: "guestRegistrationFields", value: JSON.stringify(modes) });
+  const register = (settings: SettingRow[], body: Record<string, unknown>) => {
     const { controller } = personController({ settings });
-    return (controller as any).guestRegister({ body: { churchId: "c1", ...body }, headers: {} }, {});
+    return controller.guestRegister(makeReq({ body: { churchId: "c1", ...body }, headers: {} }), res) as Promise<JsonOut>;
   };
 
   beforeEach(() => {
@@ -288,11 +377,11 @@ describe("PersonController.guestRegister profile fields", () => {
   });
 
   it("rejects a missing required field", async () => {
-    const r1: any = await register([enabled, fields({ email: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
+    const r1 = await register([enabled, fields({ email: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
     expect(r1.status).toBe(400);
-    const r2: any = await register([enabled, fields({ address: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }], address: { address1: "1 Main St", city: "X", state: "IL" } });
+    const r2 = await register([enabled, fields({ address: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }], address: { address1: "1 Main St", city: "X", state: "IL" } });
     expect(r2.status).toBe(400);
-    const r3: any = await register([enabled, fields({ grade: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor", grade: "K" }, { firstName: "Sam", lastName: "Visitor" }] });
+    const r3 = await register([enabled, fields({ grade: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor", grade: "K" }, { firstName: "Sam", lastName: "Visitor" }] });
     expect(r3.status).toBe(400);
     expect(PersonHelper.registerGuestHousehold).not.toHaveBeenCalled();
   });
@@ -310,7 +399,7 @@ describe("PersonController.guestRegister profile fields", () => {
     expect(PersonHelper.registerGuestHousehold).toHaveBeenLastCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor", title: "Dr" }, { firstName: "Sam", lastName: "Visitor" }] }, undefined, false);
     await register([enabled], { members: [{ firstName: "Pat", lastName: "Visitor", title: "Dr" }] });
     expect(PersonHelper.registerGuestHousehold).toHaveBeenLastCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, undefined, false);
-    const r: any = await register([enabled, fields({ title: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
+    const r = await register([enabled, fields({ title: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
     expect(r.status).toBe(400);
   });
 
@@ -318,7 +407,7 @@ describe("PersonController.guestRegister profile fields", () => {
     const settings = [enabled, fields({ birthDate: "optional" })];
     const nextYear = new Date().getUTCFullYear() + 1;
     for (const birthDate of [`${nextYear}-01-01`, "2001-02-30", "1800-01-01", "01/02/1990"]) {
-      const r: any = await register(settings, { members: [{ firstName: "Pat", lastName: "V", birthDate }] });
+      const r = await register(settings, { members: [{ firstName: "Pat", lastName: "V", birthDate }] });
       expect(r.status).toBe(400);
     }
     expect(PersonHelper.registerGuestHousehold).not.toHaveBeenCalled();
@@ -327,9 +416,9 @@ describe("PersonController.guestRegister profile fields", () => {
 
 describe("PersonController.guestRegister group and comments", () => {
   const enabled = { keyName: "enableQRGuestRegistration", value: "true" };
-  const register = (settings: any[], body: any) => {
+  const register = (settings: SettingRow[], body: Record<string, unknown>) => {
     const { controller } = personController({ settings });
-    return (controller as any).guestRegister({ body: { churchId: "c1", ...body }, headers: {} }, {});
+    return controller.guestRegister(makeReq({ body: { churchId: "c1", ...body }, headers: {} }), res) as Promise<JsonOut>;
   };
 
   beforeEach(() => {
@@ -354,14 +443,14 @@ describe("PersonController.guestRegister group and comments", () => {
   });
 
   it("keeps the comment only when the church included it, and enforces required", async () => {
-    const fields = (modes: any) => ({ keyName: "guestRegistrationFields", value: JSON.stringify(modes) });
+    const fields = (modes: Record<string, string>) => ({ keyName: "guestRegistrationFields", value: JSON.stringify(modes) });
     await register([enabled], { members: [{ firstName: "Pat", lastName: "Visitor" }], comments: "Hi" });
     expect((PersonHelper.registerGuestHousehold as jest.Mock).mock.calls[0][1].comments).toBeUndefined();
     await register([enabled, fields({ comments: "optional" })], { members: [{ firstName: "Pat", lastName: "Visitor" }], comments: "  Loved the picnic  " });
     expect((PersonHelper.registerGuestHousehold as jest.Mock).mock.calls[1][1].comments).toBe("Loved the picnic");
     await register([enabled, fields({ comments: "optional" })], { members: [{ firstName: "Pat", lastName: "Visitor" }], comments: "x".repeat(1200) });
     expect((PersonHelper.registerGuestHousehold as jest.Mock).mock.calls[2][1].comments).toHaveLength(1000);
-    const r: any = await register([enabled, fields({ comments: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
+    const r = await register([enabled, fields({ comments: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
     expect(r.status).toBe(400);
   });
 });
@@ -374,20 +463,20 @@ describe("PersonController.guestRegisterOptions", () => {
 
   it("returns the defaults when the church has not set a checklist", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
-    const result = await (controller as any).guestRegisterOptions({ query: { churchId: "c1" }, headers: {} }, {});
+    const result = await controller.guestRegisterOptions(makeReq({ query: { churchId: "c1" }, headers: {} }), res);
     expect(result).toEqual({ title: "off", email: "optional", phone: "optional", householdRole: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off", photo: "off" });
   });
 
   it("returns the saved checklist and ignores unknown modes", async () => {
     const settings = [{ keyName: "enableQRGuestRegistration", value: "true" }, { keyName: "guestRegistrationFields", value: JSON.stringify({ address: "required", grade: "optional", gender: "bogus" }) }];
     const { controller } = personController({ settings });
-    const result: any = await (controller as any).guestRegisterOptions({ query: { churchId: "c1" }, headers: {} }, {});
+    const result = await controller.guestRegisterOptions(makeReq({ query: { churchId: "c1" }, headers: {} }), res);
     expect(result).toMatchObject({ address: "required", grade: "optional", gender: "off" });
   });
 
   it("rejects when guest registration is not enabled", async () => {
     const { controller } = personController({ settings: [] });
-    const result: any = await (controller as any).guestRegisterOptions({ query: { churchId: "c1" }, headers: {} }, {});
+    const result = (await controller.guestRegisterOptions(makeReq({ query: { churchId: "c1" }, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
   });
 });
@@ -401,14 +490,14 @@ describe("PersonController.loadOrCreate", () => {
 
   it("rejects a missing churchId", async () => {
     const { controller } = personController();
-    const result: any = await (controller as any).loadOrCreate({ body: { email: "a@b.com", firstName: "A", lastName: "B" }, headers: {} }, {});
+    const result = (await controller.loadOrCreate(makeReq({ body: { email: "a@b.com", firstName: "A", lastName: "B" }, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(400);
     expect(PersonHelper.getPerson).not.toHaveBeenCalled();
   });
 
   it("rejects an archived church on the anon path", async () => {
     const { controller } = personController({ church: { id: "c1", archivedDate: new Date() } });
-    const result: any = await (controller as any).loadOrCreate({ body: loadBody, headers: {} }, {});
+    const result = (await controller.loadOrCreate(makeReq({ body: loadBody, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(PersonHelper.getPerson).not.toHaveBeenCalled();
   });
@@ -416,14 +505,14 @@ describe("PersonController.loadOrCreate", () => {
   it("rate-limits the anon path", async () => {
     const { controller } = personController();
     (PublicPersonRateLimiter.allow as jest.Mock).mockReturnValue(false);
-    const result: any = await (controller as any).loadOrCreate({ body: loadBody, headers: {} }, {});
+    const result = (await controller.loadOrCreate(makeReq({ body: loadBody, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(429);
     expect(PersonHelper.getPerson).not.toHaveBeenCalled();
   });
 
   it("does not restore and does not return contactInfo", async () => {
     const { controller } = personController();
-    const result = await (controller as any).loadOrCreate({ body: loadBody, headers: {} }, {});
+    const result = (await controller.loadOrCreate(makeReq({ body: loadBody, headers: {} }), res)) as Person;
     expect(PersonHelper.getPerson).toHaveBeenCalledWith("c1", "pat@example.com", "Pat", "Guest", false, false);
     expect(result).toEqual({ id: "p1", name: { first: "Pat", last: "Guest", display: "Pat Guest" } });
     expect(result.contactInfo).toBeUndefined();
@@ -432,14 +521,14 @@ describe("PersonController.loadOrCreate", () => {
   it("echoes the submitted name, not an existing member's stored name", async () => {
     (PersonHelper.getPerson as jest.Mock).mockResolvedValueOnce({ id: "p9", name: { first: "Real", last: "Member", display: "Real Member" } });
     const { controller } = personController();
-    const result = await (controller as any).loadOrCreate({ body: loadBody, headers: {} }, {});
+    const result = await controller.loadOrCreate(makeReq({ body: loadBody, headers: {} }), res);
     expect(result).toEqual({ id: "p9", name: { first: "Pat", last: "Guest", display: "Pat Guest" } });
   });
 
   it("uses the JWT/site church and skips the anon church lookup", async () => {
     (PublicChurchContext.bind as jest.Mock).mockReturnValue({ churchId: "c1", mismatch: false });
     const { controller, repos } = personController();
-    await (controller as any).loadOrCreate({ body: loadBody, headers: {} }, {});
+    await controller.loadOrCreate(makeReq({ body: loadBody, headers: {} }), res);
     expect(repos.church.loadById).not.toHaveBeenCalled();
     expect(PersonHelper.getPerson).toHaveBeenCalledWith("c1", "pat@example.com", "Pat", "Guest", false, false);
   });
@@ -447,7 +536,7 @@ describe("PersonController.loadOrCreate", () => {
   it("rejects a claimed churchId that does not match the signed context", async () => {
     (PublicChurchContext.bind as jest.Mock).mockReturnValue({ churchId: null, mismatch: true });
     const { controller } = personController();
-    const result: any = await (controller as any).loadOrCreate({ body: loadBody, headers: {} }, {});
+    const result = (await controller.loadOrCreate(makeReq({ body: loadBody, headers: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(PersonHelper.getPerson).not.toHaveBeenCalled();
   });
@@ -461,18 +550,18 @@ describe("PersonController.publicEmail", () => {
     (PublicPersonRateLimiter.allow as jest.Mock).mockReturnValue(true);
   });
 
-  const emailReq = (body: any = {}) => ({ body: { churchId: "c1", personId: "leader1", subject: "Hi", body: "Hello<br />there", appName: "B1", ...body }, headers: {} });
+  const emailReq = (body: Record<string, unknown> = {}) => makeReq({ body: { churchId: "c1", personId: "leader1", subject: "Hi", body: "Hello<br />there", appName: "B1", ...body }, headers: {} });
 
   it("rejects a missing churchId or personId (400, no send)", async () => {
     const { controller } = personController({ isPublicGroupLeader: true, person: { email: "a@x.com" } });
-    const result: any = await (controller as any).publicEmail(emailReq({ churchId: "", personId: "leader1" }), {});
+    const result = (await controller.publicEmail(emailReq({ churchId: "", personId: "leader1" }), res)) as JsonOut;
     expect(result.status).toBe(400);
     expect(sendTransactional).not.toHaveBeenCalled();
   });
 
   it("rejects a non-leader personId (401, no send)", async () => {
     const { controller, repos } = personController({ isPublicGroupLeader: false, person: { email: "member@x.com" } });
-    const result: any = await (controller as any).publicEmail(emailReq({ personId: "member9" }), {});
+    const result = (await controller.publicEmail(emailReq({ personId: "member9" }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.groupMember.isPublicGroupLeader).toHaveBeenCalledWith("c1", "member9", undefined);
     expect(repos.person.load).not.toHaveBeenCalled();
@@ -481,13 +570,13 @@ describe("PersonController.publicEmail", () => {
 
   it("scopes the leader check to the group named in the body", async () => {
     const { controller, repos } = personController({ isPublicGroupLeader: true, person: { email: "leader@x.com" } });
-    await (controller as any).publicEmail(emailReq({ groupId: "g1" }), {});
+    await controller.publicEmail(emailReq({ groupId: "g1" }), res);
     expect(repos.groupMember.isPublicGroupLeader).toHaveBeenCalledWith("c1", "leader1", "g1");
   });
 
   it("rejects a leader of some other group when a groupId is supplied (401, no send)", async () => {
     const { controller, repos } = personController({ isPublicGroupLeader: false, person: { email: "leader@x.com" } });
-    const result: any = await (controller as any).publicEmail(emailReq({ groupId: "g2" }), {});
+    const result = (await controller.publicEmail(emailReq({ groupId: "g2" }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.groupMember.isPublicGroupLeader).toHaveBeenCalledWith("c1", "leader1", "g2");
     expect(sendTransactional).not.toHaveBeenCalled();
@@ -496,7 +585,7 @@ describe("PersonController.publicEmail", () => {
   it("rejects when the per-IP burst guard is exhausted (429, no send)", async () => {
     (PublicPersonRateLimiter.allow as jest.Mock).mockReturnValue(false);
     const { controller, repos } = personController({ isPublicGroupLeader: true, person: { email: "a@x.com" } });
-    const result: any = await (controller as any).publicEmail(emailReq(), {});
+    const result = (await controller.publicEmail(emailReq(), res)) as JsonOut;
     expect(result.status).toBe(429);
     expect(repos.groupMember.isPublicGroupLeader).not.toHaveBeenCalled();
     expect(sendTransactional).not.toHaveBeenCalled();
@@ -505,7 +594,7 @@ describe("PersonController.publicEmail", () => {
   it("rejects when the durable per-target throttle is exhausted (429, no send)", async () => {
     throttleAllow.mockResolvedValue(false);
     const { controller, repos } = personController({ isPublicGroupLeader: true, person: { email: "a@x.com" } });
-    const result: any = await (controller as any).publicEmail(emailReq(), {});
+    const result = (await controller.publicEmail(emailReq(), res)) as JsonOut;
     expect(result.status).toBe(429);
     expect(throttleAllow).toHaveBeenCalledWith(repos, "c1", "leader1");
     expect(repos.person.load).not.toHaveBeenCalled();
@@ -515,8 +604,8 @@ describe("PersonController.publicEmail", () => {
   it("returns the same error for a public leader with no email as for a non-leader (no oracle)", async () => {
     const noEmail = personController({ isPublicGroupLeader: true, person: { id: "leader1" } });
     const notLeader = personController({ isPublicGroupLeader: false, person: { email: "member@x.com" } });
-    const noEmailResult: any = await (noEmail.controller as any).publicEmail(emailReq(), {});
-    const notLeaderResult: any = await (notLeader.controller as any).publicEmail(emailReq(), {});
+    const noEmailResult = (await noEmail.controller.publicEmail(emailReq(), res)) as JsonOut;
+    const notLeaderResult = (await notLeader.controller.publicEmail(emailReq(), res)) as JsonOut;
     expect(noEmailResult.status).toBe(401);
     expect(noEmailResult).toEqual(notLeaderResult);
     expect(sendTransactional).not.toHaveBeenCalled();
@@ -524,7 +613,7 @@ describe("PersonController.publicEmail", () => {
 
   it("sends and records the send when the person is a public group leader", async () => {
     const { controller, repos } = personController({ isPublicGroupLeader: true, person: { email: "leader@x.com" } });
-    const result = await (controller as any).publicEmail(emailReq({ subject: "Contact Request For Youth", body: "First Name: Pat<br />Message: hi" }), {});
+    const result = await controller.publicEmail(emailReq({ subject: "Contact Request For Youth", body: "First Name: Pat<br />Message: hi" }), res);
     expect(result).toEqual({ success: true });
     expect(repos.groupMember.isPublicGroupLeader).toHaveBeenCalledWith("c1", "leader1", undefined);
     expect(throttleRecord).toHaveBeenCalledWith(repos, "c1", "leader1", "1.2.3.4");
@@ -533,29 +622,37 @@ describe("PersonController.publicEmail", () => {
 
   it("escapes attacker-supplied html but keeps the form's line breaks", async () => {
     const { controller } = personController({ isPublicGroupLeader: true, person: { email: "leader@x.com" } });
-    await (controller as any).publicEmail(emailReq({ subject: "<b>x</b>", body: "a<br />b<script>alert(1)</script>" }), {});
+    await controller.publicEmail(emailReq({ subject: "<b>x</b>", body: "a<br />b<script>alert(1)</script>" }), res);
     expect(sendTransactional).toHaveBeenCalledWith("support@test", "leader@x.com", "B1", null, "&lt;b&gt;x&lt;/b&gt;", "a<br />b&lt;script&gt;alert(1)&lt;/script&gt;");
   });
 });
 
 // Contact visibility levels: everyone > members > groups > leaders > staff (ChurchAppsSupport#1058).
+interface VisOpts {
+  settings?: SettingRow[];
+  prefs?: Record<string, string>[];
+  groupRows?: Record<string, string>[];
+  groupIds?: string[];
+  leaderGroupIds?: string[];
+}
+
 describe("PersonController contact visibility levels", () => {
   const target = { id: "p2", name: { display: "Donald Clark" }, membershipStatus: "Member", contactInfo: { email: "donald@x.org", mobilePhone: "555", homePhone: "556", workPhone: "557", address1: "1 Main", city: "Springfield", state: "IL", zip: "62701" } };
   const sharedGroup = [{ churchId: "c1", personId: "p2", groupId: "g1" }];
 
-  function visController(opts: any) {
+  function visController(opts: VisOpts) {
     const { controller, repos } = personController({ personId: "p1", access: [], membershipStatus: "Member", person: { ...target, contactInfo: { ...target.contactInfo } }, settings: opts.settings ?? [] });
-    repos.visibilityPreference = { loadForPerson: jest.fn(async () => null), loadForPeople: jest.fn(async () => opts.prefs ?? []) };
+    repos.visibilityPreference = { loadForPerson: jest.fn(async (): Promise<unknown> => null), loadForPeople: jest.fn(async () => opts.prefs ?? []) };
     repos.groupMember.loadForPeople = jest.fn(async () => opts.groupRows ?? []);
     repos.person.loadMembersByVisibility = jest.fn(async () => [{ ...target, contactInfo: { ...target.contactInfo } }]);
-    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", id: "u1", personId: "p1", membershipStatus: "Member", groupIds: opts.groupIds ?? [], leaderGroupIds: opts.leaderGroupIds ?? [], checkAccess: () => false });
+    wireActions(controller, { churchId: "c1", id: "u1", personId: "p1", membershipStatus: "Member", groupIds: opts.groupIds ?? [], leaderGroupIds: opts.leaderGroupIds ?? [], checkAccess: () => false });
     return { controller, repos };
   }
 
   it("'leaders' church default: a leader of a shared group sees email/phone/address", async () => {
     const settings = [{ keyName: "emailVisibility", value: "leaders" }, { keyName: "phoneVisibility", value: "leaders" }, { keyName: "addressVisibility", value: "leaders" }];
     const { controller } = visController({ settings, groupRows: sharedGroup, groupIds: ["g1"], leaderGroupIds: ["g1"] });
-    const result = await (controller as any).get("p2", {}, {});
+    const result = (await controller.get("p2", req, res)) as Person;
     expect(result.contactInfo.email).toBe("donald@x.org");
     expect(result.contactInfo.mobilePhone).toBe("555");
     expect(result.contactInfo.address1).toBe("1 Main");
@@ -564,7 +661,7 @@ describe("PersonController contact visibility levels", () => {
   it("'leaders' church default: a plain group-mate sees none of it", async () => {
     const settings = [{ keyName: "emailVisibility", value: "leaders" }, { keyName: "phoneVisibility", value: "leaders" }, { keyName: "addressVisibility", value: "leaders" }];
     const { controller } = visController({ settings, groupRows: sharedGroup, groupIds: ["g1"] });
-    const result = await (controller as any).get("p2", {}, {});
+    const result = (await controller.get("p2", req, res)) as Person;
     expect(result.contactInfo.email).toBeUndefined();
     expect(result.contactInfo.mobilePhone).toBeUndefined();
     expect(result.contactInfo.homePhone).toBeUndefined();
@@ -574,7 +671,7 @@ describe("PersonController contact visibility levels", () => {
   it("'staff' person preference: even a group leader sees nothing", async () => {
     const prefs = [{ personId: "p2", address: "staff", phoneNumber: "staff", email: "staff" }];
     const { controller } = visController({ prefs, groupRows: sharedGroup, groupIds: ["g1"], leaderGroupIds: ["g1"] });
-    const result = await (controller as any).get("p2", {}, {});
+    const result = (await controller.get("p2", req, res)) as Person;
     expect(result.contactInfo.email).toBeUndefined();
     expect(result.contactInfo.mobilePhone).toBeUndefined();
     expect(result.contactInfo.address1).toBeUndefined();
@@ -582,15 +679,15 @@ describe("PersonController contact visibility levels", () => {
 
   it("staff with people.view bypass every level", async () => {
     const { controller, repos } = personController({ personId: "p1", access: ["peopleView"], person: { ...target, contactInfo: { ...target.contactInfo } }, settings: [{ keyName: "emailVisibility", value: "staff" }] });
-    repos.visibilityPreference = { loadForPerson: jest.fn(async () => null), loadForPeople: jest.fn(async () => [{ personId: "p2", email: "staff" }]) };
-    const result = await (controller as any).get("p2", {}, {});
+    repos.visibilityPreference = { loadForPerson: jest.fn(async (): Promise<unknown> => null), loadForPeople: jest.fn(async () => [{ personId: "p2", email: "staff" }]) };
+    const result = (await controller.get("p2", req, res)) as Person;
     expect(result.contactInfo.email).toBe("donald@x.org");
   });
 
   it("the directory list (GET /people) redacts with the same rules", async () => {
     const settings = [{ keyName: "emailVisibility", value: "leaders" }, { keyName: "phoneVisibility", value: "staff" }, { keyName: "addressVisibility", value: "everyone" }];
     const { controller } = visController({ settings, groupRows: sharedGroup, groupIds: ["g1"] });
-    const result = await (controller as any).getAll({ query: {} }, {});
+    const result = (await controller.getAll(makeReq({ query: {} }), res)) as Person[];
     expect(result).toHaveLength(1);
     expect(result[0].name.display).toBe("Donald Clark");
     expect(result[0].contactInfo.email).toBeUndefined();
@@ -602,7 +699,7 @@ describe("PersonController contact visibility levels", () => {
 describe("PersonController.duplicates", () => {
   it("blocks a caller without people.view or member status (401)", async () => {
     const { controller, repos } = personController({ access: [], membershipStatus: "Guest" });
-    const result: any = await (controller as any).duplicates({ body: { email: "a@b.com" } }, {});
+    const result = (await controller.duplicates(makeReq({ body: { email: "a@b.com" } }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.findPossibleDuplicates).not.toHaveBeenCalled();
   });
@@ -610,14 +707,14 @@ describe("PersonController.duplicates", () => {
   it("passes email/phone/name/birthDate through and returns matches", async () => {
     const match = { id: "p2", name: { display: "Donald Clark" } };
     const { controller, repos } = personController({ access: ["peopleView"], duplicates: [match] });
-    const result = await (controller as any).duplicates({ body: { email: "donald@x.org", phone: "555-1212", firstName: "Donald", lastName: "Clark", birthDate: "1980-01-01" } }, {});
+    const result = (await controller.duplicates(makeReq({ body: { email: "donald@x.org", phone: "555-1212", firstName: "Donald", lastName: "Clark", birthDate: "1980-01-01" } }), res)) as Person[];
     expect(repos.person.findPossibleDuplicates).toHaveBeenCalledWith("c1", { email: "donald@x.org", phone: "555-1212", firstName: "Donald", lastName: "Clark", birthDate: new Date("1980-01-01") });
     expect(result).toEqual([match]);
   });
 
   it("returns [] when the repo finds no matches", async () => {
     const { controller } = personController({ access: ["peopleView"], duplicates: [] });
-    const result = await (controller as any).duplicates({ body: { email: "nobody@x.org" } }, {});
+    const result = (await controller.duplicates(makeReq({ body: { email: "nobody@x.org" } }), res)) as Person[];
     expect(result).toEqual([]);
   });
 });
@@ -625,7 +722,7 @@ describe("PersonController.duplicates", () => {
 describe("PersonController.getPossibleDuplicates", () => {
   it("requires people.edit (401 for view-only)", async () => {
     const { controller, repos } = personController({ access: ["peopleView"] });
-    const result: any = await (controller as any).getPossibleDuplicates({}, {});
+    const result = (await controller.getPossibleDuplicates(req, res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.findPossibleDuplicatePairs).not.toHaveBeenCalled();
   });
@@ -643,7 +740,7 @@ describe("PersonController.getPossibleDuplicates", () => {
       { personId1: "c", personId2: "gone", matchedOn: ["email"] }
     ];
     const { controller, repos } = personController({ access: ["peopleEdit"], duplicatePairs, rowsByIds: rows });
-    const result: any = await (controller as any).getPossibleDuplicates({}, {});
+    const result = await controller.getPossibleDuplicates(req, res);
     expect(repos.person.findPossibleDuplicatePairs).toHaveBeenCalledWith("c1");
     expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["a", "b", "c", "d", "gone"]);
     expect(result).toEqual([
@@ -656,60 +753,60 @@ describe("PersonController.getPossibleDuplicates", () => {
 // The directory gate must honour the church's directoryVisibility tier, not a hardcoded
 // Member/Staff check (ChurchAppsSupport#1089).
 describe("PersonController directory visibility gate", () => {
-  function dirController(opts: any) {
+  function dirController(opts: { directoryVisibility?: string; membershipStatus?: string }) {
     const settings = opts.directoryVisibility ? [{ keyName: "directoryVisibility", value: opts.directoryVisibility }] : [];
     const { controller, repos } = personController({ personId: "p1", access: [], membershipStatus: opts.membershipStatus, settings });
     repos.person.loadAlphabetical = jest.fn(async () => [{ id: "p2", name: { display: "Donald Clark" }, membershipStatus: "Member" }]);
     repos.person.loadMembersByVisibility = jest.fn(async () => [{ id: "p2", name: { display: "Donald Clark" }, membershipStatus: "Member" }]);
-    repos.person.convertAllToBasicModel = (_c: string, rows: any[]) => rows;
+    repos.person.convertAllToBasicModel = jest.fn((_c: string, rows: PersonRow[]) => rows);
     return { controller, repos };
   }
 
   it("lets a Regular Attendee load the directory list when the church allows Regular Attendees", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Regular Attendee", directoryVisibility: "Regular Attendees" });
-    const result: any = await (controller as any).getList({ query: {} }, {});
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as JsonOut;
     expect(result.status).not.toBe(401);
     expect(repos.person.loadAlphabetical).toHaveBeenCalled();
   });
 
   it("lets a Visitor load the directory list when the church allows Everyone", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Visitor", directoryVisibility: "Everyone" });
-    const result: any = await (controller as any).getList({ query: {} }, {});
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as JsonOut;
     expect(result.status).not.toBe(401);
     expect(repos.person.loadAlphabetical).toHaveBeenCalled();
   });
 
   it("lets a Regular Attendee load GET /people/directory/all when the church allows Regular Attendees", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Regular Attendee", directoryVisibility: "Regular Attendees" });
-    const result: any = await (controller as any).getDirectoryPeople("all", { query: {} }, {});
+    const result = (await controller.getDirectoryPeople("all", makeReq({ query: {} }), res)) as JsonOut;
     expect(result.status).not.toBe(401);
     expect(repos.person.loadMembersByVisibility).toHaveBeenCalledWith("c1", "Regular Attendees");
   });
 
   it("still blocks a Regular Attendee when the church is set to Members", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Regular Attendee", directoryVisibility: "Members" });
-    const result: any = await (controller as any).getList({ query: {} }, {});
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.loadAlphabetical).not.toHaveBeenCalled();
   });
 
   it("still blocks a Visitor when the church has no directoryVisibility setting (defaults to Members)", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Visitor" });
-    const result: any = await (controller as any).getList({ query: {} }, {});
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.loadAlphabetical).not.toHaveBeenCalled();
   });
 
   it("blocks a Staff-status person without People View when the church is set to Admins Only (#1316)", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Staff", directoryVisibility: "Staff" });
-    const result: any = await (controller as any).getList({ query: {} }, {});
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.loadAlphabetical).not.toHaveBeenCalled();
   });
 
   it("still blocks a Member when the church is set to Staff only", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Member", directoryVisibility: "Staff" });
-    const result: any = await (controller as any).getList({ query: {} }, {});
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.loadAlphabetical).not.toHaveBeenCalled();
   });
@@ -723,7 +820,7 @@ const nameRows = [
 describe("PersonController names lookup", () => {
   it("returns name and photo for every supplied id in one call when the caller has any church permission", async () => {
     const { controller, repos } = personController({ permissions: ["GivingApi_Donations__Edit"], rowsByIds: nameRows });
-    const result = await (controller as any).postNames({ body: { peopleIds: ["p1", " p1 ", "p2"] } }, {});
+    const result = (await controller.postNames(makeReq({ body: { peopleIds: ["p1", " p1 ", "p2"] } }), res)) as Person[];
     expect(repos.person.loadByIds).toHaveBeenCalledTimes(1);
     expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["p1", "p2"]);
     expect(result).toEqual([
@@ -735,7 +832,7 @@ describe("PersonController names lookup", () => {
 
   it("accepts the same id list on the query string", async () => {
     const { controller, repos } = personController({ permissions: ["AttendanceApi_Attendance__View"], rowsByIds: nameRows });
-    const result = await (controller as any).getNames({ query: { ids: "p1,p2" } }, {});
+    const result = (await controller.getNames(makeReq({ query: { ids: "p1,p2" } }), res)) as Person[];
     expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["p1", "p2"]);
     expect(result).toEqual([
       { id: "p1", name: { display: "Ada Lovelace", first: "Ada", last: "Lovelace" }, photo: "a.png" },
@@ -745,21 +842,21 @@ describe("PersonController names lookup", () => {
 
   it("returns 401 for a signed-in caller with no permissions and does not load people", async () => {
     const { controller, repos } = personController({ permissions: [], rowsByIds: nameRows });
-    const result: any = await (controller as any).postNames({ body: { peopleIds: ["p1"] } }, {});
+    const result = (await controller.postNames(makeReq({ body: { peopleIds: ["p1"] } }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.loadByIds).not.toHaveBeenCalled();
   });
 
   it("returns 401 when the caller is not signed in", async () => {
     const { controller, repos } = personController({ userId: "", permissions: ["GivingApi_Donations__View"], rowsByIds: nameRows });
-    const result: any = await (controller as any).postNames({ body: { peopleIds: ["p1"] } }, {});
+    const result = (await controller.postNames(makeReq({ body: { peopleIds: ["p1"] } }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.loadByIds).not.toHaveBeenCalled();
   });
 
   it("returns [] for an empty list without querying", async () => {
     const { controller, repos } = personController({ permissions: ["GivingApi_Donations__Edit"] });
-    const result = await (controller as any).postNames({ body: { peopleIds: [] } }, {});
+    const result = (await controller.postNames(makeReq({ body: { peopleIds: [] } }), res)) as Person[];
     expect(result).toEqual([]);
     expect(repos.person.loadByIds).not.toHaveBeenCalled();
   });
@@ -771,14 +868,14 @@ describe("PersonController names-only search (View People Names Only)", () => {
     const { controller, repos } = personController({ access, membershipStatus: "Guest" });
     repos.person.search = jest.fn(async () => searchRows);
     repos.person.searchEmail = jest.fn(async () => searchRows);
-    repos.person.convertAllToBasicModel = jest.fn((_c: string, rows: any[]) => rows.map((r) => ({ id: r.id, name: { display: r.displayName }, contactInfo: {}, photo: r.photo, membershipStatus: r.membershipStatus })));
-    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, rows: any[]) => rows);
+    repos.person.convertAllToBasicModel = jest.fn((_c: string, rows: PersonRow[]) => rows.map((r) => ({ id: r.id, name: { display: r.displayName }, contactInfo: {}, photo: r.photo, membershipStatus: r.membershipStatus })));
+    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, rows: PersonRow[]) => rows);
     return { controller, repos };
   }
 
   it("GET /search returns only id, name, photo and status for a View Names role, with opted-out people filtered", async () => {
     const { controller, repos } = searchController(["peopleViewNames"]);
-    const result: any = await (controller as any).search({ query: { term: "Donald" } }, {});
+    const result = (await controller.search(makeReq({ query: { term: "Donald" } }), res)) as Person[];
     expect(repos.person.search).toHaveBeenCalledWith("c1", "Donald", true);
     expect(result).toEqual([{ id: "p2", name: { display: "Donald Clark" }, contactInfo: {}, photo: "d.png", membershipStatus: "Visitor" }]);
     expect(JSON.stringify(result)).not.toMatch(/donald@x.org|birthDate|householdId|mobilePhone/);
@@ -787,22 +884,22 @@ describe("PersonController names-only search (View People Names Only)", () => {
 
   it("POST /search returns the same names-only result for a View Names role", async () => {
     const { controller, repos } = searchController(["peopleViewNames"]);
-    const result: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
+    const result = (await controller.searchPost(makeReq({ body: { term: "Donald" } }), res)) as Person[];
     expect(repos.person.search).toHaveBeenCalledWith("c1", "Donald", true);
     expect(result).toEqual([{ id: "p2", name: { display: "Donald Clark" }, contactInfo: {}, photo: "d.png", membershipStatus: "Visitor" }]);
   });
 
   it("does not allow email lookups with View Names only", async () => {
     const { controller, repos } = searchController(["peopleViewNames"]);
-    const result: any = await (controller as any).searchPost({ body: { email: "donald@x.org" } }, {});
+    const result = (await controller.searchPost(makeReq({ body: { email: "donald@x.org" } }), res)) as Person[];
     expect(result).toEqual([]);
     expect(repos.person.searchEmail).not.toHaveBeenCalled();
   });
 
   it("returns 401 from both search endpoints with neither View People nor View Names", async () => {
     const { controller, repos } = searchController([]);
-    const getResult: any = await (controller as any).search({ query: { term: "Donald" } }, {});
-    const postResult: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
+    const getResult = (await controller.search(makeReq({ query: { term: "Donald" } }), res)) as JsonOut;
+    const postResult = (await controller.searchPost(makeReq({ body: { term: "Donald" } }), res)) as JsonOut;
     expect(getResult.status).toBe(401);
     expect(postResult.status).toBe(401);
     expect(repos.person.search).not.toHaveBeenCalled();
@@ -811,9 +908,9 @@ describe("PersonController names-only search (View People Names Only)", () => {
   it("returns a visitor for a Member with View Names, because directory access would hide them", async () => {
     const { controller, repos } = personController({ access: ["peopleViewNames"], membershipStatus: "Member" });
     repos.person.search = jest.fn(async () => searchRows);
-    repos.person.convertAllToBasicModel = jest.fn((_c: string, rows: any[]) => rows.map((r) => ({ id: r.id, name: { display: r.displayName }, contactInfo: {}, photo: r.photo, membershipStatus: r.membershipStatus })));
-    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, rows: any[]) => rows);
-    const result: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
+    repos.person.convertAllToBasicModel = jest.fn((_c: string, rows: PersonRow[]) => rows.map((r) => ({ id: r.id, name: { display: r.displayName }, contactInfo: {}, photo: r.photo, membershipStatus: r.membershipStatus })));
+    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, rows: PersonRow[]) => rows);
+    const result = (await controller.searchPost(makeReq({ body: { term: "Donald" } }), res)) as Person[];
     expect(repos.person.convertAllToBasicModel).toHaveBeenCalled();
     expect(repos.person.convertAllToModelWithPermissions).not.toHaveBeenCalled();
     expect(result).toEqual([{ id: "p2", name: { display: "Donald Clark" }, contactInfo: {}, photo: "d.png", membershipStatus: "Visitor" }]);
@@ -821,7 +918,7 @@ describe("PersonController names-only search (View People Names Only)", () => {
 
   it("keeps the full View People result unchanged", async () => {
     const { controller, repos } = searchController(["peopleView"]);
-    const result: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
+    const result = (await controller.searchPost(makeReq({ body: { term: "Donald" } }), res)) as Person[];
     expect(repos.person.convertAllToModelWithPermissions).toHaveBeenCalled();
     expect(repos.person.convertAllToBasicModel).not.toHaveBeenCalled();
     expect(result[0].contactInfo.email).toBe("donald@x.org");
@@ -830,7 +927,7 @@ describe("PersonController names-only search (View People Names Only)", () => {
   it("GET /recent returns the names-only recent list for a View Names role", async () => {
     const { controller, repos } = searchController(["peopleViewNames"]);
     repos.person.loadRecent = jest.fn(async () => searchRows);
-    const result: any = await (controller as any).getRecent({ query: {} }, {});
+    const result = (await controller.getRecent(makeReq({ query: {} }), res)) as Person[];
     expect(repos.person.loadRecent).toHaveBeenCalledWith("c1", true);
     expect(result).toEqual([{ id: "p2", name: { display: "Donald Clark" }, contactInfo: {}, photo: "d.png", membershipStatus: "Visitor" }]);
     expect(repos.person.convertAllToModelWithPermissions).not.toHaveBeenCalled();
@@ -839,7 +936,7 @@ describe("PersonController names-only search (View People Names Only)", () => {
   it("GET /recent returns 401 with neither View People nor View Names", async () => {
     const { controller, repos } = searchController([]);
     repos.person.loadRecent = jest.fn(async () => searchRows);
-    const result: any = await (controller as any).getRecent({ query: {} }, {});
+    const result = (await controller.getRecent(makeReq({ query: {} }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.loadRecent).not.toHaveBeenCalled();
   });
@@ -853,16 +950,16 @@ describe("PersonController /ids names-only (issue 1308)", () => {
 
   function idsController(access: string[], membershipStatus = "Member") {
     const { controller, repos } = personController({ access, membershipStatus, rowsByIds: rows, personId: "me" });
-    repos.person.convertAllToBasicModel = jest.fn((_c: string, list: any[]) => list.map((r) => ({ id: r.id, name: { display: r.displayName }, photo: r.photo })));
-    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, list: any[]) => list);
+    repos.person.convertAllToBasicModel = jest.fn((_c: string, list: PersonRow[]) => list.map((r) => ({ id: r.id, name: { display: r.displayName }, photo: r.photo })));
+    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, list: PersonRow[]) => list);
     return { controller, repos };
   }
 
   it("returns id, name and photo for View Names, keeps visitors, and drops opted-out people", async () => {
     const { controller, repos } = idsController(["peopleViewNames"], "Member");
-    const result: any = await (controller as any).getMultiple({ query: { ids: "visitor,hidden" } }, {});
+    const result = (await controller.getMultiple(makeReq({ query: { ids: "visitor,hidden" } }), res)) as Person[];
     const passed = (repos.person.convertAllToBasicModel as jest.Mock).mock.calls[0][1];
-    expect(passed.map((p: any) => p.id)).toEqual(["visitor"]);
+    expect(passed.map((p: PersonRow) => p.id)).toEqual(["visitor"]);
     expect(repos.person.convertAllToModelWithPermissions).not.toHaveBeenCalled();
     expect(result).toEqual([{ id: "visitor", name: { display: "Zacchaeus Attendance" }, photo: "z.png" }]);
     expect(JSON.stringify(result)).not.toMatch(/email|birthDate|contactInfo|z@x.org/);
@@ -870,14 +967,14 @@ describe("PersonController /ids names-only (issue 1308)", () => {
 
   it("returns 401 with neither View People, View Names, nor directory access and does not load people", async () => {
     const { controller, repos } = idsController([], "Guest");
-    const result: any = await (controller as any).getMultiple({ query: { ids: "visitor" } }, {});
+    const result = (await controller.getMultiple(makeReq({ query: { ids: "visitor" } }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.person.loadByIds).not.toHaveBeenCalled();
   });
 
   it("keeps the full model for View People", async () => {
     const { controller, repos } = idsController(["peopleView"], "Guest");
-    const result: any = await (controller as any).getMultiple({ query: { ids: "visitor,hidden" } }, {});
+    const result = (await controller.getMultiple(makeReq({ query: { ids: "visitor,hidden" } }), res)) as Person[];
     expect(repos.person.convertAllToModelWithPermissions).toHaveBeenCalled();
     expect(repos.person.convertAllToBasicModel).not.toHaveBeenCalled();
     expect(result[0].contactInfo.email).toBe("z@x.org");
@@ -890,7 +987,7 @@ describe("PersonController.addFamilyMember", () => {
 
   it("creates the person in the caller's household with the role, title and phone", async () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: { last: "Clark" } }, settings: [] });
-    const result: any = await (controller as any).addFamilyMember({ body }, {});
+    const result = (await controller.addFamilyMember(makeReq({ body }), res)) as Person;
     expect(repos.person.save).toHaveBeenCalledTimes(1);
     expect(repos.person.save.mock.calls[0][0]).toMatchObject({ churchId: "c1", householdId: "h9", householdRole: "Child", name: { first: "Sam", last: "Clark", prefix: "Mr" }, contactInfo: { mobilePhone: "555-0102" } });
     expect(result.id).toBe("genP");
@@ -898,22 +995,22 @@ describe("PersonController.addFamilyMember", () => {
 
   it("falls back to Other and the caller's last name", async () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: { last: "Clark" } }, settings: [] });
-    await (controller as any).addFamilyMember({ body: { first: "Sam", householdRole: "Boss" } }, {});
+    await controller.addFamilyMember(makeReq({ body: { first: "Sam", householdRole: "Boss" } }), res);
     expect(repos.person.save.mock.calls[0][0]).toMatchObject({ householdRole: "Other", name: { first: "Sam", last: "Clark" } });
   });
 
   it("refuses when the church reviews directory changes", async () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: {} }, settings: [{ keyName: "directoryApprovalGroupId", value: "g1" }] });
-    const result: any = await (controller as any).addFamilyMember({ body }, {});
+    const result = (await controller.addFamilyMember(makeReq({ body }), res)) as JsonOut;
     expect(result.status).toBe(403);
     expect(repos.person.save).not.toHaveBeenCalled();
   });
 
   it("refuses a caller without editSelf, and a missing first name", async () => {
     const denied = personController({ access: [], person: { id: "p1", householdId: "h9", name: {} }, settings: [] });
-    expect((await (denied.controller as any).addFamilyMember({ body }, {})).status).toBe(401);
+    expect(((await denied.controller.addFamilyMember(makeReq({ body }), res)) as JsonOut).status).toBe(401);
     const blank = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: {} }, settings: [] });
-    expect((await (blank.controller as any).addFamilyMember({ body: { first: " " } }, {})).status).toBe(400);
+    expect(((await blank.controller.addFamilyMember(makeReq({ body: { first: " " } }), res)) as JsonOut).status).toBe(400);
     expect(blank.repos.person.save).not.toHaveBeenCalled();
   });
 });
@@ -937,26 +1034,26 @@ describe("PersonController opted-out people in staff lists", () => {
 
   it("GET /list includes an opted-out person for a View People caller who is not a server admin", async () => {
     const { controller } = listController(["peopleView"]);
-    const result: any[] = await (controller as any).getList({ query: {} }, {});
+    const result = (await controller.getList(makeReq({ query: {} }), res)) as Person[];
     expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
   });
 
   it("GET /recent includes an opted-out person for a View People caller who is not a server admin", async () => {
     const { controller } = listController(["peopleView"]);
-    const result: any[] = await (controller as any).getRecent({ query: {} }, {});
+    const result = (await controller.getRecent(makeReq({ query: {} }), res)) as Person[];
     expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
   });
 
   it("GET /search includes an opted-out person for a View People caller who is not a server admin", async () => {
     const { controller } = listController(["peopleView"]);
-    const result: any[] = await (controller as any).search({ query: { term: "Clark" } }, {});
+    const result = (await controller.search(makeReq({ query: { term: "Clark" } }), res)) as Person[];
     expect(result.map((p) => p.id)).toEqual(["p2", "p3"]);
   });
 
   it("still hides an opted-out person from a member browsing the directory", async () => {
     const { controller } = listController([], "Member");
-    const list: any[] = await (controller as any).getList({ query: {} }, {});
-    const recent: any[] = await (controller as any).getRecent({ query: {} }, {});
+    const list = (await controller.getList(makeReq({ query: {} }), res)) as Person[];
+    const recent = (await controller.getRecent(makeReq({ query: {} }), res)) as Person[];
     expect(list.map((p) => p.id)).toEqual(["p2"]);
     expect(recent.map((p) => p.id)).toEqual(["p2"]);
   });

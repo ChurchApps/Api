@@ -53,8 +53,8 @@ export function isAllowedSelfRegisteredRedirect(uri: unknown): boolean {
 }
 
 /** OAuth clients post form-encoded bodies; on Lambda those arrive as a raw string. */
-export function oauthBody<T = any>(req: express.Request): T {
-  const body: any = req.body;
+export function oauthBody<T = Record<string, unknown>>(req: express.Request): T {
+  const body: unknown = req.body;
   if (typeof body === "string") return Object.fromEntries(new URLSearchParams(body)) as T;
   return (body || {}) as T;
 }

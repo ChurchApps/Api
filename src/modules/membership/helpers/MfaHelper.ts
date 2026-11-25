@@ -18,7 +18,7 @@ export class MfaHelper {
 
   public static verifyLoginToken(token: string): string | null {
     try {
-      const decoded: any = jwt.verify(token || "", this.tokenSecret(), { algorithms: ["HS256"] });
+      const decoded = jwt.verify(token || "", this.tokenSecret(), { algorithms: ["HS256"] }) as jwt.JwtPayload;
       return decoded?.purpose === "mfa" && decoded.id ? decoded.id : null;
     } catch {
       return null;

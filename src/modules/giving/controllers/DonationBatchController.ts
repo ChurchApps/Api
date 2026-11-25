@@ -1,5 +1,6 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { DonationBatch } from "../models/index.js";
@@ -10,7 +11,7 @@ import { BatchAccessHelper } from "../helpers/BatchAccessHelper.js";
 export class DonationBatchController extends GivingBaseController {
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canSeeBatches(au)) return this.json({}, 401);
       const data = await this.repos.donationBatch.load(au.churchId, id);
@@ -22,7 +23,7 @@ export class DonationBatchController extends GivingBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canSeeBatches(au)) return this.json([], 401);
       const data = await this.repos.donationBatch.loadAll(au.churchId);
@@ -33,7 +34,7 @@ export class DonationBatchController extends GivingBaseController {
   }
 
   // Someone who enters donations has to be able to pick the batch they are entering into.
-  private canSeeBatches(au: any) {
+  private canSeeBatches(au: AuthenticatedUser) {
     return au.checkAccess(Permissions.donations.viewSummary) || au.checkAccess(Permissions.donations.enter);
   }
 
@@ -51,7 +52,7 @@ export class DonationBatchController extends GivingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, DonationBatch[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, DonationBatch[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!BatchAccessHelper.canEnter(au)) return this.json({}, 401);
       if (!au.checkAccess(Permissions.donations.edit)) {
@@ -68,7 +69,7 @@ export class DonationBatchController extends GivingBaseController {
 
   // Override delete to also remove batch donations
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       await this.repos.donationBatch.delete(au.churchId, id);
@@ -78,7 +79,7 @@ export class DonationBatchController extends GivingBaseController {
   }
 
   @httpPost("/:id/close")
-  public async close(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async close(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       return this.setStatus(au, id, "closed");
@@ -86,14 +87,14 @@ export class DonationBatchController extends GivingBaseController {
   }
 
   @httpPost("/:id/reopen")
-  public async reopen(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async reopen(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       return this.setStatus(au, id, "open");
     });
   }
 
-  private async setStatus(au: any, id: string, status: "open" | "closed") {
+  private async setStatus(au: AuthenticatedUser, id: string, status: "open" | "closed") {
     const data = await this.repos.donationBatch.load(au.churchId, id);
     if (!data) return this.json({}, 404);
     await this.repos.donationBatch.setStatus(au.churchId, id, status, au.id);

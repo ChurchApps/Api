@@ -21,6 +21,9 @@ export interface DoingModuleGateway {
   // Rich serving-reminder email bodies per person (positions, notes, Accept/Decline
   // token buttons) for the messaging reminder engine's immediate-email path.
   buildPlanReminderEmails(churchId: string, planId: string, personIds: string[], customMessage?: string): Promise<Record<string, { subject: string; html: string }>>;
+  // Leader gap alert: a plan's unfilled positions and unconfirmed people, as text and per-leader email.
+  loadPlanGapSummary(churchId: string, planId: string, planName: string): Promise<string | null>;
+  buildPlanGapEmails(churchId: string, planId: string, personIds: string[]): Promise<Record<string, { subject: string; html: string }>>;
   // Command palette catalog: names only.
   loadPalette(churchId: string): Promise<{ id: string; name: string }[]>;
 }
@@ -80,6 +83,17 @@ class DoingModuleGatewayDb implements DoingModuleGateway {
     // Dynamic import keeps the doing email/token deps out of this module's load graph.
     const { PlanReminderEmailHelper } = await import("../../modules/doing/helpers/PlanReminderEmailHelper.js");
     return PlanReminderEmailHelper.build(churchId, planId, personIds, customMessage);
+  }
+
+  public async loadPlanGapSummary(churchId: string, planId: string, planName: string) {
+    const { PlanGapHelper } = await import("../../modules/doing/helpers/PlanGapHelper.js");
+    const gaps = await PlanGapHelper.load(churchId, planId, await this.repos());
+    return PlanGapHelper.hasGaps(gaps) ? PlanGapHelper.summary(planName, gaps) : null;
+  }
+
+  public async buildPlanGapEmails(churchId: string, planId: string, personIds: string[]) {
+    const { PlanGapHelper } = await import("../../modules/doing/helpers/PlanGapHelper.js");
+    return PlanGapHelper.buildEmails(churchId, planId, personIds, await this.repos());
   }
 
   public async loadPalette(churchId: string) {

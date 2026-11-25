@@ -6,30 +6,38 @@ import { getDb } from "../../db/index.js";
 import { PlanRepo } from "../PlanRepo.js";
 
 function recordingDb() {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy = new Proxy<Record<string, unknown>>({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => [];
       if (prop === "executeTakeFirst") return async () => null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
 
+interface JoinRecorder { onRef: (...args: string[]) => JoinRecorder }
+type JoinCallback = (join: JoinRecorder) => unknown;
+interface WhereRecorder {
+  (...args: unknown[]): { cmp: unknown[] };
+  or: (items: unknown[]) => { or: unknown[] };
+}
+type WhereCallback = (eb: WhereRecorder) => unknown;
+
 // Records the join conditions a Kysely join callback builds.
-function recordJoin(callback: (join: any) => any) {
-  const ons: any[][] = [];
-  const join: any = { onRef: (...args: any[]) => { ons.push(args); return join; } };
+function recordJoin(callback: JoinCallback) {
+  const ons: string[][] = [];
+  const join: JoinRecorder = { onRef: (...args: string[]) => { ons.push(args); return join; } };
   callback(join);
   return ons;
 }
 
 // Evaluates a Kysely where callback into a plain tree of comparisons.
-const evalWhere = (callback: (eb: any) => any) => {
-  const eb: any = (...args: any[]) => ({ cmp: args });
-  eb.or = (items: any[]) => ({ or: items });
+const evalWhere = (callback: WhereCallback) => {
+  const eb = ((...args: unknown[]) => ({ cmp: args })) as WhereRecorder;
+  eb.or = (items: unknown[]) => ({ or: items });
   return callback(eb);
 };
 
@@ -44,9 +52,9 @@ describe("PlanRepo.loadSignupPlans", () => {
 
     const leftJoin = calls.find((c) => c.method === "leftJoin");
     expect(leftJoin?.args[0]).toBe("planTypes as pt");
-    expect(recordJoin(leftJoin!.args[1])).toEqual([["pt.id", "=", "p.planTypeId"], ["pt.churchId", "=", "p.churchId"]]);
+    expect(recordJoin(leftJoin?.args[1] as JoinCallback)).toEqual([["pt.id", "=", "p.planTypeId"], ["pt.churchId", "=", "p.churchId"]]);
 
-    const predicates = calls.filter((c) => c.method === "where" && typeof c.args[0] === "function").map((c) => evalWhere(c.args[0]));
+    const predicates = calls.filter((c) => c.method === "where" && typeof c.args[0] === "function").map((c) => evalWhere(c.args[0] as WhereCallback));
     expect(predicates).toContainEqual({ or: [{ cmp: ["p.planTypeId", "is", null] }, { cmp: ["pt.id", "is not", null] }] });
   });
 });

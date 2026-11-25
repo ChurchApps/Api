@@ -18,7 +18,7 @@ export class CuratedEventRepo {
       curatedCalendarId: model.curatedCalendarId,
       groupId: model.groupId,
       eventId: model.eventId
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -40,7 +40,7 @@ export class CuratedEventRepo {
   }
 
   public async loadAll(churchId: string): Promise<CuratedEvent[]> {
-    return getDb().selectFrom("curatedEvents").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("curatedEvents").selectAll().where("churchId", "=", churchId).execute();
   }
 
   public async deleteByEventId(churchId: string, curatedCalendarId: string, eventId: string) {
@@ -60,7 +60,7 @@ export class CuratedEventRepo {
   public async loadByCuratedCalendarId(churchId: string, curatedCalendarId: string) {
     return getDb().selectFrom("curatedEvents").selectAll()
       .where("churchId", "=", churchId)
-      .where("curatedCalendarId", "=", curatedCalendarId).execute() as any;
+      .where("curatedCalendarId", "=", curatedCalendarId).execute();
   }
 
   public async loadForEvents(curatedCalendarId: string, churchId: string, includePrivate = false) {
@@ -75,12 +75,13 @@ export class CuratedEventRepo {
         "ce.id",
         "ce.churchId",
         "ce.curatedCalendarId",
-        sql`ce.groupId`.as("curatedGroupId"),
+        sql<string>`ce.groupId`.as("curatedGroupId"),
         "ce.eventId",
-        sql`e.id`.as("realEventId"),
+        sql<string>`e.id`.as("realEventId"),
         "e.groupId",
         "e.title",
         "e.description",
+        "e.location",
         "e.start",
         "e.end",
         "e.allDay",
@@ -94,18 +95,18 @@ export class CuratedEventRepo {
     if (!includePrivate) query = query.where("e.visibility", "=", "public");
     const rows = await query.execute();
     // An event listed on its own and through its whole group comes back once, as the group row.
-    const byEvent = new Map<string, any>();
-    rows.forEach((row: any) => {
+    const byEvent = new Map<string, (typeof rows)[number]>();
+    rows.forEach((row) => {
       const current = byEvent.get(row.realEventId);
       if (!current || (current.eventId && !row.eventId)) byEvent.set(row.realEventId, row);
     });
-    return rows.filter((row: any) => byEvent.get(row.realEventId) === row);
+    return rows.filter((row) => byEvent.get(row.realEventId) === row);
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as CuratedEvent; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as CuratedEvent[]; }
+  public convertToModel(_churchId: string, data: CuratedEvent) { return data; }
+  public convertAllToModel(_churchId: string, data: CuratedEvent[]) { return data || []; }
 
-  protected rowToModel(row: any): CuratedEvent {
+  protected rowToModel(row: CuratedEvent): CuratedEvent {
     return {
       id: row.id,
       churchId: row.churchId,

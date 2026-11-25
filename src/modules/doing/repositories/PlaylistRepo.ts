@@ -1,7 +1,11 @@
 import { injectable } from "inversify";
 import { UniqueIdHelper } from "@churchapps/apihelper";
-import { Playlist } from "../models/index.js";
+import { Playlist, PlaylistItem } from "../models/index.js";
 import { getDb } from "../db/index.js";
+import type { DoingDatabase } from "../db/DatabaseTypes.js";
+
+// A playlists row (items as JSON text), or an already-saved model whose items are parsed.
+type PlaylistRow = DoingDatabase["playlists"] | Playlist;
 
 @injectable()
 export class PlaylistRepo {
@@ -33,27 +37,27 @@ export class PlaylistRepo {
     return getDb().selectFrom("playlists").selectAll().where("churchId", "=", churchId).orderBy("name").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: PlaylistRow) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: PlaylistRow[]) {
     return (data || []).map(row => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): Playlist {
+  protected rowToModel(row: PlaylistRow): Playlist {
     return {
       id: row.id,
       churchId: row.churchId,
       name: row.name,
-      items: PlaylistRepo.parseJson(row.items) || [],
+      items: PlaylistRepo.parseJson<PlaylistItem[]>(row.items) || [],
       updatedAt: row.updatedAt
     };
   }
 
-  public static parseJson(value: unknown) {
+  public static parseJson<T>(value: unknown): T | null {
     if (value === null || value === undefined) return null;
-    if (typeof value !== "string") return value as any;
+    if (typeof value !== "string") return value as T;
     try {
       return JSON.parse(value);
     } catch {

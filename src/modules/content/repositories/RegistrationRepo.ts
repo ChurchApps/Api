@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { Registration } from "../models/index.js";
 import { injectable } from "inversify";
+import type { MysqlWriteResult } from "./types.js";
 
 @injectable()
 export class RegistrationRepo {
@@ -12,48 +13,46 @@ export class RegistrationRepo {
 
   private async create(model: Registration): Promise<Registration> {
     model.id = UniqueIdHelper.shortId();
-    const m: any = { ...model };
-    if (m.registeredDate) m.registeredDate = DateHelper.toMysqlDate(m.registeredDate);
-    if (m.cancelledDate) m.cancelledDate = DateHelper.toMysqlDate(m.cancelledDate);
-    if (m.waitlistNotifiedDate) m.waitlistNotifiedDate = DateHelper.toMysqlDate(m.waitlistNotifiedDate);
+    const registeredDate = model.registeredDate ? DateHelper.toMysqlDate(model.registeredDate) : model.registeredDate;
+    const cancelledDate = model.cancelledDate ? DateHelper.toMysqlDate(model.cancelledDate) : model.cancelledDate;
+    const waitlistNotifiedDate = model.waitlistNotifiedDate ? DateHelper.toMysqlDate(model.waitlistNotifiedDate) : model.waitlistNotifiedDate;
     await getDb().insertInto("registrations").values({
       id: model.id,
       churchId: model.churchId,
-      eventId: m.eventId,
-      personId: m.personId,
-      householdId: m.householdId,
-      status: m.status,
-      formSubmissionId: m.formSubmissionId,
-      notes: m.notes,
-      registeredDate: m.registeredDate,
-      cancelledDate: m.cancelledDate,
-      totalAmount: m.totalAmount ?? null,
-      amountPaid: m.amountPaid ?? 0,
-      couponId: m.couponId ?? null,
-      waitlistNotifiedDate: m.waitlistNotifiedDate ?? null
-    } as any).execute();
+      eventId: model.eventId,
+      personId: model.personId,
+      householdId: model.householdId,
+      status: model.status,
+      formSubmissionId: model.formSubmissionId,
+      notes: model.notes,
+      registeredDate,
+      cancelledDate,
+      totalAmount: model.totalAmount ?? null,
+      amountPaid: model.amountPaid ?? 0,
+      couponId: model.couponId ?? null,
+      waitlistNotifiedDate: waitlistNotifiedDate ?? null
+    }).execute();
     return model;
   }
 
   private async update(model: Registration): Promise<Registration> {
-    const m: any = { ...model };
-    if (m.registeredDate) m.registeredDate = DateHelper.toMysqlDate(m.registeredDate);
-    if (m.cancelledDate) m.cancelledDate = DateHelper.toMysqlDate(m.cancelledDate);
-    if (m.waitlistNotifiedDate) m.waitlistNotifiedDate = DateHelper.toMysqlDate(m.waitlistNotifiedDate);
+    const registeredDate = model.registeredDate ? DateHelper.toMysqlDate(model.registeredDate) : model.registeredDate;
+    const cancelledDate = model.cancelledDate ? DateHelper.toMysqlDate(model.cancelledDate) : model.cancelledDate;
+    const waitlistNotifiedDate = model.waitlistNotifiedDate ? DateHelper.toMysqlDate(model.waitlistNotifiedDate) : model.waitlistNotifiedDate;
     await getDb().updateTable("registrations").set({
-      eventId: m.eventId,
-      personId: m.personId,
-      householdId: m.householdId,
-      status: m.status,
-      formSubmissionId: m.formSubmissionId,
-      notes: m.notes,
-      registeredDate: m.registeredDate,
-      cancelledDate: m.cancelledDate,
-      totalAmount: m.totalAmount ?? null,
-      amountPaid: m.amountPaid ?? 0,
-      couponId: m.couponId ?? null,
-      waitlistNotifiedDate: m.waitlistNotifiedDate ?? null
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+      eventId: model.eventId,
+      personId: model.personId,
+      householdId: model.householdId,
+      status: model.status,
+      formSubmissionId: model.formSubmissionId,
+      notes: model.notes,
+      registeredDate,
+      cancelledDate,
+      totalAmount: model.totalAmount ?? null,
+      amountPaid: model.amountPaid ?? 0,
+      couponId: model.couponId ?? null,
+      waitlistNotifiedDate: waitlistNotifiedDate ?? null
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -66,28 +65,51 @@ export class RegistrationRepo {
   }
 
   public async loadAll(churchId: string): Promise<Registration[]> {
-    return getDb().selectFrom("registrations").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("registrations").selectAll().where("churchId", "=", churchId).execute();
   }
 
   public async loadForEvent(churchId: string, eventId: string): Promise<Registration[]> {
     return getDb().selectFrom("registrations").selectAll()
       .where("churchId", "=", churchId)
       .where("eventId", "=", eventId)
-      .orderBy("registeredDate").execute() as any;
+      .orderBy("registeredDate").execute();
   }
 
   public async loadForPerson(churchId: string, personId: string): Promise<Registration[]> {
     return getDb().selectFrom("registrations").selectAll()
       .where("churchId", "=", churchId)
       .where("personId", "=", personId)
-      .orderBy("registeredDate", "desc").execute() as any;
+      .orderBy("registeredDate", "desc").execute();
   }
 
   public async loadForHousehold(churchId: string, householdId: string): Promise<Registration[]> {
     return getDb().selectFrom("registrations").selectAll()
       .where("churchId", "=", churchId)
       .where("householdId", "=", householdId)
-      .orderBy("registeredDate", "desc").execute() as any;
+      .orderBy("registeredDate", "desc").execute();
+  }
+
+  // Of the given people, those already on a non-cancelled registration for the event, as registrant or attendee.
+  public async loadRegisteredPersonIds(churchId: string, eventId: string, personIds: string[], excludeRegistrationId?: string): Promise<string[]> {
+    if (personIds.length === 0) return [];
+    let registrants = getDb().selectFrom("registrations").select("personId")
+      .where("churchId", "=", churchId)
+      .where("eventId", "=", eventId)
+      .where("status", "<>", "cancelled")
+      .where("personId", "in", personIds);
+    let attendees = getDb().selectFrom("registrationMembers as m")
+      .innerJoin("registrations as r", "r.id", "m.registrationId")
+      .select("m.personId")
+      .where("r.churchId", "=", churchId)
+      .where("r.eventId", "=", eventId)
+      .where("r.status", "<>", "cancelled")
+      .where("m.personId", "in", personIds);
+    if (excludeRegistrationId) {
+      registrants = registrants.where("id", "<>", excludeRegistrationId);
+      attendees = attendees.where("r.id", "<>", excludeRegistrationId);
+    }
+    const rows = [...await registrants.execute(), ...await attendees.execute()];
+    return [...new Set(rows.map((r) => r.personId).filter((id): id is string => !!id))];
   }
 
   public async countActiveForEvent(churchId: string, eventId: string): Promise<number> {
@@ -97,7 +119,7 @@ export class RegistrationRepo {
       .where("eventId", "=", eventId)
       .where("status", "in", ["pending", "confirmed"])
       .executeTakeFirst();
-    return (result as any)?.cnt || 0;
+    return result?.cnt || 0;
   }
 
   public async countActiveForCoupon(churchId: string, couponId: string): Promise<number> {
@@ -107,46 +129,66 @@ export class RegistrationRepo {
       .where("couponId", "=", couponId)
       .where("status", "in", ["pending", "confirmed"])
       .executeTakeFirst();
-    return (result as any)?.cnt || 0;
+    return result?.cnt || 0;
   }
 
   public async atomicInsertWithCapacityCheck(registration: Registration, capacity: number | null): Promise<boolean> {
-    const m: any = { ...registration };
-    if (!m.id) m.id = UniqueIdHelper.shortId();
-    if (m.registeredDate) m.registeredDate = DateHelper.toMysqlDate(m.registeredDate);
+    const id = registration.id || UniqueIdHelper.shortId();
+    const registeredDate = registration.registeredDate ? DateHelper.toMysqlDate(registration.registeredDate) : registration.registeredDate;
 
     const values = {
-      id: m.id,
-      churchId: m.churchId,
-      eventId: m.eventId,
-      personId: m.personId || null,
-      householdId: m.householdId || null,
-      status: m.status || "confirmed",
-      formSubmissionId: m.formSubmissionId || null,
-      notes: m.notes || null,
-      registeredDate: m.registeredDate || null,
-      cancelledDate: m.cancelledDate || null,
-      totalAmount: m.totalAmount ?? null,
-      amountPaid: m.amountPaid ?? 0,
-      couponId: m.couponId || null,
-      waitlistNotifiedDate: m.waitlistNotifiedDate || null
+      id,
+      churchId: registration.churchId,
+      eventId: registration.eventId,
+      personId: registration.personId || null,
+      householdId: registration.householdId || null,
+      status: registration.status || "confirmed",
+      formSubmissionId: registration.formSubmissionId || null,
+      notes: registration.notes || null,
+      registeredDate: registeredDate || null,
+      cancelledDate: registration.cancelledDate || null,
+      totalAmount: registration.totalAmount ?? null,
+      amountPaid: registration.amountPaid ?? 0,
+      couponId: registration.couponId || null,
+      waitlistNotifiedDate: registration.waitlistNotifiedDate || null
     };
 
     if (capacity === null || capacity === undefined) {
-      await getDb().insertInto("registrations").values(values as any).execute();
-      registration.id = m.id;
+      await getDb().insertInto("registrations").values(values).execute();
+      registration.id = id;
       return true;
     }
 
-    const result: any = await sql`INSERT INTO registrations (id, churchId, eventId, personId, householdId, status, formSubmissionId, notes, registeredDate, cancelledDate, totalAmount, amountPaid, couponId, waitlistNotifiedDate)
+    const result: MysqlWriteResult = await sql`INSERT INTO registrations (id, churchId, eventId, personId, householdId, status, formSubmissionId, notes, registeredDate, cancelledDate, totalAmount, amountPaid, couponId, waitlistNotifiedDate)
       SELECT ${values.id}, ${values.churchId}, ${values.eventId}, ${values.personId}, ${values.householdId}, ${values.status}, ${values.formSubmissionId}, ${values.notes}, ${values.registeredDate}, ${values.cancelledDate}, ${values.totalAmount}, ${values.amountPaid}, ${values.couponId}, ${values.waitlistNotifiedDate}
       FROM dual
       WHERE (SELECT COUNT(*) FROM registrations WHERE eventId=${values.eventId} AND churchId=${values.churchId} AND status IN ('pending','confirmed')) < ${capacity}`.execute(getDb());
     if (result?.numAffectedRows > 0n || result?.affectedRows > 0) {
-      registration.id = m.id;
+      registration.id = id;
       return true;
     }
     return false;
+  }
+
+  // Flips a cancelled registration back to active only while the event still has room.
+  public async restoreWithCapacityCheck(churchId: string, id: string, eventId: string, status: string, capacity: number | null): Promise<boolean> {
+    const cap = capacity === null || capacity === undefined ? Number.MAX_SAFE_INTEGER : capacity;
+    const result: MysqlWriteResult = await sql`UPDATE registrations SET status=${status}, cancelledDate=NULL
+      WHERE id=${id} AND churchId=${churchId} AND status='cancelled'
+      AND (SELECT cnt FROM (SELECT COUNT(*) AS cnt FROM registrations WHERE churchId=${churchId} AND eventId=${eventId} AND status IN ('pending','confirmed')) AS used) < ${cap}`.execute(getDb());
+    return result?.numAffectedRows > 0n || result?.affectedRows > 0;
+  }
+
+  // Compare-and-set so two payments or refunds recorded at once can't overwrite each other's amountPaid.
+  public async updatePaidIfUnchanged(churchId: string, id: string, expected: Pick<Registration, "amountPaid" | "status">, next: Pick<Registration, "amountPaid" | "status">): Promise<boolean> {
+    const result = await getDb().updateTable("registrations")
+      .set({ amountPaid: next.amountPaid, status: next.status })
+      .where("id", "=", id)
+      .where("churchId", "=", churchId)
+      .where("amountPaid", "=", Number(expected.amountPaid) || 0)
+      .where("status", "=", expected.status)
+      .executeTakeFirst();
+    return Number(result?.numUpdatedRows ?? 0) > 0;
   }
 
   public async promoteFromWaitlist(churchId: string, eventId: string, capacity: number | null, registrationId?: string): Promise<Registration | null> {
@@ -155,12 +197,12 @@ export class RegistrationRepo {
       .where("eventId", "=", eventId)
       .where("status", "=", "waitlisted");
     if (registrationId) query = query.where("id", "=", registrationId);
-    const candidate = await query.orderBy("registeredDate").limit(1).executeTakeFirst() as any;
+    const candidate = await query.orderBy("registeredDate").limit(1).executeTakeFirst();
     if (!candidate) return null;
 
     const cap = capacity === null || capacity === undefined ? Number.MAX_SAFE_INTEGER : capacity;
     const status = Number(candidate.totalAmount || 0) - Number(candidate.amountPaid || 0) > 0 ? "pending" : "confirmed";
-    const result: any = await sql`UPDATE registrations SET status=${status}, waitlistNotifiedDate=NOW()
+    const result: MysqlWriteResult = await sql`UPDATE registrations SET status=${status}, waitlistNotifiedDate=NOW()
       WHERE id=${candidate.id} AND churchId=${churchId} AND status='waitlisted'
       AND (SELECT cnt FROM (SELECT COUNT(*) AS cnt FROM registrations WHERE churchId=${churchId} AND eventId=${eventId} AND status IN ('pending','confirmed')) AS used) < ${cap}`.execute(getDb());
     if (result?.numAffectedRows > 0n || result?.affectedRows > 0) {
@@ -169,6 +211,6 @@ export class RegistrationRepo {
     return null;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Registration; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Registration[]; }
+  public convertToModel(_churchId: string, data: Registration) { return data; }
+  public convertAllToModel(_churchId: string, data: Registration[]) { return data || []; }
 }

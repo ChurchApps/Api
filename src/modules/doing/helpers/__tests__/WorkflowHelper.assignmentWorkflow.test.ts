@@ -10,11 +10,18 @@ jest.mock("../AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: {
 
 import { WorkflowHelper } from "../WorkflowHelper.js";
 import { statusFromError } from "../../../../shared/helpers/httpError.js";
+import type { Repos } from "../../repositories/Repos.js";
+
+// In-memory fakes return partial rows, so each repo method may resolve to a partial of what the real one returns.
+type Loose<R> = R extends (infer E)[] ? Partial<E>[] : R extends object ? Partial<R> : R;
+type FakeRepo<T> = { [K in keyof T]?: T[K] extends (...args: infer A) => Promise<infer R> ? (...args: A) => Promise<Loose<R>> : T[K] };
+type FakeRepos = { [K in keyof Repos]?: FakeRepo<Repos[K]> };
 
 // Production: 5 "Issue serving requests from a plan to use this workflow" 500s on /doing/tasks/addToWorkflow and
 // bulkAddToWorkflow. Asking to add people to a plan-driven workflow is a bad request, not a server failure.
 describe("WorkflowHelper with an assignment confirmation workflow", () => {
-  const repos: any = { workflow: { load: jest.fn(async () => ({ id: "wf1", workflowType: "assignmentConfirmation" })) } };
+  const fake: FakeRepos = { workflow: { load: jest.fn(async () => ({ id: "wf1", workflowType: "assignmentConfirmation" })) } };
+  const repos = fake as Repos;
 
   it("answers 400 from addToWorkflow", async () => {
     const error = await WorkflowHelper.addToWorkflow("c1", "wf1", { type: "person", id: "p1" }, undefined, undefined, repos).catch((e) => e);

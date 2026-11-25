@@ -2,8 +2,11 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
+import type { GatewayObject, NormalizedPaymentMethod } from "../../../shared/helpers/gateways/IGatewayProvider.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
-import { GatewayPaymentMethod } from "../models/index.js";
+import { AuthenticatedUser } from "@churchapps/apihelper";
+import { Customer, Gateway, GatewayPaymentMethod } from "../models/index.js";
+import { AchSetupIntentRequest, AddBankAccountRequest, AddCardRequest, BankChangeRequest, GatewayError, UpdateCardRequest } from "./types.js";
 import { DonationRateLimiter } from "../helpers/DonationRateLimiter.js";
 import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 
@@ -11,14 +14,14 @@ import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 export class PaymentMethodController extends GivingBaseController {
 
   @httpGet("/personid/:id")
-  public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view) && id !== au.personId) return this.json({}, 401);
 
-      const allGateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const allGateways: Gateway[] = await this.repos.gateway.loadAll(au.churchId);
       if (!allGateways?.length) return [];
 
-      const normalizedMethods: any[] = [];
+      const normalizedMethods: NormalizedPaymentMethod[] = [];
 
       for (const gw of allGateways) {
         const capabilities = GatewayService.getProviderCapabilities(gw);
@@ -41,7 +44,7 @@ export class PaymentMethodController extends GivingBaseController {
   }
 
   @httpPost("/addcard")
-  public async addCard(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async addCard(req: express.Request<{}, {}, AddCardRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // authz-exempt: anonymous guest giving has no au.churchId; body churchId is the only source, scoped to the gateway lookup below
       const { id, email, name, churchId, provider } = req.body;
@@ -82,17 +85,17 @@ export class PaymentMethodController extends GivingBaseController {
         try {
           customer = await GatewayService.createCustomer(gateway, email, name, { personId: vaultPersonId });
           if (customer) await saveCustomer(customer);
-        } catch (e: any) {
-          return this.json({ error: "Failed to create customer", details: e.message }, 500);
+        } catch (e) {
+          return this.json({ error: "Failed to create customer", details: (e as GatewayError).message }, 500);
         }
       }
 
       try {
-        let pm: any;
+        let pm: GatewayObject;
         try {
           pm = await GatewayService.attachPaymentMethod(gateway, id, GatewayService.buildAttachOptions(gateway, customer, id, req.body));
-        } catch (attachErr: any) {
-          const status = attachErr.response?.status || attachErr.statusCode;
+        } catch (attachErr) {
+          const status = (attachErr as GatewayError).response?.status || (attachErr as GatewayError).statusCode;
           if (status === 404 && GatewayService.recreatesMissingCustomers(gateway)) {
             console.log(`Customer ${customer} not found on ${gateway.provider}, recreating...`);
             const newCustomer = await GatewayService.createCustomer(gateway, email, name);
@@ -125,7 +128,8 @@ export class PaymentMethodController extends GivingBaseController {
         }
 
         return { paymentMethod: pm, customerId: customer };
-      } catch (e: any) {
+      } catch (err) {
+        const e = err as GatewayError;
         if (isGuest) await DonationRateLimiter.recordDecline(req);
         const mapped = GatewayService.mapGatewayError(gateway, e);
         if (mapped) return this.json(mapped.body, mapped.status);
@@ -140,7 +144,7 @@ export class PaymentMethodController extends GivingBaseController {
   }
 
   @httpPost("/updatecard")
-  public async updateCard(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async updateCard(req: express.Request<{}, {}, UpdateCardRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { personId, paymentMethodId, cardData, provider } = req.body;
       const gateway = await GatewayService.getGatewayForChurch(
@@ -152,7 +156,8 @@ export class PaymentMethodController extends GivingBaseController {
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
       try {
         return await GatewayService.updateCard(gateway, paymentMethodId, cardData);
-      } catch (e: any) {
+      } catch (err) {
+        const e = err as GatewayError;
         console.error("Error updating card:", e);
         const mapped = GatewayService.mapGatewayError(gateway, e);
         if (mapped) return this.json(mapped.body, mapped.status);
@@ -165,7 +170,7 @@ export class PaymentMethodController extends GivingBaseController {
   }
 
   @httpPost("/ach-setup-intent")
-  public async createACHSetupIntent(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async createACHSetupIntent(req: express.Request<{}, {}, AchSetupIntentRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // authz-exempt: gated to au.personId or donations.edit below; cId prefers au.churchId, body churchId only a fallback
       const { personId, customerId, email, name, churchId } = req.body;
@@ -197,9 +202,9 @@ export class PaymentMethodController extends GivingBaseController {
             if (customer) {
               await this.repos.customer.save({ id: customer, churchId: cId, personId, provider: gateway.provider });
             }
-          } catch (e: any) {
+          } catch (e) {
             console.error("Error creating customer:", e);
-            return this.json({ error: "Failed to create customer", details: e.message }, 500);
+            return this.json({ error: "Failed to create customer", details: (e as GatewayError).message }, 500);
           }
         }
       }
@@ -211,7 +216,8 @@ export class PaymentMethodController extends GivingBaseController {
           setupIntentId: setupIntent.id,
           customerId: customer
         };
-      } catch (e: any) {
+      } catch (err) {
+        const e = err as GatewayError;
         console.error("Error creating ACH SetupIntent:", e);
         return this.json({
           error: e.message || "Failed to create ACH SetupIntent",
@@ -222,7 +228,7 @@ export class PaymentMethodController extends GivingBaseController {
   }
 
   @httpPost("/ach-setup-intent-anon")
-  public async createACHSetupIntentAnon(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async createACHSetupIntentAnon(req: express.Request<{}, {}, AchSetupIntentRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public guest-donation flow; churchId required to resolve the public widget gateway
       const { email, name, churchId, gatewayId } = req.body;
@@ -257,7 +263,8 @@ export class PaymentMethodController extends GivingBaseController {
           setupIntentId: setupIntent.id,
           customerId: gatewayCustomerId
         };
-      } catch (e: any) {
+      } catch (err) {
+        const e = err as GatewayError;
         console.error("Error creating anonymous ACH SetupIntent:", e);
         return this.json({
           error: e.message || "Failed to create ACH SetupIntent",
@@ -268,7 +275,7 @@ export class PaymentMethodController extends GivingBaseController {
   }
 
   @httpPost("/addbankaccount")
-  public async addBankAccount(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async addBankAccount(req: express.Request<{}, {}, AddBankAccountRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name } = req.body;
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
@@ -286,15 +293,16 @@ export class PaymentMethodController extends GivingBaseController {
           if (customer) {
             await this.repos.customer.save({ id: customer, churchId: au.churchId, personId, provider: gateway.provider });
           }
-        } catch (e: any) {
+        } catch (e) {
           console.error("Error creating customer:", e);
-          return this.json({ error: "Failed to create customer", details: e.message }, 500);
+          return this.json({ error: "Failed to create customer", details: (e as GatewayError).message }, 500);
         }
       }
 
       try {
         return await GatewayService.createBankAccount(gateway, customer, { source: id });
-      } catch (e: any) {
+      } catch (err) {
+        const e = err as GatewayError;
         console.error("Error adding bank account:", e);
         if (e.type === "StripeInvalidRequestError" && e.code === "resource_missing") {
           return this.json({
@@ -311,7 +319,7 @@ export class PaymentMethodController extends GivingBaseController {
   }
 
   @httpPost("/updatebank")
-  public async updateBank(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async updateBank(req: express.Request<{}, {}, BankChangeRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, personId, bankData, customerId } = req.body;
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
@@ -319,16 +327,16 @@ export class PaymentMethodController extends GivingBaseController {
       if (!permission) return this.json({}, 401);
       try {
         return await GatewayService.updateBank(gateway, paymentMethodId, bankData, customerId);
-      } catch (e: any) {
+      } catch (e) {
         console.error("Update bank error", e);
         // clients read raw.message for the gateway's user-facing error; never echo the full exception
-        return { raw: { message: e?.raw?.message || "Failed to update bank account" } };
+        return { raw: { message: (e as GatewayError | null)?.raw?.message || "Failed to update bank account" } };
       }
     });
   }
 
   @httpPost("/verifybank")
-  public async verifyBank(req: express.Request<any>, res: express.Response): Promise<any> {
+  public async verifyBank(req: express.Request<{}, {}, BankChangeRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, customerId, amountData } = req.body;
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
@@ -337,24 +345,24 @@ export class PaymentMethodController extends GivingBaseController {
       else {
         try {
           return await GatewayService.verifyBank(gateway, paymentMethodId, amountData, customerId);
-        } catch (e: any) {
+        } catch (e) {
           console.error("Verify bank error", e);
-          return { raw: { message: e?.raw?.message || "Failed to verify bank account" } };
+          return { raw: { message: (e as GatewayError | null)?.raw?.message || "Failed to verify bank account" } };
         }
       }
     });
   }
 
   @httpDelete("/:id/:customerid")
-  public async deletePaymentMethod(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deletePaymentMethod(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const providerParam = (req.query as any).provider?.toLowerCase();
+      const providerParam = (req.query.provider as string | undefined)?.toLowerCase();
       let resolvedProvider = providerParam || GatewayService.inferProviderFromMethodId(id);
 
       if (!resolvedProvider) {
         const localRecord = await this.repos.gatewayPaymentMethod.loadByExternalIdAcrossGateways(au.churchId, id);
         if (localRecord) {
-          const gw = (await this.repos.gateway.loadAll(au.churchId) as any[]).find(g => g.id === localRecord.gatewayId);
+          const gw = (await this.repos.gateway.loadAll(au.churchId) as Gateway[]).find(g => g.id === localRecord.gatewayId);
           resolvedProvider = gw?.provider?.toLowerCase();
         }
       }
@@ -373,7 +381,7 @@ export class PaymentMethodController extends GivingBaseController {
           try {
             const customerData = await this.repos.customer.load(au.churchId, customerId);
             if (customerData) {
-              const customer = this.repos.customer.convertToModel(au.churchId, customerData as any);
+              const customer = this.repos.customer.convertToModel(au.churchId, customerData);
               // A non-admin must own the customer AND the payment method must belong to that
               // customer — otherwise a donor could delete another donor's PM by supplying their
               // own customerId (which passes the personId check) with the victim's PM id.
@@ -388,10 +396,23 @@ export class PaymentMethodController extends GivingBaseController {
       }
       if (!permission) return this.json({}, 401);
 
+      // If the lookup fails we can't tell, so the delete goes ahead as it always has.
+      const inUse = await GatewayService.activeSubscriptionIdsUsingMethod(gateway, id, customerId).catch((e): null => {
+        console.warn("[PM Delete] Could not check recurring gifts for payment method:", (e as Error)?.message || e);
+        return null;
+      });
+      if (inUse?.length) {
+        return this.json({
+          error: "This payment method is used by a recurring gift. Move the gift to another payment method, then delete this one.",
+          code: "payment_method_in_use"
+        }, 409);
+      }
+
       try {
         await GatewayService.deletePaymentMethod(gateway, id, customerId, this.repos);
         return this.json({});
-      } catch (e: any) {
+      } catch (err) {
+        const e = err as GatewayError | null;
         return this.json({
           error: e?.message || "Failed to delete payment method",
           code: e?.code || "unknown_error"
@@ -400,16 +421,16 @@ export class PaymentMethodController extends GivingBaseController {
     });
   }
 
-  private async ownsCustomer(au: any, customerId: string): Promise<boolean> {
+  private async ownsCustomer(au: AuthenticatedUser, customerId: string): Promise<boolean> {
     if (!au.personId) return false;
-    const customer: any = await this.repos.customer.load(au.churchId, customerId);
+    const customer: Customer | null = await this.repos.customer.load(au.churchId, customerId);
     return customer?.personId === au.personId;
   }
 
-  private async ownsPaymentMethod(au: any, gateway: any, paymentMethodId: string, customerId?: string): Promise<boolean> {
+  private async ownsPaymentMethod(au: AuthenticatedUser, gateway: Gateway, paymentMethodId: string, customerId?: string): Promise<boolean> {
     if (!au.personId || !paymentMethodId) return false;
     try {
-      let customer: any;
+      let customer: Customer | null;
       if (customerId) customer = await this.repos.customer.load(au.churchId, customerId);
       else customer = (await this.repos.customer.loadByPersonAndProvider(au.churchId, au.personId, gateway.provider)) || (await this.repos.customer.loadByPersonId(au.churchId, au.personId));
       if (!customer || customer.personId !== au.personId) return false;

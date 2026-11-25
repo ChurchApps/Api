@@ -10,7 +10,7 @@ export interface CouponValidation {
 // Pure pricing/discount math. Prices arrive from MySQL DECIMAL columns as strings,
 // so every amount is coerced with Number() before arithmetic.
 export class RegistrationPricingHelper {
-  static num(value: any): number {
+  static num(value: unknown): number {
     const n = Number(value);
     return isNaN(n) ? 0 : n;
   }
@@ -19,9 +19,9 @@ export class RegistrationPricingHelper {
     return Math.round(value * 100) / 100;
   }
 
-  static isValidQuantity(quantity: any): boolean {
+  static isValidQuantity(quantity: unknown): boolean {
     if (quantity === undefined || quantity === null) return true;
-    return Number.isInteger(quantity) && quantity >= 1;
+    return Number.isInteger(quantity) && (quantity as number) >= 1;
   }
 
   // Omitting attendee types must not turn a paid event into a free one.
@@ -50,6 +50,38 @@ export class RegistrationPricingHelper {
       if (s) total += this.num(s.price) * (c.quantity ?? 1);
     }
     return this.round(total);
+  }
+
+  // The per-attendee deposit for a type, or null when the type takes its full price at checkout.
+  static depositFor(type: RegistrationType): number | null {
+    if (type.depositAmount === undefined || type.depositAmount === null) return null;
+    const deposit = this.num(type.depositAmount);
+    if (deposit <= 0 || deposit >= this.num(type.price)) return null;
+    return deposit;
+  }
+
+  // Staff may leave the deposit empty; when set it must be above zero and no more than the price.
+  static isValidDeposit(type: RegistrationType): boolean {
+    const raw = type.depositAmount as unknown;
+    if (raw === undefined || raw === null || raw === "") return true;
+    const deposit = Number(raw);
+    return Number.isFinite(deposit) && deposit > 0 && deposit <= this.num(type.price);
+  }
+
+  // What checkout charges: each attendee's deposit where the type has one, full price for everything
+  // else (add-ons included), never more than the already-discounted total.
+  static computeDueNow(
+    types: RegistrationType[],
+    selections: RegistrationSelection[],
+    members: { registrationTypeId?: string }[],
+    choices: { selectionId?: string; quantity?: number }[],
+    total: number
+  ): number {
+    const depositPriced = types.map((t) => {
+      const deposit = this.depositFor(t);
+      return deposit === null ? t : { ...t, price: deposit };
+    });
+    return this.round(Math.min(total, this.computeTotal(depositPriced, selections, members, choices)));
   }
 
   static validateCoupon(coupon: RegistrationCoupon | null | undefined, memberCount: number, usesCount: number, now: Date = new Date()): CouponValidation {

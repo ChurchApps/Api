@@ -2,31 +2,77 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Assignment, Plan, Position, Time } from "../models/index.js";
-import { PlanAuth } from "../../../shared/helpers/index.js";
+import { Repos } from "../repositories/index.js";
+import { PlanAuth, Permissions } from "../../../shared/helpers/index.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { ReminderTokenHelper } from "../helpers/ReminderTokenHelper.js";
+import { cleanDeclineReason, formReason, redactDeclineReasons } from "../helpers/DeclineReason.js";
 import { SignupDeadlineHelper } from "../helpers/SignupDeadlineHelper.js";
+import { ServingFeedHelper } from "../helpers/ServingFeedHelper.js";
 
 @controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
   @httpGet("/my")
-  public async getMy(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.assignment.loadByByPersonId(au.churchId, au.personId);
     });
   }
 
   @httpGet("/my/upcoming")
-  public async getMyUpcoming(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMyUpcoming(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.assignment.loadUpcomingByPersonId(au.churchId, au.personId);
     });
   }
 
+  // The signed-in person's serving calendar link credentials; the client builds the webcal URL.
+  @httpGet("/my/calendar")
+  public async getMyCalendar(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return this.json({ error: "personId required" }, 400);
+      return await ServingFeedHelper.link(au.churchId, au.personId);
+    });
+  }
+
+  // "Reset link": a new nonce invalidates every link issued before it.
+  // authz-exempt: self-service; only ever resets the signed-in person's own link (au.personId)
+  @httpPost("/my/calendar/reset")
+  public async resetMyCalendar(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return this.json({ error: "personId required" }, 400);
+      return await ServingFeedHelper.link(au.churchId, au.personId, true);
+    });
+  }
+
+  // Personal serving ICS feed. The HMAC token from /my/calendar is the credential and is checked before any data loads.
+  @httpGet("/public/calendar")
+  public async calendarFeed(req: express.Request, res: express.Response): Promise<void> {
+    try {
+      // authz-exempt: churchId/personId are only trusted after the signed token verifies for exactly that pair
+      const result = await ServingFeedHelper.calendar(req.query.churchId, req.query.personId, req.query.token, await this.getRepos<Repos>());
+      if (!result) {
+        res.status(401).send("Invalid calendar link.");
+        return;
+      }
+      if (result.error || !result.value) {
+        console.error("[calendarFeed] ics failed:", result.error);
+        res.status(500).send("Error generating calendar.");
+        return;
+      }
+      res.set("Content-Type", "text/calendar");
+      res.set("Cache-Control", "private, max-age=900");
+      res.send(result.value);
+    } catch (e) {
+      console.error("[calendarFeed] failed:", e);
+      res.status(500).send("Error generating calendar.");
+    }
+  }
+
   @httpGet("/monthCounts")
-  public async getMonthCounts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMonthCounts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const dateString = typeof req.query.date === "string" ? req.query.date : "";
       const date = dateString ? new Date(dateString) : new Date();
@@ -34,31 +80,42 @@ export class AssignmentController extends DoingBaseController {
     });
   }
 
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  // Assign Position picker: when each team member last served and what else they serve that day.
+  @httpGet("/picker/:positionId")
+  public async getPickerContext(@requestParam("positionId") positionId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.assignment.load(au.churchId, id);
+      if (!await PlanAuth.canEditPosition(au, positionId)) return this.json({}, 401);
+      return await PlanHelper.loadPickerContext(au.churchId, positionId, this.repos);
+    });
+  }
+
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
+      if (!assignment) return assignment;
+      return redactDeclineReasons([assignment], au.personId, au.checkAccess(Permissions.plans.edit))[0];
     });
   }
 
   @httpGet("/plan/ids")
-  public async getByPlanIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByPlanIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const planIdsString = req.query.planIds as string;
       const planIds = planIdsString.split(",");
-      return await this.repos.assignment.loadByPlanIds(au.churchId, planIds);
+      return redactDeclineReasons(await this.repos.assignment.loadByPlanIds(au.churchId, planIds) as Assignment[], au.personId, au.checkAccess(Permissions.plans.edit));
     });
   }
 
   @httpGet("/plan/:planId")
-  public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.assignment.loadByPlanId(au.churchId, planId);
+      return redactDeclineReasons(await this.repos.assignment.loadByPlanId(au.churchId, planId) as Assignment[], au.personId, au.checkAccess(Permissions.plans.edit));
     });
   }
 
   @httpPost("/accept/:id")
-  public async accept(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async accept(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
       if (!assignment) return this.json({}, 404);
@@ -74,13 +131,14 @@ export class AssignmentController extends DoingBaseController {
   }
 
   @httpPost("/decline/:id")
-  public async decline(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async decline(@requestParam("id") id: string, req: express.Request<{}, {}, { declineReason?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
       if (!assignment) return this.json({}, 404);
       if (assignment.personId !== au.personId) throw new Error("Invalid Assignment");
       else {
         assignment.status = "Declined";
+        assignment.declineReason = cleanDeclineReason(req.body?.declineReason);
         const result = await this.repos.assignment.save(assignment);
         await InternalEventBus.publish(au.churchId, "assignment.updated", result);
         try {
@@ -116,7 +174,7 @@ export class AssignmentController extends DoingBaseController {
       const payload = ReminderTokenHelper.verify(req.query.token as string);
       if (!payload) { res.status(400).send(page("Link expired", "This link is no longer valid. Please open the app to respond.")); return; }
 
-      const repos = await this.getRepos<any>();
+      const repos = await this.getRepos<Repos>();
       const assignment = (await repos.assignment.load(payload.churchId, payload.assignmentId)) as Assignment;
       if (!assignment) { res.status(404).send(page("Not found", "We couldn't find that serving request.")); return; }
 
@@ -135,12 +193,16 @@ export class AssignmentController extends DoingBaseController {
       const target = payload.action === "accept" ? "Accepted" : "Declined";
       if (!apply && assignment.status !== target) {
         const label = target === "Accepted" ? "Accept" : "Decline";
-        const button = `<form method="post" action=""><button type="submit" style="background-color:#0288d1;border:0;border-radius:5px;color:white;cursor:pointer;font-size:16px;padding:10px 24px;">${label}</button></form>`;
+        const reasonField = target === "Declined"
+          ? `<label for="reason" style="display:block;margin-bottom:6px;color:#555;">Reason (optional)</label><input id="reason" name="reason" type="text" maxlength="255" style="box-sizing:border-box;width:100%;padding:10px;margin-bottom:16px;border:1px solid #ccc;border-radius:5px;font-size:16px;">`
+          : "";
+        const button = `<form method="post" action="">${reasonField}<button type="submit" style="background-color:#0288d1;border:0;border-radius:5px;color:white;cursor:pointer;font-size:16px;padding:10px 24px;">${label}</button></form>`;
         res.status(200).send(page(target === "Accepted" ? "Accept this serving request?" : "Decline this serving request?", "Tap the button below to confirm.", button));
         return;
       }
       if (assignment.status !== target) {
         assignment.status = target;
+        if (target === "Declined") assignment.declineReason = cleanDeclineReason(formReason(req.body));
         await repos.assignment.save(assignment);
         await InternalEventBus.publish(payload.churchId, "assignment.updated", assignment);
         if (target === "Declined") {
@@ -164,7 +226,7 @@ export class AssignmentController extends DoingBaseController {
   }
 
   @httpPost("/signup")
-  public async signup(req: express.Request<{}, {}, { positionId: string }>, res: express.Response): Promise<any> {
+  public async signup(req: express.Request<{}, {}, { positionId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { positionId } = req.body;
       if (!positionId) throw new Error("positionId is required");
@@ -198,7 +260,7 @@ export class AssignmentController extends DoingBaseController {
   }
 
   @httpDelete("/signup/:id")
-  public async signupRemove(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async signupRemove(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
       if (!assignment || assignment.personId !== au.personId) throw new Error("Invalid assignment");
@@ -219,7 +281,7 @@ export class AssignmentController extends DoingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Assignment[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Assignment[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       for (const assignment of req.body) {
         if (!await PlanAuth.canEditPosition(au, assignment.positionId)) return this.json({}, 401);
@@ -243,9 +305,9 @@ export class AssignmentController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const assignment: any = await this.repos.assignment.load(au.churchId, id);
+      const assignment: Assignment | null = await this.repos.assignment.load(au.churchId, id);
       if (!await PlanAuth.canEditPosition(au, assignment?.positionId)) return this.json({}, 401);
       await this.repos.assignment.delete(au.churchId, id);
       await InternalEventBus.publish(au.churchId, "assignment.destroyed", { id });

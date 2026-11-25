@@ -13,7 +13,7 @@ const db = buildDb();
 jest.mock("../../db/index", () => ({ getDb: () => db }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, DateHelper: { toMysqlDate: jest.fn() } }));
 
-import { AttendanceRepo } from "../AttendanceRepo";
+import { AttendanceRepo } from "../AttendanceRepo.js";
 
 const CHURCH_ID = "tst1171";
 const ST_ID = "tst1171st";
@@ -46,7 +46,7 @@ describe("AttendanceRepo.loadSessionStatus", () => {
   });
 
   it("returns every group at the service time with its session and attendance count for the date", async () => {
-    const rows: any[] = await new AttendanceRepo().loadSessionStatus(CHURCH_ID, ST_ID, "2026-09-27");
+    const rows = await new AttendanceRepo().loadSessionStatus(CHURCH_ID, ST_ID, "2026-09-27");
     const byGroup = Object.fromEntries(rows.map((r) => [r.groupId, r]));
     expect(Object.keys(byGroup).sort()).toEqual(["tst1171g1", "tst1171g2", "tst1171g3"]);
     expect(byGroup.tst1171g1.sessionId).toBe("tst1171s1");

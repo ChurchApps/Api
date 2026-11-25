@@ -12,76 +12,92 @@ export class EventRepo {
 
   private async create(model: Event): Promise<Event> {
     model.id = UniqueIdHelper.shortId();
-    const m: any = { ...model };
-    if (m.start) m.start = DateHelper.toMysqlDate(m.start);
-    if (m.end) m.end = DateHelper.toMysqlDate(m.end);
-    if (m.registrationOpenDate) m.registrationOpenDate = DateHelper.toMysqlDate(m.registrationOpenDate);
-    if (m.registrationCloseDate) m.registrationCloseDate = DateHelper.toMysqlDate(m.registrationCloseDate);
-    if (m.resolvedDate) m.resolvedDate = DateHelper.toMysqlDate(m.resolvedDate);
+    const start = model.start ? DateHelper.toMysqlDate(model.start) : model.start;
+    const end = model.end ? DateHelper.toMysqlDate(model.end) : model.end;
+    const registrationOpenDate = model.registrationOpenDate ? DateHelper.toMysqlDate(model.registrationOpenDate) : model.registrationOpenDate;
+    const registrationCloseDate = model.registrationCloseDate ? DateHelper.toMysqlDate(model.registrationCloseDate) : model.registrationCloseDate;
+    const resolvedDate = model.resolvedDate ? DateHelper.toMysqlDate(model.resolvedDate) : model.resolvedDate;
     await getDb().insertInto("events").values({
       id: model.id,
       churchId: model.churchId,
-      groupId: m.groupId,
-      allDay: m.allDay,
-      start: m.start,
-      end: m.end,
-      title: m.title,
-      description: m.description,
-      visibility: m.visibility,
-      recurrenceRule: m.recurrenceRule,
-      registrationEnabled: m.registrationEnabled,
-      capacity: m.capacity,
-      waitlistEnabled: m.waitlistEnabled,
-      registrationOpenDate: m.registrationOpenDate,
-      registrationCloseDate: m.registrationCloseDate,
-      tags: m.tags,
-      formId: m.formId,
-      approvalStatus: m.approvalStatus,
-      requestedBy: m.requestedBy,
-      resolvedBy: m.resolvedBy,
-      resolvedDate: m.resolvedDate,
-      rsvpDisabled: m.rsvpDisabled ?? false,
-      photoUrl: m.photoUrl,
-      notesViewRole: m.notesViewRole || null,
-      notesPostRole: m.notesPostRole || null
-    } as any).execute();
+      groupId: model.groupId,
+      allDay: model.allDay,
+      start,
+      end,
+      title: model.title,
+      description: model.description,
+      location: model.location || null,
+      visibility: model.visibility,
+      recurrenceRule: model.recurrenceRule,
+      registrationEnabled: model.registrationEnabled,
+      capacity: model.capacity,
+      waitlistEnabled: model.waitlistEnabled,
+      allowSelfCancel: model.allowSelfCancel ?? true,
+      allowPayLater: model.allowPayLater ?? false,
+      registrationOpenDate,
+      registrationCloseDate,
+      tags: model.tags,
+      formId: model.formId,
+      confirmationMessage: EventRepo.confirmationMessage(model) ?? null,
+      approvalStatus: model.approvalStatus,
+      requestedBy: model.requestedBy,
+      resolvedBy: model.resolvedBy,
+      resolvedDate,
+      rsvpDisabled: model.rsvpDisabled ?? false,
+      photoUrl: model.photoUrl,
+      notesViewRole: model.notesViewRole || null,
+      notesPostRole: model.notesPostRole || null
+    }).execute();
     return model;
   }
 
   private async update(model: Event): Promise<Event> {
-    const m: any = { ...model };
-    if (m.start) m.start = DateHelper.toMysqlDate(m.start);
-    if (m.end) m.end = DateHelper.toMysqlDate(m.end);
-    if (m.registrationOpenDate) m.registrationOpenDate = DateHelper.toMysqlDate(m.registrationOpenDate);
-    if (m.registrationCloseDate) m.registrationCloseDate = DateHelper.toMysqlDate(m.registrationCloseDate);
-    if (m.resolvedDate) m.resolvedDate = DateHelper.toMysqlDate(m.resolvedDate);
+    const start = model.start ? DateHelper.toMysqlDate(model.start) : model.start;
+    const end = model.end ? DateHelper.toMysqlDate(model.end) : model.end;
+    const registrationOpenDate = model.registrationOpenDate ? DateHelper.toMysqlDate(model.registrationOpenDate) : model.registrationOpenDate;
+    const registrationCloseDate = model.registrationCloseDate ? DateHelper.toMysqlDate(model.registrationCloseDate) : model.registrationCloseDate;
+    const resolvedDate = model.resolvedDate ? DateHelper.toMysqlDate(model.resolvedDate) : model.resolvedDate;
     await getDb().updateTable("events").set({
-      groupId: m.groupId,
-      allDay: m.allDay,
-      start: m.start,
-      end: m.end,
-      title: m.title,
-      description: m.description,
-      visibility: m.visibility,
-      recurrenceRule: m.recurrenceRule,
-      registrationEnabled: m.registrationEnabled,
-      capacity: m.capacity,
-      waitlistEnabled: m.waitlistEnabled,
-      registrationOpenDate: m.registrationOpenDate,
-      registrationCloseDate: m.registrationCloseDate,
-      tags: m.tags,
-      formId: m.formId,
-      approvalStatus: m.approvalStatus,
-      requestedBy: m.requestedBy,
-      resolvedBy: m.resolvedBy,
-      resolvedDate: m.resolvedDate,
+      groupId: model.groupId,
+      allDay: model.allDay,
+      start,
+      end,
+      title: model.title,
+      description: model.description,
+      // Undefined leaves the stored location alone, so a client that does not send the field keeps it.
+      location: model.location === undefined ? undefined : model.location || null,
+      visibility: model.visibility,
+      recurrenceRule: model.recurrenceRule,
+      registrationEnabled: model.registrationEnabled,
+      capacity: model.capacity,
+      waitlistEnabled: model.waitlistEnabled,
+      // Undefined (Kysely drops it) keeps the stored setting for clients that do not send these fields.
+      allowSelfCancel: model.allowSelfCancel,
+      allowPayLater: model.allowPayLater,
+      registrationOpenDate,
+      registrationCloseDate,
+      tags: model.tags,
+      formId: model.formId,
+      // Undefined leaves the stored message alone, so the calendar's event dialog (which never sends it) keeps it.
+      confirmationMessage: EventRepo.confirmationMessage(model),
+      approvalStatus: model.approvalStatus,
+      requestedBy: model.requestedBy,
+      resolvedBy: model.resolvedBy,
+      resolvedDate,
       // explicit false so un-disabling RSVP persists (Kysely drops undefined)
-      rsvpDisabled: m.rsvpDisabled ?? false,
-      photoUrl: m.photoUrl,
-      notesViewRole: m.notesViewRole || null,
-      notesPostRole: m.notesPostRole || null
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+      rsvpDisabled: model.rsvpDisabled ?? false,
+      photoUrl: model.photoUrl,
+      notesViewRole: model.notesViewRole || null,
+      notesPostRole: model.notesPostRole || null
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
+  }
+
+  // Blank clears the message; the column holds at most 2000 characters.
+  private static confirmationMessage(model: Event): string | null | undefined {
+    if (model.confirmationMessage === undefined) return undefined;
+    const message = (model.confirmationMessage || "").trim();
+    return message ? message.slice(0, 2000) : null;
   }
 
   public async delete(churchId: string, id: string) {
@@ -93,14 +109,14 @@ export class EventRepo {
   }
 
   public async loadAll(churchId: string): Promise<Event[]> {
-    return getDb().selectFrom("events").selectAll().where("churchId", "=", churchId).orderBy("start").execute() as any;
+    return getDb().selectFrom("events").selectAll().where("churchId", "=", churchId).orderBy("start").execute();
   }
 
   public async loadForGroup(churchId: string, groupId: string) {
     return getDb().selectFrom("events").selectAll()
       .where("groupId", "=", groupId)
       .where("churchId", "=", churchId)
-      .orderBy("start").execute() as any;
+      .orderBy("start").execute();
   }
 
   public async loadPublicForGroup(churchId: string, groupId: string) {
@@ -108,7 +124,7 @@ export class EventRepo {
       .where("groupId", "=", groupId)
       .where("churchId", "=", churchId)
       .where("visibility", "=", "public")
-      .orderBy("start").execute() as any;
+      .orderBy("start").execute();
   }
 
   public async loadByTag(churchId: string, tag: string): Promise<Event[]> {
@@ -117,7 +133,7 @@ export class EventRepo {
       .where("churchId", "=", churchId)
       .where("visibility", "=", "public")
       .where("tags", "like", "%" + escaped + "%")
-      .orderBy("start").execute() as any;
+      .orderBy("start").execute();
   }
 
   // CA-1: the caller's own event requests, newest first, for the "My requests" screen.
@@ -125,14 +141,14 @@ export class EventRepo {
     return getDb().selectFrom("events").selectAll()
       .where("churchId", "=", churchId)
       .where("requestedBy", "=", personId)
-      .orderBy("start", "desc").execute() as any;
+      .orderBy("start", "desc").execute();
   }
 
   public async loadPendingApproval(churchId: string): Promise<Event[]> {
     return getDb().selectFrom("events").selectAll()
       .where("churchId", "=", churchId)
       .where("approvalStatus", "=", "pending")
-      .orderBy("start").execute() as any;
+      .orderBy("start").execute();
   }
 
   // Approved and rejected event requests for the approvals history, newest first.
@@ -140,7 +156,7 @@ export class EventRepo {
     return getDb().selectFrom("events").selectAll()
       .where("churchId", "=", churchId)
       .where("approvalStatus", "in", ["approved", "rejected"])
-      .orderBy("start", "desc").execute() as any;
+      .orderBy("start", "desc").execute();
   }
 
   // Events with an approved booking for the room, for per-room iCal feeds.
@@ -151,14 +167,14 @@ export class EventRepo {
       .where("events.churchId", "=", churchId)
       .where("eventBookings.roomId", "=", roomId)
       .where("eventBookings.status", "=", "approved")
-      .orderBy("events.start").execute() as any;
+      .orderBy("events.start").execute();
   }
 
   public async loadRegistrationEnabled(churchId: string): Promise<Event[]> {
     return getDb().selectFrom("events").selectAll()
       .where("churchId", "=", churchId)
-      .where("registrationEnabled", "=", 1 as any)
-      .orderBy("start").execute() as any;
+      .where(sql.ref<number>("registrationEnabled"), "=", 1)
+      .orderBy("start").execute();
   }
 
   private timelineAccess(groupIds: string[]) {
@@ -204,10 +220,10 @@ export class EventRepo {
     return result.rows;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Event; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Event[]; }
+  public convertToModel(_churchId: string, data: Event) { return data; }
+  public convertAllToModel(_churchId: string, data: Event[]) { return data || []; }
 
-  protected rowToModel(row: any): Event {
+  protected rowToModel(row: Event): Event {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -217,15 +233,19 @@ export class EventRepo {
       end: row.end,
       title: row.title,
       description: row.description,
+      location: row.location,
       visibility: row.visibility,
       recurrenceRule: row.recurrenceRule,
       registrationEnabled: row.registrationEnabled,
       capacity: row.capacity,
       waitlistEnabled: row.waitlistEnabled,
+      allowSelfCancel: row.allowSelfCancel,
+      allowPayLater: row.allowPayLater,
       registrationOpenDate: row.registrationOpenDate,
       registrationCloseDate: row.registrationCloseDate,
       tags: row.tags,
       formId: row.formId,
+      confirmationMessage: row.confirmationMessage,
       approvalStatus: row.approvalStatus,
       requestedBy: row.requestedBy,
       resolvedBy: row.resolvedBy,

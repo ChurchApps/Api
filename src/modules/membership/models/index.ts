@@ -35,7 +35,7 @@ export * from "./responses.js";
 export { Answer } from "./Answer.js";
 export { Form } from "./Form.js";
 export { FormSubmission } from "./FormSubmission.js";
-export { Question } from "./Question.js";
+export { Question, type QuestionCondition } from "./Question.js";
 export { Setting } from "./Setting.js";
 
 export { ClientError } from "./ClientError.js";

@@ -861,6 +861,28 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-24_person_disable_private_messages": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "people",
+     "column": "disablePrivateMessages",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-11-23_question_show_if": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "questions",
+     "column": "showIf",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {
@@ -1695,6 +1717,51 @@
     }
    ],
    "schemaChanges": 2
+  },
+  "2026-11-23_event_location": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "location",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-11-24_event_confirmation_message": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "confirmationMessage",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-11-24_registration_payment_options": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "allowSelfCancel",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "allowPayLater",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "registrationTypes",
+     "column": "depositAmount",
+     "present": true
+    }
+   ],
+   "schemaChanges": 3
   }
  },
  "giving": {
@@ -1849,6 +1916,17 @@
      "kind": "column",
      "table": "donations",
      "column": "memo",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-11-23_fund_description": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "funds",
+     "column": "description",
      "present": true
     }
    ],
@@ -2563,6 +2641,17 @@
      "kind": "column",
      "table": "workflowSteps",
      "column": "instructions",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-11-24_assignment_decline_reason": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "assignments",
+     "column": "declineReason",
      "present": true
     }
    ],

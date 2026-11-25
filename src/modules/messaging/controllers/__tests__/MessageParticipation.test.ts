@@ -9,41 +9,61 @@ jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConvers
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { checkShouldNotify: jest.fn() } }));
 jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, tasks: { view: "tasksView" }, chat: { host: "chatHost" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
 // The post gate reads the group's per-feed toggles through the membership gateway (lazy import in the controller).
-const mockLoadGroup = jest.fn(async () => ({ id: "g1" }) as any);
-jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadGroup: (...args: any[]) => mockLoadGroup(...(args as [])) }) }));
+type GroupRow = { id: string; discussionsEnabled?: boolean; announcementsEnabled?: boolean };
+const mockLoadGroup = jest.fn(async (..._args: [string, string]): Promise<GroupRow | null> => ({ id: "g1" }));
+jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadGroup: (...args: [string, string]) => mockLoadGroup(...args) }) }));
 // workflowCard notes check the card through the doing gateway (lazy import in the controller).
-const mockLoadTask = jest.fn(async () => null as any);
-jest.mock("../../../../shared/modules/DoingModuleGateway.js", () => ({ getDoingModuleGateway: () => ({ loadTask: (...args: any[]) => mockLoadTask(...(args as [])) }) }));
+type TaskRow = { id: string; assignedToType: string; assignedToId: string; createdByType?: string; createdById?: string };
+const mockLoadTask = jest.fn(async (..._args: [string, string]): Promise<TaskRow | null> => null);
+jest.mock("../../../../shared/modules/DoingModuleGateway.js", () => ({ getDoingModuleGateway: () => ({ loadTask: (...args: [string, string]) => mockLoadTask(...args) }) }));
 
+import express from "express";
 import { MessageController } from "../MessageController.js";
 import { ConversationController } from "../ConversationController.js";
 import { DeliveryHelper } from "../../helpers/DeliveryHelper.js";
+import { Conversation, Message, MessageReaction, PrivateMessage } from "../../models/index.js";
+
+interface ControllerOpts {
+  conversation?: Conversation | null;
+  message?: Message;
+  privateMessage?: PrivateMessage;
+  privateMessageByConversation?: PrivateMessage;
+  personId?: string;
+  churchId?: string;
+  groupIds?: string[];
+  leaderGroupIds?: string[];
+  access?: string[];
+}
+
+type JsonResult = { obj?: unknown; status?: number; added?: boolean };
+type StartBody = { groupId: string; contentType: string; contentId: string; title: string; comment: string };
+const emptyRes = {} as express.Response;
 
 const sendMock = DeliveryHelper.sendConversationMessages as jest.Mock;
 
-const groupConv = { id: "grp1", churchId: "c1", contentType: "group", contentId: "g1", allowAnonymousPosts: false, visibility: "public" };
-const announceConv = { id: "ann1", churchId: "c1", contentType: "groupAnnouncement", contentId: "g1", allowAnonymousPosts: false, visibility: "public" };
-const dmConv = { id: "dm1", churchId: "c1", contentType: "privateMessage", contentId: "pm1", allowAnonymousPosts: false, visibility: "hidden" };
-const publicLive = { id: "live1", churchId: "c1", contentType: "streamingLive", contentId: "svc1", allowAnonymousPosts: true, visibility: "public" };
-const hostConv = { id: "host1", churchId: "c1", contentType: "streamingLiveHost", contentId: "svc1", allowAnonymousPosts: false, visibility: "public" };
+const groupConv: Conversation = { id: "grp1", churchId: "c1", contentType: "group", contentId: "g1", allowAnonymousPosts: false, visibility: "public" };
+const announceConv: Conversation = { id: "ann1", churchId: "c1", contentType: "groupAnnouncement", contentId: "g1", allowAnonymousPosts: false, visibility: "public" };
+const dmConv: Conversation = { id: "dm1", churchId: "c1", contentType: "privateMessage", contentId: "pm1", allowAnonymousPosts: false, visibility: "hidden" };
+const publicLive: Conversation = { id: "live1", churchId: "c1", contentType: "streamingLive", contentId: "svc1", allowAnonymousPosts: true, visibility: "public" };
+const hostConv: Conversation = { id: "host1", churchId: "c1", contentType: "streamingLiveHost", contentId: "svc1", allowAnonymousPosts: false, visibility: "public" };
 
-function makeController(opts: any = {}) {
-  const repos: any = {
+function makeController(opts: ControllerOpts = {}) {
+  const repos = {
     conversation: {
       loadById: jest.fn(async () => opts.conversation ?? null),
-      convertToModel: (c: any) => c,
-      updateStats: jest.fn(async () => undefined)
+      convertToModel: (c: Conversation) => c,
+      updateStats: jest.fn(async (): Promise<void> => undefined)
     },
     message: {
       loadById: jest.fn(async () => opts.message ?? { id: "m1", conversationId: opts.conversation?.id, personId: "p2" }),
-      save: jest.fn(async (m: any) => ({ ...m, id: m.id ?? "mNew" })),
-      convertAllToModel: (rows: any[]) => rows
+      save: jest.fn(async (m: Message) => ({ ...m, id: m.id ?? "mNew" })),
+      convertAllToModel: (rows: Message[]) => rows
     },
     privateMessage: { loadById: jest.fn(async () => opts.privateMessage ?? null), loadByConversationId: jest.fn(async () => opts.privateMessageByConversation ?? null) },
     messageReaction: {
-      loadOne: jest.fn(async () => null),
-      create: jest.fn(async (m: any) => ({ ...m, id: "rx1" })),
-      delete: jest.fn(async () => undefined)
+      loadOne: jest.fn(async (): Promise<MessageReaction | null> => null),
+      create: jest.fn(async (m: MessageReaction) => ({ ...m, id: "rx1" })),
+      delete: jest.fn(async (): Promise<void> => undefined)
     }
   };
   const au = {
@@ -54,21 +74,23 @@ function makeController(opts: any = {}) {
     lastName: "User",
     groupIds: opts.groupIds ?? [],
     leaderGroupIds: opts.leaderGroupIds ?? [],
-    checkAccess: (perm: any) => (opts.access ?? []).includes(perm)
+    checkAccess: (perm: string) => (opts.access ?? []).includes(perm)
   };
   const controller = new MessageController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, repos };
 }
 
-const post = (controller: any, conversationId: string) => controller.save({ body: [{ conversationId, content: "hi" }] }, {});
+const post = async (controller: MessageController, conversationId: string) => (await controller.save({ body: [{ conversationId, content: "hi" }] } as express.Request<{}, {}, Message[]>, emptyRes)) as JsonResult;
 
 beforeEach(() => {
   sendMock.mockReset();
   mockLoadGroup.mockReset();
-  mockLoadGroup.mockImplementation(async () => ({ id: "g1" }) as any);
+  mockLoadGroup.mockImplementation(async () => ({ id: "g1" }));
   mockLoadTask.mockReset();
 });
 
@@ -134,13 +156,13 @@ describe("MessageController.save participation gate", () => {
       groupIds: ["other"],
       message: { id: "m1", conversationId: "grp1", personId: "p1" }
     });
-    await (controller as any).save({ body: [{ id: "m1", conversationId: "grp1", content: "edited" }] }, {});
+    await controller.save({ body: [{ id: "m1", conversationId: "grp1", content: "edited" }] } as express.Request<{}, {}, Message[]>, emptyRes);
     expect(repos.message.save).toHaveBeenCalledWith(expect.objectContaining({ id: "m1", personId: "p1", content: "edited" }));
   });
 });
 
 describe("MessageController.save group feed toggles", () => {
-  const react = (controller: any) => controller.toggleReaction("m1", { body: { emoji: "👍" } }, {});
+  const react = async (controller: MessageController) => (await controller.toggleReaction("m1", { body: { emoji: "👍" } } as express.Request<{}, {}, { emoji: string }>, emptyRes)) as JsonResult;
 
   it("401s a non-leader member posting an announcement, allows a leader", async () => {
     const member = makeController({ conversation: announceConv, groupIds: ["g1"] });
@@ -153,7 +175,7 @@ describe("MessageController.save group feed toggles", () => {
   });
 
   it("401s a member posting to discussions when the group has discussions turned off", async () => {
-    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false }) as any);
+    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false }));
     const { controller, repos } = makeController({ conversation: groupConv, groupIds: ["g1"], leaderGroupIds: ["g1"] });
     expect((await post(controller, "grp1")).status).toBe(401);
     expect(repos.message.save).not.toHaveBeenCalled();
@@ -161,19 +183,19 @@ describe("MessageController.save group feed toggles", () => {
   });
 
   it("401s a leader posting an announcement when the group has announcements turned off", async () => {
-    mockLoadGroup.mockImplementation(async () => ({ id: "g1", announcementsEnabled: false }) as any);
+    mockLoadGroup.mockImplementation(async () => ({ id: "g1", announcementsEnabled: false }));
     const { controller, repos } = makeController({ conversation: announceConv, groupIds: ["g1"], leaderGroupIds: ["g1"] });
     expect((await post(controller, "ann1")).status).toBe(401);
     expect(repos.message.save).not.toHaveBeenCalled();
   });
 
   it("still allows discussions when only announcements are off, and vice versa", async () => {
-    mockLoadGroup.mockImplementation(async () => ({ id: "g1", announcementsEnabled: false }) as any);
+    mockLoadGroup.mockImplementation(async () => ({ id: "g1", announcementsEnabled: false }));
     const disc = makeController({ conversation: groupConv, groupIds: ["g1"] });
     await post(disc.controller, "grp1");
     expect(disc.repos.message.save).toHaveBeenCalled();
 
-    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false }) as any);
+    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false }));
     const ann = makeController({ conversation: announceConv, groupIds: ["g1"], leaderGroupIds: ["g1"] });
     await post(ann.controller, "ann1");
     expect(ann.repos.message.save).toHaveBeenCalled();
@@ -187,14 +209,14 @@ describe("MessageController.save group feed toggles", () => {
   });
 
   it("lets content.edit staff post regardless of the toggles", async () => {
-    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false, announcementsEnabled: false }) as any);
+    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false, announcementsEnabled: false }));
     const { controller, repos } = makeController({ conversation: announceConv, access: ["contentEdit"] });
     await post(controller, "ann1");
     expect(repos.message.save).toHaveBeenCalled();
   });
 
   it("still lets a member react in a feed they cannot post to", async () => {
-    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false }) as any);
+    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false }));
     const disc = makeController({ conversation: groupConv, groupIds: ["g1"], message: { id: "m1", conversationId: "grp1", personId: "p2" } });
     expect((await react(disc.controller)).added).toBe(true);
     expect(disc.repos.messageReaction.create).toHaveBeenCalled();
@@ -206,15 +228,15 @@ describe("MessageController.save group feed toggles", () => {
 });
 
 describe("ConversationController seeding group feeds", () => {
-  function makeConversationController(opts: any = {}) {
-    const repos: any = {
+  function makeConversationController(opts: ControllerOpts = {}) {
+    const repos = {
       conversation: {
-        save: jest.fn(async (c: any) => ({ ...c, id: c.id || "new1" })),
-        updateStats: jest.fn(async () => undefined),
-        convertToModel: (c: any) => c,
-        convertAllToModel: (rows: any[]) => rows
+        save: jest.fn(async (c: Conversation) => ({ ...c, id: c.id || "new1" })),
+        updateStats: jest.fn(async (): Promise<void> => undefined),
+        convertToModel: (c: Conversation) => c,
+        convertAllToModel: (rows: Conversation[]) => rows
       },
-      message: { save: jest.fn(async (m: any) => ({ ...m, id: "mNew" })) }
+      message: { save: jest.fn(async (m: Message) => ({ ...m, id: "mNew" })) }
     };
     const au = {
       id: "u1",
@@ -224,16 +246,18 @@ describe("ConversationController seeding group feeds", () => {
       lastName: "User",
       groupIds: opts.groupIds ?? [],
       leaderGroupIds: opts.leaderGroupIds ?? [],
-      checkAccess: (perm: any) => (opts.access ?? []).includes(perm)
+      checkAccess: (perm: string) => (opts.access ?? []).includes(perm)
     };
     const controller = new ConversationController();
-    (controller as any).repos = repos;
-    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-    (controller as any).json = (obj: any, status: number) => ({ obj, status });
+    Object.assign(controller, {
+      repos,
+      actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+      json: (obj: unknown, status: number) => ({ obj, status })
+    });
     return { controller, repos };
   }
-  const seed = (controller: any, contentType: string) => controller.save({ body: [{ contentType, contentId: "g1", groupId: "g1", title: "t", visibility: "hidden" }] }, {});
-  const start = (controller: any, contentType: string) => controller.start({ body: { contentType, contentId: "g1", groupId: "g1", title: "t", comment: "hi" } }, {});
+  const seed = async (controller: ConversationController, contentType: string) => (await controller.save({ body: [{ contentType, contentId: "g1", groupId: "g1", title: "t", visibility: "hidden" }] } as express.Request<{}, {}, Conversation[]>, emptyRes)) as JsonResult;
+  const start = async (controller: ConversationController, contentType: string) => (await controller.start({ body: { contentType, contentId: "g1", groupId: "g1", title: "t", comment: "hi" } } as express.Request<{}, {}, StartBody>, emptyRes)) as JsonResult;
 
   it("401s a non-leader member creating the announcement conversation", async () => {
     const { controller, repos } = makeConversationController({ groupIds: ["g1"] });
@@ -243,7 +267,7 @@ describe("ConversationController seeding group feeds", () => {
   });
 
   it("401s a member creating the discussion conversation when discussions are off", async () => {
-    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false }) as any);
+    mockLoadGroup.mockImplementation(async () => ({ id: "g1", discussionsEnabled: false }));
     const { controller, repos } = makeConversationController({ groupIds: ["g1"] });
     expect((await seed(controller, "group")).status).toBe(401);
     expect((await start(controller, "group")).status).toBe(401);
@@ -252,7 +276,7 @@ describe("ConversationController seeding group feeds", () => {
 
   it("401s a signed-out caller creating any conversation", async () => {
     const { controller, repos } = makeConversationController({ churchId: "" });
-    const res = await controller.save({ body: [{ contentType: "privateMessage", contentId: "x", title: "anon" }] }, {});
+    const res = (await controller.save({ body: [{ contentType: "privateMessage", contentId: "x", title: "anon" }] } as express.Request<{}, {}, Conversation[]>, emptyRes)) as JsonResult;
     expect(res.status).toBe(401);
     expect(repos.conversation.save).not.toHaveBeenCalled();
   });
@@ -276,7 +300,7 @@ describe("ConversationController seeding group feeds", () => {
 });
 
 describe("MessageController.save workflowCard notes", () => {
-  const cardConv = { id: "card1", churchId: "c1", contentType: "workflowCard", contentId: "t1", allowAnonymousPosts: false, visibility: "hidden" };
+  const cardConv: Conversation = { id: "card1", churchId: "c1", contentType: "workflowCard", contentId: "t1", allowAnonymousPosts: false, visibility: "hidden" };
 
   it("lets the person the card is assigned to post without content.edit", async () => {
     mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "person", assignedToId: "p1" }));
@@ -315,7 +339,7 @@ describe("MessageController.save workflowCard notes", () => {
 });
 
 describe("MessageController.save task notes", () => {
-  const taskConv = { id: "task1", churchId: "c1", contentType: "task", contentId: "t1", allowAnonymousPosts: false, visibility: "hidden" };
+  const taskConv: Conversation = { id: "task1", churchId: "c1", contentType: "task", contentId: "t1", allowAnonymousPosts: false, visibility: "hidden" };
 
   it("lets the assignee post without content.edit", async () => {
     mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "person", assignedToId: "p1" }));

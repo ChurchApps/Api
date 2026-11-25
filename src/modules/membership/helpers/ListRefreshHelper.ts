@@ -45,7 +45,7 @@ export class ListRefreshHelper {
 
   private static async runActions(repos: Repos, list: List, addedIds: string[]) {
     if (!list.actions || list.actions.length === 0) return;
-    const people = (await repos.person.loadByIds(list.churchId, addedIds)) as any[];
+    const people = await repos.person.loadByIds(list.churchId, addedIds);
     for (const action of list.actions) {
       for (const person of people) {
         try {
@@ -69,9 +69,9 @@ export class ListRefreshHelper {
 
   private static async notifyCreator(repos: Repos, list: List, addedIds: string[], removedIds: string[]) {
     if (!list.createdByPersonId) return;
-    const creator: any = await repos.person.load(list.churchId, list.createdByPersonId);
+    const creator = await repos.person.load(list.churchId, list.createdByPersonId);
     if (!creator?.email) return;
-    const church: any = await repos.church.loadById(list.churchId).catch((): null => null);
+    const church = await repos.church.loadById(list.churchId).catch((): null => null);
     const subject = `List "${list.name}" membership changed`;
     const added = await this.getNamesHtml(repos, list.churchId, "Added", addedIds);
     const removed = await this.getNamesHtml(repos, list.churchId, "Removed", removedIds);
@@ -85,7 +85,7 @@ export class ListRefreshHelper {
 
   public static async getNamesHtml(repos: Repos, churchId: string, heading: string, personIds: string[]) {
     if (personIds.length === 0) return "";
-    const people = (await repos.person.loadByIds(churchId, personIds.slice(0, this.maxNames))) as any[];
+    const people = await repos.person.loadByIds(churchId, personIds.slice(0, this.maxNames));
     const items = people.map((p) => `<li>${UserHelper.escapeHtml(p.displayName || [p.firstName, p.lastName].filter(Boolean).join(" "))}</li>`).join("");
     const more = personIds.length > this.maxNames ? `<p>And ${personIds.length - this.maxNames} more.</p>` : "";
     return `<h3>${heading}</h3><ul>${items}</ul>${more}`;

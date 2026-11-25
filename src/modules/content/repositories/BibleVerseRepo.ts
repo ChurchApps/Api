@@ -17,7 +17,7 @@ export class BibleVerseRepo {
       chapterKey: model.chapterKey,
       keyName: model.keyName,
       number: model.number
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -39,11 +39,11 @@ export class BibleVerseRepo {
     return (await getDb().selectFrom("bibleVerses").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public async loadByChapter(translationKey: string, chapterKey: string) {
+  public async loadByChapter(translationKey: string, chapterKey: string): Promise<BibleVerse[]> {
     return getDb().selectFrom("bibleVerses").selectAll()
       .where("translationKey", "=", translationKey)
       .where("chapterKey", "=", chapterKey)
-      .orderBy("number").execute() as any;
+      .orderBy("number").execute();
   }
 
   public async saveAll(models: BibleVerse[]) {
@@ -51,10 +51,10 @@ export class BibleVerseRepo {
     return Promise.all(promises);
   }
 
-  public convertToModel(data: any) { return data as BibleVerse; }
-  public convertAllToModel(data: any[]) { return (data || []) as BibleVerse[]; }
+  public convertToModel(data: BibleVerse) { return data; }
+  public convertAllToModel(data: BibleVerse[]) { return data || []; }
 
-  protected rowToModel(row: any): BibleVerse {
+  protected rowToModel(row: BibleVerse): BibleVerse {
     return {
       id: row.id,
       translationKey: row.translationKey,

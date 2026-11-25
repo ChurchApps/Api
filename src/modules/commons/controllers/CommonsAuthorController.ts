@@ -43,7 +43,7 @@ function cleanLinks(input: unknown, kind: "links" | "support"): { links: AuthorL
 export class CommonsAuthorController extends CommonsBaseController {
   // authz-exempt: the caller's own author row, resolved from au.id — there is nothing else to authorize
   @httpGet("/mine")
-  public async mine(req: express.Request, res: express.Response): Promise<any> {
+  public async mine(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const author = await this.repos.author.loadByUserId(au.id);
       return author ? this.profile(author) : {};
@@ -52,7 +52,7 @@ export class CommonsAuthorController extends CommonsBaseController {
 
   // authz-exempt: only the author row already claimed by au.id can be written
   @httpPut("/mine")
-  public async saveMine(req: express.Request<{}, {}, { bio?: string; links?: AuthorLink[]; supportLinks?: AuthorLink[] }>, res: express.Response): Promise<any> {
+  public async saveMine(req: express.Request<{}, {}, { bio?: string; links?: AuthorLink[]; supportLinks?: AuthorLink[] }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const author = await this.repos.author.loadByUserId(au.id);
       if (!author) return this.json({ errors: ["You don't have a writer page yet. Publish a song first."] }, 404);
@@ -71,7 +71,7 @@ export class CommonsAuthorController extends CommonsBaseController {
   }
 
   @httpGet("/:id")
-  public async get(req: express.Request, res: express.Response): Promise<any> {
+  public async get(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const id = String(req.params.id);
       const [author, songs] = await Promise.all([

@@ -25,9 +25,9 @@ export class ReminderDefinitionRepo {
       message: model.message,
       channels: model.channels ?? "push,email,in_app",
       recipientMode: model.recipientMode ?? "auto",
-      enabled: (model.enabled ?? true) as any,
-      dateCreated: sql`NOW()` as any,
-      dateModified: sql`NOW()` as any
+      enabled: model.enabled ?? true,
+      dateCreated: sql`NOW()`,
+      dateModified: sql`NOW()`
     }).execute();
     return model;
   }
@@ -41,8 +41,8 @@ export class ReminderDefinitionRepo {
       message: model.message,
       channels: model.channels,
       recipientMode: model.recipientMode,
-      enabled: model.enabled as any,
-      dateModified: sql`NOW()` as any
+      enabled: model.enabled,
+      dateModified: sql`NOW()`
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -67,7 +67,7 @@ export class ReminderDefinitionRepo {
 
   // Global across churches — the expander cron iterates every enabled definition.
   public async loadAllEnabled() {
-    return getDb().selectFrom("reminderDefinitions").selectAll().where("enabled", "=", true as any).execute();
+    return getDb().selectFrom("reminderDefinitions").selectAll().where("enabled", "=", true).execute();
   }
 
   public async delete(churchId: string, id: string) {

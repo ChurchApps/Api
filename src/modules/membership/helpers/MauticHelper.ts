@@ -13,10 +13,23 @@ const segmentByApp: Record<string, number> = {
 // Only leader/volunteer-facing apps belong here.
 const userSegmentByApp: Record<string, number> = { WorshipCommons: 54 };
 
+// The parts of Mautic's REST responses this helper reads.
+interface MauticContact {
+  id?: number | string;
+  fields?: { all?: Record<string, string> };
+}
+
+interface MauticResponse {
+  contact?: MauticContact;
+  contacts?: Record<string, MauticContact>;
+  company?: { id?: number | string };
+  companies?: Record<string, { id?: number | string }>;
+}
+
 export class MauticHelper {
   private static authHeader = () => "Basic " + Buffer.from(`${Environment.mauticUser}:${Environment.mauticPassword}`).toString("base64");
 
-  private static request = async (method: string, path: string, body?: any, attempt = 1): Promise<any> => {
+  private static request = async (method: string, path: string, body?: unknown, attempt = 1): Promise<MauticResponse> => {
     let res;
     try {
       res = await fetch(`${Environment.mauticUrl}${path}`, {
@@ -38,11 +51,11 @@ export class MauticHelper {
     }
     // The query string can hold a contact's email (contacts?search=), so it stays out of the logged message.
     if (!res.ok) throw new Error(`Mautic ${path.split("?")[0]} failed: ${res.status} ${await res.text()}`);
-    return res.json();
+    return (await res.json()) as MauticResponse;
   };
 
-  private static post = (path: string, body?: any) => MauticHelper.request("POST", path, body);
-  private static patch = (path: string, body?: any) => MauticHelper.request("PATCH", path, body);
+  private static post = (path: string, body?: unknown) => MauticHelper.request("POST", path, body);
+  private static patch = (path: string, body?: unknown) => MauticHelper.request("PATCH", path, body);
   private static get = (path: string) => MauticHelper.request("GET", path);
 
   static register = async (
@@ -114,11 +127,11 @@ export class MauticHelper {
     MauticHelper.createAndUpdate(email, firstName, lastName, { tags: [tag] });
 
   /** Creates a contact (if truly absent) and patches the supplied field aliases onto it. Returns silently on any failure. */
-  static createAndUpdate = async (email: string, firstName: string | undefined, lastName: string | undefined, fields: Record<string, any>) => {
+  static createAndUpdate = async (email: string, firstName: string | undefined, lastName: string | undefined, fields: Record<string, unknown>) => {
     if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
     try {
       const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
-      const existing = Object.values(data.contacts || {}) as any[];
+      const existing = Object.values(data.contacts || {});
       if (existing.length) {
         await MauticHelper.patch(`/api/contacts/${existing[0].id}/edit`, fields);
         return;
@@ -130,10 +143,10 @@ export class MauticHelper {
   };
 
   // Finds a contact by email and patches the supplied field aliases onto it.
-  static updateContact = async (email: string, fields: Record<string, any>) => {
+  static updateContact = async (email: string, fields: Record<string, unknown>) => {
     if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
     const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
-    const contacts = Object.values(data.contacts || {}) as any[];
+    const contacts = Object.values(data.contacts || {});
     if (!contacts.length) return;
     await MauticHelper.patch(`/api/contacts/${contacts[0].id}/edit`, fields);
   };
@@ -148,7 +161,7 @@ export class MauticHelper {
     if (!segmentId) return;
     try {
       const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
-      const contacts = Object.values(data.contacts || {}) as any[];
+      const contacts = Object.values(data.contacts || {});
       let contactId = contacts.length ? contacts[0].id : null;
       if (!contactId) {
         const created = await MauticHelper.post("/api/contacts/new", { firstname: firstName, lastname: lastName, email });
@@ -159,7 +172,7 @@ export class MauticHelper {
       await MauticHelper.post(`/api/segments/${segmentId}/contact/${contactId}/add`);
       if (churchId) {
         const companies = await MauticHelper.get(`/api/companies?search=${encodeURIComponent("companychurchid:" + churchId)}&limit=1`);
-        const list = Object.values(companies.companies || {}) as any[];
+        const list = Object.values(companies.companies || {});
         if (list.length) await MauticHelper.post(`/api/companies/${list[0].id}/contact/${contactId}/add`);
       }
     } catch (err) {
@@ -174,7 +187,7 @@ export class MauticHelper {
   static trackLogin = async (email: string, appName?: string) => {
     if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
     const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
-    let contacts = Object.values(data.contacts || {}) as any[];
+    let contacts = Object.values(data.contacts || {});
     if (!contacts.length) {
       // No marketing contact yet (e.g. the user predates the Mautic bridge).
       // For leader-facing apps, create one now so the app connection isn't lost.
@@ -185,7 +198,7 @@ export class MauticHelper {
     }
     const contact = contacts[0];
     const currentCount = parseInt(contact.fields?.all?.b1_login_count || "0", 10) || 0;
-    const fields: Record<string, any> = {
+    const fields: Record<string, unknown> = {
       b1_last_login: new Date().toISOString(),
       b1_login_count: currentCount + 1
     };

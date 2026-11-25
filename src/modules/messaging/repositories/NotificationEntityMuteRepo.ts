@@ -15,8 +15,8 @@ export class NotificationEntityMuteRepo {
       .executeTakeFirst();
     if (existing) {
       await getDb().updateTable("notificationEntityMutes").set({ level: model.level })
-        .where("id", "=", (existing as any).id).execute();
-      model.id = (existing as any).id;
+        .where("id", "=", existing.id).execute();
+      model.id = existing.id;
       return model;
     }
     model.id = UniqueIdHelper.shortId();

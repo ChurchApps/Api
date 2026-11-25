@@ -1,19 +1,27 @@
 import "reflect-metadata";
+import type express from "express";
 
-jest.mock("../AttendanceBaseController", () => ({ AttendanceBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../AttendanceBaseController", () => ({ AttendanceBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { attendance: { edit: "e" } }, Environment: {} }));
+jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadPeople: jest.fn(async () => []) }) }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("axios", () => ({ post: jest.fn() }));
 
 import { VisitSessionController } from "../VisitSessionController.js";
+import type { Session } from "../../models/index.js";
+
+type JsonResult = { obj: unknown; status: number };
+const asReq = (r: Partial<express.Request>) => r as express.Request;
+const res = {} as express.Response;
 
 function makeController() {
-  const repos: any = { session: { load: jest.fn(async () => null) }, visit: { loadForSessionPerson: jest.fn() } };
-  const au = { churchId: "c1", id: "u1", leaderGroupIds: [], checkAccess: () => true };
-  const controller = new VisitSessionController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  const repos = { session: { load: jest.fn(async (): Promise<Session | null> => null) }, visit: { loadForSessionPerson: jest.fn() } };
+  const au = { churchId: "c1", id: "u1", leaderGroupIds: [] as string[], checkAccess: () => true };
+  const controller = Object.assign(new VisitSessionController(), {
+    repos,
+    actionWrapper: (_req: unknown, _res: unknown, action: (user: typeof au) => Promise<unknown>) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, repos };
 }
 
@@ -27,14 +35,14 @@ describe("VisitSessionController.log", () => {
     ["no personId", { visitSessions: [{ sessionId: "s1" }] }]
   ])("answers 400 for %s", async (_name, body) => {
     const { controller, repos } = makeController();
-    const result: any = await (controller as any).log({ body }, {});
+    const result = (await controller.log(asReq({ body }), res)) as JsonResult;
     expect(result.status).toBe(400);
     expect(repos.session.load).not.toHaveBeenCalled();
   });
 
   it("still answers 404 for an unknown session", async () => {
     const { controller } = makeController();
-    const result: any = await (controller as any).log({ body: { personId: "p1", visitSessions: [{ sessionId: "s1" }] } }, {});
+    const result = (await controller.log(asReq({ body: { personId: "p1", visitSessions: [{ sessionId: "s1" }] } }), res)) as JsonResult;
     expect(result.status).toBe(404);
   });
 });

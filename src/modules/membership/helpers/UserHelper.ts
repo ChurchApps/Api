@@ -62,13 +62,13 @@ export class UserHelper {
   // Resolves a user's permissions in one church with domain-admin and reporting
   // permissions expanded — the shape both JWT minting and API-key auth consume.
   static async loadExpandedPermissions(userId: string, churchId: string, repos: Repos): Promise<Api[]> {
-    const luc = (await repos.rolePermission.loadUserPermissionInChurch(userId, churchId)) ?? ({ apis: [] } as unknown as LoginUserChurch);
+    const luc = (await repos.rolePermission.loadUserPermissionInChurch(userId, churchId)) ?? ({ apis: [] } as LoginUserChurch);
     await UserHelper.replaceDomainAdminPermissions([luc]);
     UserHelper.addAllReportingPermissions([luc]);
     return luc.apis;
   }
 
-  static sendWelcomeEmail(email: string, code: string, _appName: string, _appUrl: string): Promise<any> {
+  static sendWelcomeEmail(email: string, code: string, _appName: string, _appUrl: string): Promise<void> {
     const appName = "ChurchApps";
     const appUrl = Environment.b1AdminRoot;
 
@@ -80,7 +80,7 @@ export class UserHelper {
     return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, "Welcome to " + appName + ".", contents);
   }
 
-  static sendInviteEmail(email: string, personName: string, contextName: string, churchName: string, loginLink: string, actionLabel: string, inviterEmail?: string): Promise<any> {
+  static sendInviteEmail(email: string, personName: string, contextName: string, churchName: string, loginLink: string, actionLabel: string, inviterEmail?: string): Promise<void> {
     const appName = churchName || "ChurchApps";
     const appUrl = Environment.b1AdminRoot;
     const subject = "You've been added to " + contextName.replace(/[\r\n]/g, " ");
@@ -97,7 +97,7 @@ export class UserHelper {
     return (value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
-  static sendForgotEmail(email: string, code: string, _appName: string, _appUrl: string): Promise<any> {
+  static sendForgotEmail(email: string, code: string, _appName: string, _appUrl: string): Promise<void> {
     const appName = "ChurchApps";
     const appUrl = Environment.b1AdminRoot;
 
@@ -107,5 +107,17 @@ export class UserHelper {
       `<p style="font-size: 28px; font-weight: bold; letter-spacing: 6px; text-align: center; font-family: monospace; padding: 16px; background: #f3f4f6; border-radius: 6px;">${code}</p>` +
       "<p style=\"color: #6b7280; font-size: 14px;\">This code expires in 15 minutes. If you did not request a password reset, you can safely ignore this email.</p>";
     return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, appName + " Password Reset", contents);
+  }
+
+  static sendLoginCodeEmail(email: string, code: string): Promise<void> {
+    const appName = "ChurchApps";
+    const appUrl = Environment.b1AdminRoot;
+
+    const contents =
+      "<h2>Sign-in Code</h2>" +
+      "<p>Enter this code in the app to sign in:</p>" +
+      `<p style="font-size: 28px; font-weight: bold; letter-spacing: 6px; text-align: center; font-family: monospace; padding: 16px; background: #f3f4f6; border-radius: 6px;">${code}</p>` +
+      "<p style=\"color: #6b7280; font-size: 14px;\">This code expires in 10 minutes and works once. If you did not try to sign in, you can safely ignore this email.</p>";
+    return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, appName + " Sign-in Code", contents);
   }
 }

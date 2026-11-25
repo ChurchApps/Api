@@ -3,7 +3,7 @@ import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { BibleSourceFactory } from "../helpers/BibleSourceFactory.js";
 import { Permissions } from "../helpers/index.js";
-import { BibleTranslation, BibleVerseText } from "../models/index.js";
+import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models/index.js";
 import { BibleVerseTextRepo } from "../repositories/BibleVerseTextRepo.js";
 
 @controller("/content/bibles")
@@ -17,7 +17,7 @@ export class BibleController extends ContentBaseController {
   ];
 
   @httpGet("/:translationKey/search")
-  public async search(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async search(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!BibleController.isSafeKey(translationKey)) return this.json({ error: "Invalid key" }, 400);
       const query = req.query.query as string;
@@ -29,7 +29,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/stats")
-  public async getStats(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getStats(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       if (!req.query.startDate || !req.query.endDate) return this.json({ error: "startDate and endDate are required" }, 400);
@@ -41,7 +41,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/updateCopyrights")
-  public async updateCopyrights(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async updateCopyrights(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const translations = await this.repos.bibleTranslation.loadNeedingCopyrights();
@@ -55,7 +55,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/:translationKey/updateCopyright")
-  public async updateCopyright(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async updateCopyright(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const { source, sourceKey, translation } = await this.resolveTranslation(translationKey);
@@ -68,14 +68,14 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/:translationKey/books")
-  public async getBooks(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getBooks(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!BibleController.isSafeKey(translationKey)) return this.json({ error: "Invalid key" }, 400);
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
-      let result = await this.repos.bibleBook.loadAll(sourceKey);
+      let result: BibleBook[] = await this.repos.bibleBook.loadAll(sourceKey);
       if (result.length === 0) {
         result = await BibleSourceFactory.getBooks(source, sourceKey);
-        result.forEach((r: any) => { r.translationKey = sourceKey; });
+        result.forEach((r) => { r.translationKey = sourceKey; });
         await this.repos.bibleBook.saveAll(result);
       }
       return result;
@@ -83,16 +83,16 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/:translationKey/:bookKey/chapters")
-  public async getChapters(@requestParam("translationKey") translationKey: string, @requestParam("bookKey") bookKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getChapters(@requestParam("translationKey") translationKey: string, @requestParam("bookKey") bookKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!BibleController.isSafeKey(translationKey) || !BibleController.isSafeKey(bookKey)) return this.json({ error: "Invalid key" }, 400);
       const resolvedBookKey = await this.resolveBookKey(bookKey);
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
 
-      let result = await this.repos.bibleChapter.loadByBook(sourceKey, resolvedBookKey);
+      let result: BibleChapter[] = await this.repos.bibleChapter.loadByBook(sourceKey, resolvedBookKey);
       if (result.length === 0) {
         result = await BibleSourceFactory.getChapters(source, sourceKey, resolvedBookKey);
-        result.forEach((r: any) => { r.translationKey = sourceKey; });
+        result.forEach((r) => { r.translationKey = sourceKey; });
         await this.repos.bibleChapter.saveAll(result);
       }
       return result;
@@ -105,14 +105,14 @@ export class BibleController extends ContentBaseController {
     @requestParam("chapterKey") chapterKey: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!BibleController.isSafeKey(translationKey) || !BibleController.isSafeKey(chapterKey)) return this.json({ error: "Invalid key" }, 400);
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
-      let result = await this.repos.bibleVerse.loadByChapter(sourceKey, chapterKey);
+      let result: BibleVerse[] = await this.repos.bibleVerse.loadByChapter(sourceKey, chapterKey);
       if (result.length === 0) {
         result = await BibleSourceFactory.getVerses(source, sourceKey, chapterKey);
-        result.forEach((r: any) => { r.translationKey = sourceKey; });
+        result.forEach((r) => { r.translationKey = sourceKey; });
         await this.repos.bibleVerse.saveAll(result);
       }
       return result;
@@ -126,7 +126,7 @@ export class BibleController extends ContentBaseController {
     @requestParam("endVerseKey") endVerseKey: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (![translationKey, startVerseKey, endVerseKey].every((k) => BibleController.isSafeKey(k))) return this.json({ error: "Invalid key" }, 400);
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
@@ -154,7 +154,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/availableTranslations/:source")
-  public async getAvailableTranslations(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAvailableTranslations(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const available = await BibleSourceFactory.getAvailableTranslations(source);
       return available.map((t: BibleTranslation) => ({ abbreviation: t.abbreviation, name: t.name, language: t.language }));
@@ -162,7 +162,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/updateTranslations/:source")
-  public async updateTranslationsFromSource(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async updateTranslationsFromSource(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const dbResult = await this.repos.bibleTranslation.loadAll();
@@ -185,7 +185,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/updateTranslations")
-  public async updateTranslations(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async updateTranslations(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const dbResult = await this.repos.bibleTranslation.loadAll();
@@ -208,7 +208,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repos.bibleTranslation.loadAll();
       if (result.length === 0) {

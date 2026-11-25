@@ -10,7 +10,7 @@ import { ArrayHelper } from "@churchapps/apihelper";
 export class BlockController extends ContentBaseController {
 
   @httpGet("/:churchId/tree/:id")
-  public async getTree(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getTree(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const block: Block = await this.repos.block.load(churchId, id);
       let result: Block = {};
@@ -28,7 +28,7 @@ export class BlockController extends ContentBaseController {
   }
 
   @httpGet("/blockType/:blockType")
-  public async loadByType(@requestParam("blockType") blockType: string, req: express.Request, res: express.Response): Promise<any> {
+  public async loadByType(@requestParam("blockType") blockType: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       return await this.repos.block.loadByBlockType(au.churchId, blockType, siteId);
@@ -36,13 +36,13 @@ export class BlockController extends ContentBaseController {
   }
 
   @httpGet("/public/footer/:churchId")
-  public async loadFooter(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async loadFooter(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
-      const footerBlocks = await this.repos.block.loadByBlockType(churchId, "footerBlock", siteId);
+      const footerBlocks: Block[] = await this.repos.block.loadByBlockType(churchId, "footerBlock", siteId);
       const result: Section[] = [];
       // Prefer the site's own footer block, else fall back to the shared ('') one.
-      const chosen = (siteId && footerBlocks.find((b: any) => b.siteId === siteId)) || footerBlocks.find((b: any) => !b.siteId || b.siteId === "");
+      const chosen = (siteId && footerBlocks.find((b) => b.siteId === siteId)) || footerBlocks.find((b) => !b.siteId || b.siteId === "");
       if (chosen) {
         const blockIds: string[] = ArrayHelper.getIds(footerBlocks, "id");
         const allBlockSections = await this.repos.section.loadForBlocks(churchId, blockIds);
@@ -63,7 +63,7 @@ export class BlockController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.block.load(au.churchId, id);
       return this.repos.block.convertToModel(au.churchId, data);
@@ -71,7 +71,7 @@ export class BlockController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       const data = await this.repos.block.loadAll(au.churchId, siteId);
@@ -80,11 +80,11 @@ export class BlockController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Block[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Block[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<Block>[] = [];
-      req.body.forEach((item) => { (item as any).churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.block.save(item)); });
+      req.body.forEach((item) => { item.churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.block.save(item)); });
       const result = await Promise.all(promises);
       this.bumpSiteCache(au.churchId);
       return this.repos.block.convertAllToModel(au.churchId, result);
@@ -92,7 +92,7 @@ export class BlockController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
 

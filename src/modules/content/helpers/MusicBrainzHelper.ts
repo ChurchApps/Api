@@ -1,5 +1,15 @@
 import { SongDetail, SongDetailLink } from "../models/index.js";
 
+// The fields of a MusicBrainz recording (ws/2 JSON) that this helper reads.
+interface MusicBrainzRecording {
+  id?: string;
+  score?: number;
+  title?: string;
+  length?: number;
+  "artist-credit"?: { name?: string }[];
+  releases?: { id?: string; title?: string; date?: string }[];
+}
+
 export class MusicBrainzHelper {
   static async lookup(artist: string, title: string) {
     const cleanTitle = title.replace(/\s*\((Live|Radio|Acoustic|Studio|Album|Single).*?\)\s*$/i, "").trim();
@@ -13,7 +23,7 @@ export class MusicBrainzHelper {
     const userAgent = "ChurchApps https://churchapps.org/";
     const response = await fetch(url, { headers: { "User-Agent": userAgent } });
     if (response.ok) {
-      const data = await response.json();
+      const data = (await response.json()) as { recordings?: MusicBrainzRecording[] };
       if (data.recordings?.length > 0) {
         const bestMatch = this.findBestMatch(data.recordings, originalTitle, originalArtist);
         return { id: bestMatch.id, songDetail: this.convertRecordingToSongDetail(bestMatch) };
@@ -25,7 +35,7 @@ export class MusicBrainzHelper {
     }
   }
 
-  private static findBestMatch(recordings: any[], originalTitle?: string, originalArtist?: string): any {
+  private static findBestMatch(recordings: MusicBrainzRecording[], originalTitle?: string, originalArtist?: string): MusicBrainzRecording {
     if (!originalTitle || !originalArtist) return recordings[0];
 
     const scoredRecordings = recordings.map((recording) => {
@@ -55,7 +65,7 @@ export class MusicBrainzHelper {
     const userAgent = "ChurchApps https://churchapps.org/";
     const response = await fetch(url, { headers: { "User-Agent": userAgent } });
     if (response.ok) {
-      const data = await response.json();
+      const data = (await response.json()) as MusicBrainzRecording;
       if (data.id) {
         return { id: data.id, songDetail: this.convertRecordingToSongDetail(data) };
       } else {
@@ -100,7 +110,7 @@ export class MusicBrainzHelper {
     }
   }
 
-  private static convertRecordingToSongDetail(recording: any) {
+  private static convertRecordingToSongDetail(recording: MusicBrainzRecording) {
     const result: SongDetail = {
       // musicBrainzId: recording.id,
       title: recording.title,

@@ -12,6 +12,7 @@ jest.mock("../../../../shared/helpers/NotificationService.js", () => ({ Notifica
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { b1AdminRoot: "https://admin.test" } }));
 
 import { AccountDeletionHelper } from "../AccountDeletionHelper.js";
+import type { Task } from "../../models/index.js";
 
 const au = { churchId: "c1", personId: "p1", firstName: "Donald", lastName: "Clark" };
 
@@ -60,7 +61,7 @@ describe("AccountDeletionHelper.prepareRequest", () => {
   it("targets the caller and routes the request to the approval group, ignoring client-supplied identity", async () => {
     loadSetting.mockResolvedValue("g9");
     loadGroup.mockResolvedValue({ id: "g9", name: "Staff" });
-    const task: any = { id: "existing", associatedWithId: "someoneElse", assignedToType: "person", assignedToId: "admin", status: "Closed", taskType: "directoryUpdate" };
+    const task: Task = { id: "existing", associatedWithId: "someoneElse", assignedToType: "person", assignedToId: "admin", status: "Closed", taskType: "directoryUpdate" };
     const result = await AccountDeletionHelper.prepareRequest(au, task);
     expect(result.error).toBeUndefined();
     expect(loadSetting).toHaveBeenCalledWith("c1", "directoryApprovalGroupId");
@@ -87,7 +88,7 @@ describe("AccountDeletionHelper.completeDecision", () => {
     notifyMock.mockReset().mockResolvedValue(undefined);
     anonymizePerson.mockReset().mockResolvedValue(undefined);
     loadPerson.mockReset().mockResolvedValue({ id: "p1", email: "donald@example.com", displayName: "Donald Clark" });
-    repos = { task: { save: jest.fn(async (t: any) => t) } };
+    repos = { task: { save: jest.fn(async (t: Task) => t) } };
   });
 
   it("refuses a rejection that has no reason", async () => {
@@ -174,7 +175,7 @@ describe("AccountDeletionHelper.remindPending", () => {
     repos = {
       task: {
         loadOpenAccountDeletions: jest.fn(),
-        save: jest.fn(async (t: any) => t)
+        save: jest.fn(async (t: Task) => t)
       }
     };
   });

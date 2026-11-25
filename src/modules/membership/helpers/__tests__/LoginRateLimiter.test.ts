@@ -1,15 +1,17 @@
 import { LoginRateLimiter } from "../LoginRateLimiter.js";
+import type express from "express";
+import type { Repos } from "../../repositories/Repos.js";
 
 function fakeRepos(counts: Record<string, number> = {}) {
   const incremented: string[] = [];
   const cleared: string[][] = [];
-  const repos: any = {
+  const repos = Object.assign({} as Repos, {
     loginAttempt: {
       loadCount: jest.fn(async (key: string) => counts[key] ?? 0),
       increment: jest.fn(async (key: string) => { incremented.push(key); }),
       clear: jest.fn(async (keys: string[]) => { cleared.push(keys); })
     }
-  };
+  });
   return { repos, incremented, cleared };
 }
 
@@ -106,25 +108,25 @@ describe("LoginRateLimiter counters", () => {
 
 describe("LoginRateLimiter.getClientIp", () => {
   it("prefers the API Gateway source ip over any header", () => {
-    const req: any = {
+    const req = Object.assign({} as express.Request, {
       headers: { "x-forwarded-for": "9.9.9.9" },
       apiGateway: { event: { requestContext: { identity: { sourceIp: "5.5.5.5" } } } }
-    };
+    });
     expect(LoginRateLimiter.getClientIp(req)).toBe("5.5.5.5");
   });
 
   it("reads the http api source ip shape too", () => {
-    const req: any = { headers: {}, requestContext: { http: { sourceIp: "5.5.5.5" } } };
+    const req = Object.assign({} as express.Request, { headers: {}, requestContext: { http: { sourceIp: "5.5.5.5" } } });
     expect(LoginRateLimiter.getClientIp(req)).toBe("5.5.5.5");
   });
 
   it("uses the last x-forwarded-for hop, so a spoofed header cannot reset the counter", () => {
-    const req: any = { headers: { "x-forwarded-for": "1.2.3.4, 203.0.113.7" } };
+    const req = Object.assign({} as express.Request, { headers: { "x-forwarded-for": "1.2.3.4, 203.0.113.7" } });
     expect(LoginRateLimiter.getClientIp(req)).toBe("203.0.113.7");
   });
 
   it("falls back to the socket address when there is no proxy header", () => {
-    const req: any = { headers: {}, socket: { remoteAddress: "127.0.0.1" } };
+    const req = Object.assign({} as express.Request, { headers: {}, socket: { remoteAddress: "127.0.0.1" } });
     expect(LoginRateLimiter.getClientIp(req)).toBe("127.0.0.1");
   });
 });

@@ -6,13 +6,21 @@ import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
+// The GroupJoinRequest row published with group.member.requested / group.joinRequest.decided.
+interface JoinRequestPayload {
+  id?: string;
+  groupId?: string;
+  personId?: string;
+  message?: string;
+}
+
 export class GroupJoinRequestTaskHelper {
   public static readonly taskType = "groupJoinRequest";
 
   // One Open task per group leader (or, if the group has no leader, per person with
   // groupMembers.edit, or failing that per domain admin) so they can approve/decline
   // from Serving > Tasks.
-  public static async createJoinRequestTask(churchId: string, payload: any): Promise<Task[]> {
+  public static async createJoinRequestTask(churchId: string, payload: JoinRequestPayload): Promise<Task[]> {
     if (!churchId || !payload?.groupId || !payload?.personId) return [];
     const repos = await RepoManager.getRepos<Repos>("doing");
     const membership = getMembershipModuleGateway();
@@ -80,7 +88,7 @@ export class GroupJoinRequestTaskHelper {
     return saved;
   }
 
-  private static async notify(churchId: string, personId: string, payload: any, message: string, task: Task): Promise<void> {
+  private static async notify(churchId: string, personId: string, payload: JoinRequestPayload, message: string, task: Task): Promise<void> {
     const root = (Environment.b1AdminRoot || "https://admin.b1.church").replace(/\/$/, "");
     const link = task.id ? `${root}/serving/tasks/${task.id}` : root;
     try {
@@ -90,7 +98,7 @@ export class GroupJoinRequestTaskHelper {
     }
   }
 
-  public static async closeJoinRequestTask(churchId: string, payload: any): Promise<void> {
+  public static async closeJoinRequestTask(churchId: string, payload: JoinRequestPayload): Promise<void> {
     if (!churchId || !payload?.id) return;
     const repos = await RepoManager.getRepos<Repos>("doing");
     const open = await repos.task.loadOpenByTaskType(churchId, GroupJoinRequestTaskHelper.taskType);
@@ -107,9 +115,9 @@ export class GroupJoinRequestTaskHelper {
     }
   }
 
-  public static onEvent = async (churchId: string, event: string, payload: any): Promise<void> => {
-    if (event === "group.member.requested") await GroupJoinRequestTaskHelper.createJoinRequestTask(churchId, payload);
-    else if (event === "group.joinRequest.decided") await GroupJoinRequestTaskHelper.closeJoinRequestTask(churchId, payload);
+  public static onEvent = async (churchId: string, event: string, payload: unknown): Promise<void> => {
+    if (event === "group.member.requested") await GroupJoinRequestTaskHelper.createJoinRequestTask(churchId, payload as JoinRequestPayload);
+    else if (event === "group.joinRequest.decided") await GroupJoinRequestTaskHelper.closeJoinRequestTask(churchId, payload as JoinRequestPayload);
   };
 }
 

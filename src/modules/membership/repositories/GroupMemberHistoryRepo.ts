@@ -3,6 +3,18 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
+interface MonthlyStatRow {
+  month: string;
+  action: "joined" | "left";
+  count: number;
+}
+
+interface GroupActionCountRow {
+  groupId: string;
+  action: "joined" | "left";
+  count: number;
+}
+
 @injectable()
 export class GroupMemberHistoryRepo {
   public async log(churchId: string, groupId: string, personId: string, action: "joined" | "left") {
@@ -12,12 +24,12 @@ export class GroupMemberHistoryRepo {
       groupId,
       personId,
       action,
-      actionDate: sql`NOW()` as any
+      actionDate: sql<Date>`NOW()`
     }).execute();
   }
 
   public async loadMonthlyStats(churchId: string, groupId: string, months: number) {
-    const rows = await sql<any>`SELECT DATE_FORMAT(actionDate, '%Y-%m') AS month, action, COUNT(*) AS count
+    const rows = await sql<MonthlyStatRow>`SELECT DATE_FORMAT(actionDate, '%Y-%m') AS month, action, COUNT(*) AS count
       FROM groupMemberHistory
       WHERE churchId=${churchId} AND groupId=${groupId} AND actionDate >= DATE_SUB(CURDATE(), INTERVAL ${months} MONTH)
       GROUP BY month, action
@@ -26,7 +38,7 @@ export class GroupMemberHistoryRepo {
   }
 
   public async loadCountsSince(churchId: string, since: Date) {
-    const rows = await sql<any>`SELECT groupId, action, COUNT(*) AS count
+    const rows = await sql<GroupActionCountRow>`SELECT groupId, action, COUNT(*) AS count
       FROM groupMemberHistory
       WHERE churchId=${churchId} AND actionDate >= ${since}
       GROUP BY groupId, action`.execute(getDb());

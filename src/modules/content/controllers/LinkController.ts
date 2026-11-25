@@ -3,6 +3,7 @@ import express from "express";
 import { Permissions } from "../helpers/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Link } from "../models/index.js";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 
 // Links on a person's record are staff-only: never listed through the public or member link routes.
 const PERSON_LINK_CATEGORY = "personLink";
@@ -14,7 +15,7 @@ export class LinkController extends ContentBaseController {
   // Authenticated access - filters links by visibility based on user context
   // Note: "team" visibility is handled client-side since group tags aren't in the JWT
   @httpGet("/church/:churchId/filtered")
-  public async loadFiltered(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async loadFiltered(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query.category?.toString();
       if (category === PERSON_LINK_CATEGORY) return [];
@@ -29,7 +30,7 @@ export class LinkController extends ContentBaseController {
     });
   }
 
-  private isLinkVisible(link: Link, au: any): boolean {
+  private isLinkVisible(link: Link, au: Partial<Pick<AuthenticatedUser, "personId" | "membershipStatus" | "groupIds">>): boolean {
     const visibility = link.visibility || "everyone";
 
     switch (visibility) {
@@ -57,7 +58,7 @@ export class LinkController extends ContentBaseController {
 
   // Anonymous access
   @httpGet("/church/:churchId")
-  public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const category = req.query.category?.toString();
       if (category === PERSON_LINK_CATEGORY) return [];
@@ -68,7 +69,7 @@ export class LinkController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.link.load(au.churchId, id);
       if (isPersonLink(data) && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
@@ -78,7 +79,7 @@ export class LinkController extends ContentBaseController {
 
   // Override GET / to support optional category filter
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query?.category?.toString();
       if (category === PERSON_LINK_CATEGORY) {
@@ -94,7 +95,7 @@ export class LinkController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!(await this.canSave(au, req.body))) return this.json({}, 401);
       const promises: Promise<Link>[] = [];
@@ -114,7 +115,7 @@ export class LinkController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existing = await this.repos.link.load(au.churchId, id);
       const permission = isPersonLink(existing) ? Permissions.people.edit : Permissions.content.edit;
@@ -129,7 +130,7 @@ export class LinkController extends ContentBaseController {
 
   // Person links need Edit People (and nothing else in the batch); every other link needs content edit.
   // An existing row keeps the rule of its stored category, so an id can't be used to cross between them.
-  private async canSave(au: any, links: Link[]): Promise<boolean> {
+  private async canSave(au: AuthenticatedUser, links: Link[]): Promise<boolean> {
     if (!Array.isArray(links) || links.length === 0) return au.checkAccess(Permissions.content.edit);
     const personLinks = links.filter((l) => isPersonLink(l));
     if (personLinks.length > 0 && personLinks.length !== links.length) return false;

@@ -12,6 +12,38 @@ interface Subject {
   label?: string;
 }
 
+// The record published with a triggerable event (person, donation, recurring gift, group member,
+// form submission, visit, registration or list member); each event fills only its own fields.
+interface TriggerEventPayload {
+  id?: string;
+  personId?: string;
+  displayName?: string;
+  membershipStatus?: string;
+  gender?: string;
+  maritalStatus?: string;
+  amount?: number;
+  currency?: string;
+  donationDate?: string | Date;
+  method?: string;
+  groupId?: string;
+  name?: string;
+  categoryName?: string;
+  contentType?: string;
+  contentId?: string;
+  submittedBy?: string;
+  submitterName?: string;
+  formName?: string;
+  formId?: string;
+  visitSessions?: { sessionId?: string }[];
+  eventId?: string;
+  listId?: string;
+  listName?: string;
+  interval?: { interval_count?: number | string; interval?: string };
+  subscriptionFunds?: { fundId?: string }[];
+}
+
+type TriggerFacts = Record<string, unknown>;
+
 // Canonical membership statuses (mirror B1Admin people/helpers/MembershipStatusOptions.ts).
 const MEMBERSHIP_STATUS_OPTIONS = [
   { value: "Visitor", label: "Visitor" },
@@ -21,6 +53,15 @@ const MEMBERSHIP_STATUS_OPTIONS = [
   { value: "Staff", label: "Staff" },
   { value: "Inactive", label: "Inactive" },
   { value: "Deceased", label: "Deceased" }
+];
+
+// Recurring gift frequencies, keyed the way the giving form names them (DonationHelper.getInterval).
+const FREQUENCY_OPTIONS = [
+  { value: "one_week", label: "Weekly" },
+  { value: "two_week", label: "Every 2 Weeks" },
+  { value: "one_month", label: "Monthly" },
+  { value: "three_month", label: "Quarterly" },
+  { value: "one_year", label: "Annually" }
 ];
 
 interface TriggerFieldDef {
@@ -66,6 +107,16 @@ const EVENT_DEFS: TriggerEventDef[] = [
       { key: "fundDonation.fundId", label: "Fund", type: "select", optionsSource: "funds" }
     ]
   },
+  {
+    eventType: "subscription.created",
+    label: "Recurring gift · Created",
+    recordType: "subscription",
+    fields: [
+      { key: "subscription.amount", label: "Amount", type: "number" },
+      { key: "subscriptionFund.fundId", label: "Fund", type: "select", optionsSource: "funds" },
+      { key: "subscription.frequency", label: "Frequency", type: "select", options: FREQUENCY_OPTIONS }
+    ]
+  },
   { eventType: "group.member.added", label: "Group · Member Joined", recordType: "group", fields: GROUP_FIELDS },
   { eventType: "group.member.removed", label: "Group · Member Left", recordType: "group", fields: GROUP_FIELDS },
   { eventType: "group.member.requested", label: "Group · Join Requested", recordType: "group", fields: GROUP_FIELDS },
@@ -106,6 +157,15 @@ const EVENT_DEFS: TriggerEventDef[] = [
     ]
   },
   {
+    eventType: "registration.cancelled",
+    label: "Event · Registration Cancelled",
+    recordType: "registration",
+    fields: [
+      { key: "registration.eventId", label: "Event", type: "select", optionsSource: "events" },
+      { key: "person.membershipStatus", label: "Registrant Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS }
+    ]
+  },
+  {
     eventType: "list.member.added",
     label: "List · Member Added",
     recordType: "list",
@@ -139,7 +199,7 @@ export class EventTriggerHelper {
 
   // Subscribed to InternalEventBus. Wrapped in try/catch — the doing module may
   // not be booted in this process, and a trigger failure must never break the write.
-  public static async onEvent(churchId: string, event: string, payload: any): Promise<void> {
+  public static async onEvent(churchId: string, event: string, payload: unknown): Promise<void> {
     try {
       if (!churchId || !payload) return;
       const repos = await RepoManager.getRepos<Repos>("doing");
@@ -150,8 +210,10 @@ export class EventTriggerHelper {
       if (triggers.length === 0) return;
 
       // Most events resolve to one subject; some (e.g. multi-person form posts) to several.
-      const resolved = await EventTriggerHelper.resolve(churchId, event, payload);
-      const context = EventTriggerHelper.eventContext(event, payload);
+      // Bus payloads are untyped records; form submissions may also arrive as an array (handled in resolve).
+      const record = payload as TriggerEventPayload;
+      const resolved = await EventTriggerHelper.resolve(churchId, event, record);
+      const context = EventTriggerHelper.eventContext(event, record);
       for (const { subject, facts } of resolved) {
         for (const t of triggers) {
           if (!t.workflowId) continue;
@@ -172,14 +234,15 @@ export class EventTriggerHelper {
   }
 
   // What the card keeps of the triggering record, for the gift merge fields in its emails and texts.
-  private static eventContext(event: string, payload: any): EventContext | undefined {
+  private static eventContext(event: string, payload: TriggerEventPayload): EventContext | undefined {
     if (event !== "donation.created") return undefined;
     return { type: event, donationId: payload.id, amount: payload.amount, currency: payload.currency, donationDate: payload.donationDate, method: payload.method };
   }
 
   // Per-record-type logic: load related records (cross-module via gateways), then
   // return the card subject(s) + a flat facts map. One case per event; [] = no subject.
-  private static async resolve(churchId: string, event: string, payload: any): Promise<{ subject: Subject; facts: Record<string, any> }[]> {
+  // Not private so tests can spy on it; treat as internal.
+  static async resolve(churchId: string, event: string, payload: TriggerEventPayload): Promise<{ subject: Subject; facts: TriggerFacts }[]> {
     switch (event) {
       case "person.created":
       case "person.updated":
@@ -213,6 +276,19 @@ export class EventTriggerHelper {
         ];
       }
 
+      case "subscription.created":
+        if (!payload.personId) return []; // a recurring gift with no donor has no subject
+        return [
+          {
+            subject: { type: "person", id: payload.personId },
+            facts: {
+              "subscription.amount": payload.amount,
+              "subscriptionFund.fundId": (payload.subscriptionFunds || []).map((f) => f.fundId),
+              "subscription.frequency": EventTriggerHelper.frequencyKey(payload.interval)
+            }
+          }
+        ];
+
       case "group.member.added":
       case "group.member.removed":
       case "group.member.requested": {
@@ -237,8 +313,8 @@ export class EventTriggerHelper {
         // payload is a submission (or, defensively, an array of them). The subject is
         // the person the submission is about (contentType "person"), falling back to
         // the logged-in submitter, then to the submission itself for anonymous posts.
-        const subs = Array.isArray(payload) ? payload : [payload];
-        const out: { subject: Subject; facts: Record<string, any> }[] = [];
+        const subs: TriggerEventPayload[] = Array.isArray(payload) ? payload : [payload];
+        const out: { subject: Subject; facts: TriggerFacts }[] = [];
         for (const sub of subs) {
           const personId = sub?.contentType === "person" && sub.contentId ? sub.contentId : sub?.submittedBy;
           const subject: Subject = personId
@@ -257,7 +333,7 @@ export class EventTriggerHelper {
         if (!payload.personId) return [];
         const groupIds = new Set<string>();
         if (payload.groupId) groupIds.add(payload.groupId);
-        const sessionIds = (payload.visitSessions || []).map((vs: any) => vs?.sessionId).filter(Boolean);
+        const sessionIds = (payload.visitSessions || []).map((vs) => vs?.sessionId).filter(Boolean);
         if (sessionIds.length > 0) {
           const fromSessions = await getAttendanceModuleGateway().loadSessionGroupIds(churchId, sessionIds);
           fromSessions.forEach((id) => groupIds.add(id));
@@ -271,7 +347,8 @@ export class EventTriggerHelper {
         ];
       }
 
-      case "registration.created": {
+      case "registration.created":
+      case "registration.cancelled": {
         if (!payload.personId) return [];
         const person = await getMembershipModuleGateway().loadPerson(churchId, payload.personId);
         return [
@@ -297,7 +374,16 @@ export class EventTriggerHelper {
     }
   }
 
-  private static async eventTypesForChurch(churchId: string, repos: Repos): Promise<Set<string>> {
+  // { interval_count: 2, interval: "week" } -> "two_week", matching FREQUENCY_OPTIONS.
+  static frequencyKey(interval?: { interval_count?: number | string; interval?: string }): string | undefined {
+    if (!interval?.interval) return undefined;
+    const count = Math.floor(Number(interval.interval_count) || 1);
+    const word = ({ 1: "one", 2: "two", 3: "three" } as Record<number, string>)[count] || String(count);
+    return word + "_" + interval.interval;
+  }
+
+  // Not private so tests can spy on it; treat as internal.
+  static async eventTypesForChurch(churchId: string, repos: Repos): Promise<Set<string>> {
     const entry = EventTriggerHelper.cache.get(churchId);
     if (entry && entry.expires > Date.now()) return entry.types;
     const types = new Set(await repos.workflowTrigger.loadEventTypesForChurch(churchId));

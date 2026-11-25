@@ -61,13 +61,13 @@ export class PersonFieldValueRepo {
     const existing = await this.loadForPersonField(churchId, personId, fieldId);
     const blank = value === undefined || value === null || value === "";
     if (blank) {
-      if (existing) await this.delete(churchId, (existing as any).id);
+      if (existing) await this.delete(churchId, existing.id);
       return null;
     }
-    return this.save({ id: (existing as any)?.id, churchId, personId, fieldId, value });
+    return this.save({ id: existing?.id, churchId, personId, fieldId, value });
   }
 
-  protected rowToModel(row: any): PersonFieldValue {
+  protected rowToModel(row: PersonFieldValue): PersonFieldValue {
     return {
       id: row.id,
       churchId: row.churchId,
@@ -77,11 +77,11 @@ export class PersonFieldValueRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: PersonFieldValue) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
+  public convertAllToModel(_churchId: string, data: PersonFieldValue[]) {
     return (data || []).map((row) => this.rowToModel(row));
   }
 }

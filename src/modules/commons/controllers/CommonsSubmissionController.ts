@@ -1,4 +1,6 @@
 import { controller, httpDelete, httpGet, httpPost, httpPut } from "inversify-express-utils";
+import type { results } from "inversify-express-utils";
+import type { UploadedFile } from "express-fileupload";
 import { CommonsMauticHelper } from "../helpers/CommonsMauticHelper.js";
 import { CommonsMailHelper } from "../helpers/CommonsMailHelper.js";
 import express from "express";
@@ -14,7 +16,7 @@ import { Environment } from "../../../shared/helpers/index.js";
 export class CommonsSubmissionController extends CommonsBaseController {
   // authz-exempt: au.id required and ownership enforced in own()
   @httpPost("/")
-  public async create(req: express.Request<{}, {}, { assetId?: string; assetType?: string; payload?: SubmissionPayload; note?: string }>, res: express.Response): Promise<any> {
+  public async create(req: express.Request<{}, {}, { assetId?: string; assetType?: string; payload?: SubmissionPayload; note?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const result = await SubmissionHelper.createDraft(this.repos, au, req.body || {});
       if (result.ok === false) return this.json({ errors: result.errors || [result.error] }, result.status);
@@ -23,7 +25,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
   }
 
   @httpGet("/mine")
-  public async mine(req: express.Request, res: express.Response): Promise<any> {
+  public async mine(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const rows = await this.repos.submission.loadMine(au.id, req.query.status?.toString());
       return rows.map((r) => ({ ...r, isNewAsset: !r.publishedSubmissionId || r.publishedSubmissionId === r.id, isThirdParty: r.publisherUserId !== r.submittedBy && !r.byCoPublisher }));
@@ -32,13 +34,13 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   // authz-exempt: only the caller's own grants, resolved from au.id
   @httpGet("/licenses")
-  public async licenses(req: express.Request, res: express.Response): Promise<any> {
+  public async licenses(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAuth(req, res, async (au) => licenseGrantsFor(au.id, Environment.commonsLicenseGrants || ""));
   }
 
   // token-gated rather than JWT-gated: the product preview iframe B1Admin embeds carries no session
   @httpGet("/:id/preview")
-  public async preview(req: express.Request, res: express.Response): Promise<any> {
+  public async preview(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const id = String(req.params.id);
       if (!ContentLibraryHelper.verifyPreviewToken(id, String(req.query.token || ""))) return this.json({}, 404);
@@ -50,7 +52,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
   }
 
   @httpGet("/:id")
-  public async get(req: express.Request, res: express.Response): Promise<any> {
+  public async get(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id));
       if (error) return error;
@@ -60,7 +62,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   // authz-exempt: au.id required and ownership enforced in own()
   @httpPut("/:id")
-  public async update(req: express.Request<{ id: string }, {}, { payload?: SubmissionPayload; note?: string }>, res: express.Response): Promise<any> {
+  public async update(req: express.Request<{ id: string }, {}, { payload?: SubmissionPayload; note?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
@@ -72,7 +74,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   // authz-exempt: au.id required and ownership enforced in own()
   @httpPost("/:id/postUrl")
-  public async postUrl(req: express.Request<{ id: string }, {}, { name: string; contentType?: string }>, res: express.Response): Promise<any> {
+  public async postUrl(req: express.Request<{ id: string }, {}, { name: string; contentType?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
@@ -89,11 +91,11 @@ export class CommonsSubmissionController extends CommonsBaseController {
   // disk-store counterpart of the S3 presigned POST: same multipart form shape, so clients have one upload path
   // authz-exempt: au.id required and ownership enforced in own()
   @httpPost("/:id/upload/:name")
-  public async upload(req: express.Request, res: express.Response): Promise<any> {
+  public async upload(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
-      const file: any = (req as any).files?.file;
+      const file = req.files?.file as UploadedFile | undefined;
       if (!file) return this.json({ errors: ["file is required"] }, 400);
       const buffer: Buffer = file.data?.length ? file.data : fs.readFileSync(file.tempFilePath);
       const result = await SubmissionHelper.storeInline(this.repos, sub, asset, String(req.params.name), file.mimetype, buffer, au.id);
@@ -104,7 +106,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   // authz-exempt: au.id required and ownership enforced in own()
   @httpPost("/:id/files")
-  public async addFile(req: express.Request<{ id: string }, {}, { name: string; sizeBytes?: number; contentHash?: string; action?: string; contentType?: string; base64?: string }>, res: express.Response): Promise<any> {
+  public async addFile(req: express.Request<{ id: string }, {}, { name: string; sizeBytes?: number; contentHash?: string; action?: string; contentType?: string; base64?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
@@ -124,7 +126,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   // authz-exempt: au.id required and ownership enforced in own()
   @httpDelete("/:id/files/:name")
-  public async removeFile(req: express.Request, res: express.Response): Promise<any> {
+  public async removeFile(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
@@ -135,7 +137,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   // authz-exempt: au.id required and ownership enforced in own()
   @httpPost("/:id/submit")
-  public async submit(req: express.Request, res: express.Response): Promise<any> {
+  public async submit(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
@@ -156,7 +158,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   // authz-exempt: au.id required and ownership enforced in own()
   @httpPost("/:id/withdraw")
-  public async withdraw(req: express.Request, res: express.Response): Promise<any> {
+  public async withdraw(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, error } = await this.own(au, String(req.params.id), "pending");
       if (error) return error;
@@ -167,7 +169,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   // authz-exempt: au.id required and ownership enforced in own()
   @httpDelete("/:id")
-  public async delete(req: express.Request, res: express.Response): Promise<any> {
+  public async delete(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
@@ -176,14 +178,14 @@ export class CommonsSubmissionController extends CommonsBaseController {
     });
   }
 
-  private async own(au: Reviewer, id: string, status?: string): Promise<{ sub: Submission; asset: Asset; error?: any }> {
-    if (!au.id) return { sub: null as any, asset: null as any, error: this.json({ errors: ["Sign in required"] }, 401) };
+  private async own(au: Reviewer, id: string, status?: string): Promise<{ sub: Submission; asset: Asset; error?: results.JsonResult }> {
+    if (!au.id) return { sub: null, asset: null, error: this.json({ errors: ["Sign in required"] }, 401) };
     const sub = await this.repos.submission.loadById(id);
-    if (!sub) return { sub: null as any, asset: null as any, error: this.json({}, 404) };
-    if (sub.submittedBy !== au.id && !ReviewerHelper.canReview(au)) return { sub, asset: null as any, error: this.json({}, 404) };
-    if (status && sub.status !== status) return { sub, asset: null as any, error: this.json({ errors: [`submission is ${sub.status}, not ${status}`] }, 400) };
+    if (!sub) return { sub: null, asset: null, error: this.json({}, 404) };
+    if (sub.submittedBy !== au.id && !ReviewerHelper.canReview(au)) return { sub, asset: null, error: this.json({}, 404) };
+    if (status && sub.status !== status) return { sub, asset: null, error: this.json({ errors: [`submission is ${sub.status}, not ${status}`] }, 400) };
     const asset = await this.repos.asset.loadById(sub.assetId || "");
-    if (!asset) return { sub, asset: null as any, error: this.json({}, 404) };
+    if (!asset) return { sub, asset: null, error: this.json({}, 404) };
     return { sub, asset };
   }
 
