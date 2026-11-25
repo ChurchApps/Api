@@ -13,15 +13,15 @@ export class PrivateMessageController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const gateway = getMembershipModuleGateway();
       const minimumAge = MessagingSafetyHelper.parseMinimumAge(await gateway.loadSetting(au.churchId, "messagingMinimumAge"));
-      if (minimumAge > 0) {
-        const ids = new Set<string>();
-        req.body.forEach((conv) => { if (conv.toPersonId) ids.add(conv.toPersonId); });
-        if (au.personId) ids.add(au.personId);
-        const people = await Promise.all([...ids].map((id) => gateway.loadPerson(au.churchId, id)));
-        // Null loads (unknown/removed ids) are out of scope of this rule — fail open.
-        if (people.some((p) => MessagingSafetyHelper.isRestricted(p, minimumAge))) {
-          return this.json({ errors: ["ageRestricted"] }, 403);
-        }
+      const ids = new Set<string>();
+      req.body.forEach((conv) => { if (conv.toPersonId) ids.add(conv.toPersonId); });
+      if (au.personId) ids.add(au.personId);
+      const people = await Promise.all([...ids].map((id) => gateway.loadPerson(au.churchId, id)));
+      // Either side flagged "Disable private messages" or under the minimum age blocks the new thread.
+      // Null loads (unknown/removed ids) are out of scope of these rules — fail open.
+      for (const p of people) {
+        const reason = MessagingSafetyHelper.restrictionReason(p, minimumAge);
+        if (reason) return this.json({ errors: [reason] }, 403);
       }
       for (const conv of req.body) {
         const existing = await this.repos.privateMessage.loadExisting(au.churchId, au.personId, conv.toPersonId);

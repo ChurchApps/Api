@@ -25,6 +25,8 @@ export class Person {
   public conversationId?: string;
   public optedOut?: boolean;
   public smsOptedOut?: boolean;
+  // Admin-set: this person can neither start nor receive new private conversations (ChurchAppsSupport#1680).
+  public disablePrivateMessages?: boolean;
   public allowDirectMessages?: boolean;
   public nametagNotes?: string;
   public donorNumber?: string;

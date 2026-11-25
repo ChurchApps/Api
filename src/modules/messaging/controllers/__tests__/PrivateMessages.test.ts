@@ -10,7 +10,7 @@ jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { not
 // The shared barrel drags in Environment (needs apihelper, mocked above); only the age gate is real here.
 jest.mock("../../../../shared/helpers/index", () => ({ MessagingSafetyHelper: jest.requireActual("../../../../shared/helpers/MessagingSafetyHelper").MessagingSafetyHelper }));
 const loadSetting = jest.fn(async (): Promise<string | null> => null);
-type GatewayPerson = { id: string; birthDate?: Date; householdRole?: string };
+type GatewayPerson = { id: string; birthDate?: Date; householdRole?: string; disablePrivateMessages?: boolean | number };
 const loadPerson = jest.fn(async (_churchId: string, id: string): Promise<GatewayPerson> => ({ id, birthDate: new Date("1980-01-01") }));
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadSetting, loadPerson }) }));
 
@@ -170,5 +170,40 @@ describe("PrivateMessageController.save", () => {
     expect(result).toEqual({ obj: { errors: ["ageRestricted"] }, status: 403 });
     expect(repos.privateMessage.loadExisting).not.toHaveBeenCalled();
     expect(repos.privateMessage.save).not.toHaveBeenCalled();
+  });
+
+  it("403s messagingDisabled when the recipient has private messages turned off", async () => {
+    loadPerson.mockImplementation(async (_churchId: string, id: string) => ({ id, birthDate: new Date("1980-01-01"), disablePrivateMessages: id === "pOff" ? 1 : 0 }));
+    const { controller, repos } = build({ existing: null });
+    const result = await controller.save({ body: [{ toPersonId: "pOff", conversationId: "cvNew" }] } as SaveReq, res);
+    expect(result).toEqual({ obj: { errors: ["messagingDisabled"] }, status: 403 });
+    expect(repos.privateMessage.loadExisting).not.toHaveBeenCalled();
+    expect(repos.privateMessage.save).not.toHaveBeenCalled();
+  });
+
+  it("403s messagingDisabled when the sender has private messages turned off", async () => {
+    loadPerson.mockImplementation(async (_churchId: string, id: string) => ({ id, birthDate: new Date("1980-01-01"), disablePrivateMessages: id === "pMe" }));
+    const { controller, repos } = build({ existing: null });
+    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] } as SaveReq, res);
+    expect(result).toEqual({ obj: { errors: ["messagingDisabled"] }, status: 403 });
+    expect(repos.privateMessage.save).not.toHaveBeenCalled();
+  });
+
+  it("still blocks a flagged person when the minimum-age setting is Off", async () => {
+    loadSetting.mockResolvedValueOnce("0");
+    loadPerson.mockImplementation(async (_churchId: string, id: string) => ({ id, birthDate: new Date("1980-01-01"), disablePrivateMessages: id === "pOff" }));
+    const { controller, repos } = build({ existing: null });
+    const result = await controller.save({ body: [{ toPersonId: "pOff", conversationId: "cvNew" }] } as SaveReq, res);
+    expect(result).toEqual({ obj: { errors: ["messagingDisabled"] }, status: 403 });
+    expect(repos.privateMessage.save).not.toHaveBeenCalled();
+  });
+
+  it("lets an unflagged adult pair through when the minimum-age setting is Off", async () => {
+    loadSetting.mockResolvedValueOnce("0");
+    loadPerson.mockImplementation(async (_churchId: string, id: string) => ({ id, birthDate: new Date("1980-01-01"), disablePrivateMessages: 0 }));
+    const { controller, repos } = build({ existing: null });
+    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] } as SaveReq, res);
+    expect(Array.isArray(result)).toBe(true);
+    expect(repos.privateMessage.save).toHaveBeenCalled();
   });
 });

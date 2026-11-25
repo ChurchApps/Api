@@ -43,6 +43,7 @@ interface PeopleTable {
   conversationId?: string;
   optedOut?: boolean;
   smsOptedOut?: boolean;
+  disablePrivateMessages?: boolean;
   nametagNotes?: string;
   donorNumber?: string;
   importKey?: string;

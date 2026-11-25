@@ -61,4 +61,30 @@ describe("MessagingSafetyHelper", () => {
       expect(MessagingSafetyHelper.isRestricted({ birthDate: new Date("garbage") }, 18)).toBe(false);
     });
   });
+
+  describe("disablePrivateMessages", () => {
+    it("restricts a flagged person regardless of age", () => {
+      expect(MessagingSafetyHelper.isRestricted({ birthDate: yearsAgo(40), disablePrivateMessages: true }, 18)).toBe(true);
+      expect(MessagingSafetyHelper.isRestricted({ birthDate: yearsAgo(40), disablePrivateMessages: 1 }, 18)).toBe(true);
+    });
+
+    it("restricts a flagged person even when the age rule is off", () => {
+      expect(MessagingSafetyHelper.isRestricted({ birthDate: yearsAgo(40), disablePrivateMessages: true }, 0)).toBe(true);
+    });
+
+    it("does not restrict an unflagged adult", () => {
+      expect(MessagingSafetyHelper.isRestricted({ birthDate: yearsAgo(40), disablePrivateMessages: false }, 18)).toBe(false);
+      expect(MessagingSafetyHelper.isRestricted({ birthDate: yearsAgo(40), disablePrivateMessages: 0 }, 18)).toBe(false);
+      expect(MessagingSafetyHelper.isRestricted({ birthDate: yearsAgo(40), disablePrivateMessages: null }, 18)).toBe(false);
+    });
+  });
+
+  describe("restrictionReason", () => {
+    it("names the flag before the age rule", () => {
+      expect(MessagingSafetyHelper.restrictionReason({ birthDate: yearsAgo(10), disablePrivateMessages: true }, 18)).toBe("messagingDisabled");
+      expect(MessagingSafetyHelper.restrictionReason({ birthDate: yearsAgo(10) }, 18)).toBe("ageRestricted");
+      expect(MessagingSafetyHelper.restrictionReason({ birthDate: yearsAgo(40) }, 18)).toBeNull();
+      expect(MessagingSafetyHelper.restrictionReason(null, 18)).toBeNull();
+    });
+  });
 });
