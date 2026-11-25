@@ -47,6 +47,7 @@ export interface MembershipModuleGateway {
   addGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
   // Idempotent: removes the person's membership row(s) for the group.
   removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
+  // field is a built-in people column or "personField_<fieldId>" for one of the church's custom fields.
   setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void>;
   loadPeopleForAutomation(churchId: string): Promise<{ id: string; displayName: string; membershipStatus?: string; gender?: string; maritalStatus?: string }[]>;
   loadList(churchId: string, listId: string): Promise<{ id: string; name: string } | null>;
@@ -114,6 +115,8 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     "zip",
     "maritalStatus"
   ]);
+  // Same prefix list rules and advanced search use to address a custom field.
+  private static readonly CUSTOM_FIELD_PREFIX = "personField_";
   private static readonly ALLOWED_OPERATORS = new Set(["=", "!=", ">", "<", ">=", "<=", "LIKE"]);
   // Text operators offered by the B1Admin condition editor, mapped to LIKE patterns.
   private static readonly TEXT_OPERATORS = new Map<string, (v: string) => string>([
@@ -443,12 +446,27 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
   }
 
   public async setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void> {
+    if (field.startsWith(MembershipModuleGatewayDb.CUSTOM_FIELD_PREFIX)) return this.setCustomPersonField(churchId, personId, field, value);
     if (!MembershipModuleGatewayDb.ALLOWED_FIELDS.has(field)) throw new Error(`Invalid person field: ${field}`);
     await this.getDb().updateTable("people")
       .set({ [field]: value })
       .where("churchId", "=", churchId)
       .where("id", "=", personId)
       .execute();
+  }
+
+  private async setCustomPersonField(churchId: string, personId: string, field: string, value: string): Promise<void> {
+    const repos = await this.repos();
+    const fieldId = field.substring(MembershipModuleGatewayDb.CUSTOM_FIELD_PREFIX.length);
+    const personField = fieldId ? await repos.personField.load(churchId, fieldId) : null;
+    if (!personField) throw new Error(`Invalid person field: ${field}`);
+    // The built-in update only ever touches this church's people; a value row must not be created for anyone else.
+    const person = await this.getDb().selectFrom("people").select("id")
+      .where("churchId", "=", churchId)
+      .where("id", "=", personId)
+      .executeTakeFirst();
+    if (!person) return;
+    await repos.personFieldValue.upsert(churchId, personId, fieldId, value);
   }
 
   public async anonymizePerson(churchId: string, personId: string): Promise<void> {

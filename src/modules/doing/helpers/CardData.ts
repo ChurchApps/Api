@@ -50,6 +50,8 @@ export interface StepActionConfig {
   workflowLabel?: string;
   stepId?: string;
   field?: string;
+  // Name of the custom field when field is "personField_<fieldId>", for the card history.
+  fieldLabel?: string;
   value?: string;
   title?: string;
   description?: string;

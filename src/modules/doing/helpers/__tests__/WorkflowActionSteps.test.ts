@@ -9,11 +9,12 @@ jest.mock("@churchapps/apihelper", () => ({
 const sendTemplatedEmailMock = jest.fn().mockResolvedValue(true);
 const sendPersonTextMock = jest.fn().mockResolvedValue({ ok: true });
 const addGroupMemberMock = jest.fn().mockResolvedValue(undefined);
+const setPersonFieldMock = jest.fn().mockResolvedValue(undefined);
 const loadPersonMock = jest.fn().mockResolvedValue({ email: "p@example.com" });
 const loadChurchMock = jest.fn().mockResolvedValue({ name: "Demo Church" });
 const recordAttendanceMock = jest.fn().mockResolvedValue(1);
 jest.mock("../../../../shared/modules/index.js", () => ({
-  getMembershipModuleGateway: () => ({ loadPerson: loadPersonMock, loadChurch: loadChurchMock, addGroupMember: addGroupMemberMock, setPersonField: jest.fn() }),
+  getMembershipModuleGateway: () => ({ loadPerson: loadPersonMock, loadChurch: loadChurchMock, addGroupMember: addGroupMemberMock, setPersonField: setPersonFieldMock }),
   getMessagingModuleGateway: () => ({ sendTemplatedEmail: sendTemplatedEmailMock, sendPersonText: sendPersonTextMock }),
   getAttendanceModuleGateway: () => ({ recordAttendance: recordAttendanceMock })
 }));
@@ -213,6 +214,39 @@ describe("WorkflowHelper on-enter actions", () => {
     await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
 
     expect(addGroupMemberMock).toHaveBeenCalledWith("c1", "g1", "p1");
+    expect(task.stepId).toBe("stepACT");
+  });
+
+  it("sets a built-in person field", async () => {
+    const repos = buildRepos(steps, { stepACT: [{ actionType: "setField", config: JSON.stringify({ field: "membershipStatus", value: "Member" }) }] });
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
+
+    expect(setPersonFieldMock).toHaveBeenCalledWith("c1", "p1", "membershipStatus", "Member");
+    expect(JSON.parse(task.data).history.map((h: HistoryEntry) => h.message)).toContain("Set membershipStatus");
+  });
+
+  it("sets a custom person field and names it on the card", async () => {
+    const repos = buildRepos(steps, { stepACT: [{ actionType: "setField", config: JSON.stringify({ field: "personField_f1", fieldLabel: "Baptized", value: "True" }) }] });
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
+
+    expect(setPersonFieldMock).toHaveBeenCalledWith("c1", "p1", "personField_f1", "True");
+    expect(JSON.parse(task.data).history.map((h: HistoryEntry) => h.message)).toContain("Set Baptized");
+  });
+
+  it("records a field the gateway rejects on the card and keeps the card moving", async () => {
+    setPersonFieldMock.mockRejectedValueOnce(new Error("Invalid person field: personField_gone"));
+    const repos = buildRepos(steps, { stepACT: [{ actionType: "setField", config: JSON.stringify({ field: "personField_gone", fieldLabel: "Old field", value: "x" }) }] });
+    const task: Task = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", asRepos(repos));
+
+    const messages = JSON.parse(task.data).history.map((h: HistoryEntry) => h.message);
+    expect(messages).toContain("Action setField failed: Invalid person field: personField_gone");
+    expect(messages).not.toContain("Set Old field");
     expect(task.stepId).toBe("stepACT");
   });
 });
