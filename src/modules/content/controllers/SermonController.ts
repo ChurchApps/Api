@@ -283,16 +283,29 @@ export class SermonController extends ContentBaseController {
       const url = published ? this.getEnclosureUrl(sermon) : "";
       if (!/^https?:\/\//i.test(url)) return this.json({}, 404);
       res.set("Cache-Control", "private, no-store");
-      const root = (Environment.contentRoot || "").replace(/\/$/, "");
-      const base = url.split("?")[0];
-      if (EnvironmentBase.fileStore === "S3" && /^https?:\/\//i.test(root) && base.startsWith(root + "/")) {
-        const key = base.substring(root.length);
+      const key = this.sermonUploadKey(url, churchId);
+      if (key) {
         const ext = (key.match(/\.[A-Za-z0-9]{1,5}$/) || [""])[0];
         res.redirect(302, await PersonFileStorage.s3DownloadUrl(key, (sermon.title || "sermon") + ext));
         return;
       }
       res.redirect(302, url);
     });
+  }
+
+  // Only this church's sermon uploads (FileController.buildKey: /{churchId}/files/sermon/...) may be signed; the bucket
+  // also holds private person and group files, and audioUrl is editor-controlled.
+  private sermonUploadKey(url: string, churchId: string): string | null {
+    if (EnvironmentBase.fileStore !== "S3") return null;
+    const root = (Environment.contentRoot || "").replace(/\/$/, "");
+    const base = url.split("?")[0];
+    if (!/^https?:\/\//i.test(root) || !base.startsWith(root + "/")) return null;
+    let path: string;
+    try { path = decodeURIComponent(base.substring(root.length + 1)); } catch { return null; }
+    const segments = path.split("/");
+    if (segments.some(s => s === "" || s === "." || s === ".." || s.includes("\\"))) return null;
+    if (!path.startsWith(churchId + "/files/sermon/")) return null;
+    return "/" + path;
   }
 
   private getEnclosureUrl(sermon: Sermon): string {
