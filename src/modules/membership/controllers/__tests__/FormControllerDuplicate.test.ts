@@ -89,7 +89,7 @@ describe("FormController.duplicate choices round-trip (issue 1097)", () => {
   });
 
   it("points a copied question's condition at the copy of its trigger question", async () => {
-    const rows: any[] = [
+    const rows: QuestionRow[] = [
       { id: "q1", churchId: "c1", formId: "f1", title: "Attending?", fieldType: "Yes/No", sort: 1, removed: 0, showIf: null },
       { id: "q2", churchId: "c1", formId: "f1", title: "Guests", fieldType: "Whole Number", sort: 2, removed: 0, showIf: JSON.stringify({ questionId: "q1", value: "True" }) }
     ];
@@ -97,14 +97,17 @@ describe("FormController.duplicate choices round-trip (issue 1097)", () => {
 
     const questionRepo = new QuestionRepo();
     const controller = new FormController();
-    (controller as any).repos = {
-      form: { load: jest.fn(async () => ({ id: "f1", churchId: "c1", name: "RSVP" })), save: jest.fn(async (f: any) => ({ ...f, id: "f2" })) },
-      question: questionRepo
-    };
-    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", id: "u1", personId: "p1", checkAccess: () => true });
-    (controller as any).formAccess = jest.fn(async () => true);
+    const au = { churchId: "c1", id: "u1", personId: "p1", checkAccess: () => true };
+    Object.assign(controller, {
+      repos: {
+        form: { load: jest.fn(async () => ({ id: "f1", churchId: "c1", name: "RSVP" })), save: jest.fn(async (f: Form) => ({ ...f, id: "f2" })) },
+        question: questionRepo
+      },
+      actionWrapper: (_req: express.Request, _res: express.Response, action: (user: typeof au) => unknown) => action(au),
+      formAccess: jest.fn(async () => true)
+    });
 
-    await (controller as any).duplicate("f1", {}, {});
+    await controller.duplicate("f1", {} as express.Request<{}, {}, null>, {} as express.Response);
 
     const [trigger, dependent] = rows.filter((r) => r.formId === "f2");
     expect(trigger.showIf).toBeNull();

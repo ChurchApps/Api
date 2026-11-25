@@ -3,6 +3,10 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Question, QuestionCondition } from "../models/index.js";
+import type { MembershipDatabase } from "../db/DatabaseTypes.js";
+
+// A questions row as stored (showIf is the JSON string the repo wrote), or a model being read back after save.
+type QuestionRow = MembershipDatabase["questions"] | Question;
 
 @injectable()
 export class QuestionRepo {
@@ -119,7 +123,7 @@ export class QuestionRepo {
     return this.create(model);
   }
 
-  protected rowToModel(row: Question): Question {
+  protected rowToModel(row: QuestionRow): Question {
     const result: Question = {
       id: row.id,
       churchId: row.churchId,
@@ -151,7 +155,7 @@ export class QuestionRepo {
     return JSON.stringify({ questionId: showIf.questionId, value: showIf.value || "" });
   }
 
-  private static parseShowIf(raw: any): QuestionCondition | null {
+  private static parseShowIf(raw: unknown): QuestionCondition | null {
     if (!raw) return null;
     try {
       const value = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -178,12 +182,12 @@ export class QuestionRepo {
     return Array.isArray(value) ? value : [];
   }
 
-  public convertToModel(_churchId: string, data: Question) {
+  public convertToModel(_churchId: string, data: QuestionRow) {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: Question[]) {
+  public convertAllToModel(_churchId: string, data: QuestionRow[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
   }
