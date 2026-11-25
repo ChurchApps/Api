@@ -8,6 +8,7 @@ import { MemberPermission, Person } from "../models/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
+import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { getContentModuleGateway } from "../../../shared/modules/index.js";
 import type { AuthenticatedUser } from "@churchapps/apihelper";
@@ -124,8 +125,16 @@ export class FormSubmissionController extends MembershipBaseController {
   public async save(req: express.Request<{}, {}, FormSubmission[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (req.body?.length > 0) {
+        // Signed-out submitters can create people and trigger emails, so they must pass the captcha first.
+        if (!au?.id) {
+          for (const formSubmission of req.body) {
+            const formAccess = await this.repos.form.access(formSubmission?.formId);
+            if (formAccess && !CaptchaPass.verify({ body: formSubmission }, formAccess.churchId)) return this.json({ error: "Captcha verification required" }, 403);
+          }
+        }
         const results: (FormSubmission | { error: string })[] = [];
         for (const formSubmission of req.body) {
+          delete (formSubmission as { captchaPass?: unknown }).captchaPass;
           const { formId } = formSubmission;
 
           const formAccess = await this.repos.form.access(formId);

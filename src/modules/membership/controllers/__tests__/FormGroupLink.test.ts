@@ -10,6 +10,7 @@ jest.mock("../../models/index", () => ({}));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn() } }));
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
+jest.mock("../../../../shared/helpers/CaptchaPass.js", () => ({ CaptchaPass: { verify: () => true } }));
 jest.mock("../../../../shared/modules/index.js", () => ({ getContentModuleGateway: () => contentGateway }));
 
 const contentGateway: { loadEventsForGroup: jest.Mock; loadEvent: jest.Mock } = { loadEventsForGroup: jest.fn(async (): Promise<unknown[]> => []), loadEvent: jest.fn(async (): Promise<unknown> => null) };
