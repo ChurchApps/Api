@@ -212,8 +212,8 @@ export class EmailTemplateController extends MessagingBaseController {
       await TransactionalEmailHelper.sendTransactional(from, au.email, church.name || "B1", "", MergeFieldHelper.resolve(subject, sender, church), MergeFieldHelper.resolve(htmlContent, sender, church), "ChurchEmailTemplate.html", undefined, logoUrl);
       await ChurchEmailLimiter.settle(au.churchId, reserved[0], true);
       return true;
-    } catch (err: any) {
-      await ChurchEmailLimiter.settle(au.churchId, reserved[0], false, err?.message || "Send failed");
+    } catch (err) {
+      await ChurchEmailLimiter.settle(au.churchId, reserved[0], false, (err as Error)?.message || "Send failed");
       return false;
     }
   }

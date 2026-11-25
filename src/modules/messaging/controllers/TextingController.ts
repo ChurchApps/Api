@@ -381,9 +381,9 @@ export class TextingController extends MessagingBaseController {
   }
 
   private async getPersonDetails(churchId: string, personIds: string[]): Promise<GroupMemberDetail[]> {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const people: any[] = await membershipRepos.person.loadByIds(churchId, [...new Set(personIds)]);
-    return people.map((p: any) => ({
+    const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
+    const people = await membershipRepos.person.loadByIds(churchId, [...new Set(personIds)]);
+    return people.map((p) => ({
       personId: p.id,
       displayName: p.displayName || "",
       firstName: p.firstName || "",

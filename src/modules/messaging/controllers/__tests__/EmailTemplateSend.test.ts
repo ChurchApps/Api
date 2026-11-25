@@ -1,27 +1,34 @@
 import "reflect-metadata";
-jest.mock("../MessagingBaseController", () => ({ MessagingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../MessagingBaseController", () => ({ MessagingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { groupMembers: { edit: "groupMembersEdit" } } }));
 jest.mock("../../../../shared/helpers/Environment", () => ({ Environment: { supportEmail: "support@test.org", b1AdminRoot: "" } }));
 jest.mock("../../../../shared/helpers/ChurchEmailLimiter", () => ({
   ChurchEmailLimiter: {
     status: jest.fn(async () => ({ approved: true, paused: false, remaining: 100 })),
-    reserve: jest.fn(async (_c: string, _t: string, recipients: any[]) => recipients.map((_r: any, i: number) => "r" + i)),
+    reserve: jest.fn(async (_c: string, _t: string, recipients: { address: string }[]) => recipients.map((_r, i: number) => "r" + i)),
     settle: jest.fn(async () => undefined)
   }
 }));
-const sendTransactional = jest.fn(async () => undefined);
+const sendTransactional = jest.fn(async (..._args: unknown[]) => undefined);
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper", () => ({
   TransactionalEmailHelper: {
-    sendTransactional: (...args: any[]) => (sendTransactional as any)(...args),
+    sendTransactional: (...args: unknown[]) => sendTransactional(...args),
     fromAddress: (name: string) => `"${name}" <support@test.org>`,
     logoUrl: (v?: string) => (v && v.startsWith("https://") ? v : undefined)
   }
 }));
 jest.mock("../../../../shared/infrastructure/RepoManager", () => ({ RepoManager: { getRepos: jest.fn() } }));
 
+import type express from "express";
 import { EmailTemplateController } from "../EmailTemplateController.js";
 import { RepoManager } from "../../../../shared/infrastructure/RepoManager.js";
 import { ChurchEmailLimiter } from "../../../../shared/helpers/ChurchEmailLimiter.js";
+
+type SendBody = { subject: string; htmlContent: string; groupId?: string; personIds?: string[]; sendCopy?: boolean };
+type SendResult = { recipientCount?: number; successCount?: number; copySent?: boolean; status?: number };
+const res = {} as express.Response;
+const sendReq = (body: SendBody) => ({ body }) as express.Request<{}, {}, SendBody>;
+const previewReq = (body: { personIds?: string[] }) => ({ body }) as express.Request<{}, {}, { personIds?: string[] }>;
 
 const people = [
   { id: "p1", firstName: "Donald", lastName: "Clark", displayName: "Donald Clark", email: "donald@x.org" },
@@ -35,7 +42,8 @@ function makeController(logo = "https://cdn.x.org/logo.png") {
     person: { loadByIds: jest.fn(async () => people) }
   });
   const controller = new EmailTemplateController();
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", personId: "sender", email: "pastor@x.org", firstName: "Pat", lastName: "Smith", checkAccess: (p: string) => p === "groupMembersEdit" });
+  const au = { churchId: "c1", personId: "sender", email: "pastor@x.org", firstName: "Pat", lastName: "Smith", checkAccess: (p: string) => p === "groupMembersEdit" };
+  Object.assign(controller, { actionWrapper: (_req: express.Request, _res: express.Response, action: (user: typeof au) => unknown) => action(au) });
   return controller;
 }
 
@@ -46,7 +54,7 @@ beforeEach(() => {
 
 describe("EmailTemplateController.send", () => {
   it("puts the church logo on each email", async () => {
-    await (makeController() as any).send({ body: { subject: "Hi {{firstName}}", htmlContent: "<p>Hello</p>", personIds: ["p1", "p2"] } }, {});
+    await makeController().send(sendReq({ subject: "Hi {{firstName}}", htmlContent: "<p>Hello</p>", personIds: ["p1", "p2"] }), res);
     expect(sendTransactional).toHaveBeenCalledTimes(1);
     expect(sendTransactional.mock.calls[0]).toEqual([
       '"Grace" <support@test.org>', "donald@x.org", "Grace", "", "Hi Donald", "<p>Hello</p>", "ChurchEmailTemplate.html", "pastor@x.org", "https://cdn.x.org/logo.png"
@@ -54,14 +62,14 @@ describe("EmailTemplateController.send", () => {
   });
 
   it("leaves the logo off when the stored one isn't https", async () => {
-    await (makeController("http://x.org/logo.png") as any).send({ body: { subject: "Hi", htmlContent: "<p>Hello</p>", personIds: ["p1"] } }, {});
-    expect((sendTransactional.mock.calls[0] as any[])[8]).toBeUndefined();
+    await makeController("http://x.org/logo.png").send(sendReq({ subject: "Hi", htmlContent: "<p>Hello</p>", personIds: ["p1"] }), res);
+    expect(sendTransactional.mock.calls[0][8]).toBeUndefined();
   });
 
   it("sends the sender a copy with their own merge fields when asked", async () => {
-    const result = await (makeController() as any).send({ body: { subject: "Hi {{firstName}}", htmlContent: "<p>Hello</p>", personIds: ["p1"], sendCopy: true } }, {});
+    const result = (await makeController().send(sendReq({ subject: "Hi {{firstName}}", htmlContent: "<p>Hello</p>", personIds: ["p1"], sendCopy: true }), res)) as SendResult;
     expect(sendTransactional).toHaveBeenCalledTimes(2);
-    const copy = sendTransactional.mock.calls[1] as any[];
+    const copy = sendTransactional.mock.calls[1];
     expect(copy[1]).toBe("pastor@x.org");
     expect(copy[4]).toBe("Hi Pat");
     expect(ChurchEmailLimiter.reserve).toHaveBeenLastCalledWith("c1", "email", [{ address: "pastor@x.org", personId: "sender" }]);
@@ -69,7 +77,7 @@ describe("EmailTemplateController.send", () => {
   });
 
   it("previews how many of the selected people have an email", async () => {
-    const result = await (makeController() as any).previewPeople({ body: { personIds: ["p1", "p2"] } }, {});
+    const result = await makeController().previewPeople(previewReq({ personIds: ["p1", "p2"] }), res);
     expect(result).toEqual({ totalMembers: 2, eligibleCount: 1, noEmailCount: 1 });
   });
 });

@@ -1,5 +1,5 @@
 import "reflect-metadata";
-jest.mock("../MessagingBaseController", () => ({ MessagingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../MessagingBaseController", () => ({ MessagingBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { texting: { send: "textingSend" } } }));
 jest.mock("../../../../shared/helpers/Environment", () => ({ Environment: { membershipApi: "http://membership" } }));
 jest.mock("../../../../shared/infrastructure/RepoManager", () => ({ RepoManager: { getRepos: jest.fn() } }));
@@ -11,8 +11,16 @@ const provider = { sendBulk: jest.fn(), sendMessage: jest.fn(), addSubscriber: j
 jest.mock("@churchapps/texting", () => ({ getProvider: () => provider }));
 
 import axios from "axios";
+import type express from "express";
 import { TextingController } from "../TextingController.js";
 import { RepoManager } from "../../../../shared/infrastructure/RepoManager.js";
+
+type SendBody = { groupId?: string; personIds?: string[]; message: string };
+type Saved = { id?: string; groupId?: string; personId?: string };
+type StatusResult = { status?: number };
+const res = {} as express.Response;
+const sendReq = (body: SendBody) => ({ body }) as express.Request<{}, {}, SendBody>;
+const previewReq = (body: { personIds?: string[] }) => ({ body }) as express.Request<{}, {}, { personIds?: string[] }>;
 
 const people = [
   { id: "p1", firstName: "Donald", lastName: "Clark", displayName: "Donald Clark", mobilePhone: "+15550001" },
@@ -23,14 +31,14 @@ const people = [
 
 function makeController(granted = true) {
   const loadByIds = jest.fn(async () => people);
-  const repos: any = {
-    sentText: { save: jest.fn(async (m: any) => ({ ...m, id: "st1" })) },
-    deliveryLog: { save: jest.fn(async (m: any) => m) }
+  const repos = {
+    sentText: { save: jest.fn(async (m: Saved) => ({ ...m, id: "st1" })) },
+    deliveryLog: { save: jest.fn(async (m: Saved) => m) }
   };
   (RepoManager.getRepos as jest.Mock).mockResolvedValue({ person: { loadByIds } });
   const controller = new TextingController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", personId: "sender", jwt: "jwt", checkAccess: () => granted });
+  const au = { churchId: "c1", personId: "sender", jwt: "jwt", checkAccess: () => granted };
+  Object.assign(controller, { repos, actionWrapper: (_req: express.Request, _res: express.Response, action: (user: typeof au) => unknown) => action(au) });
   return { controller, repos, loadByIds };
 }
 
@@ -43,7 +51,7 @@ beforeEach(() => {
 describe("TextingController people sends", () => {
   it("previews the selected people without calling the group endpoint", async () => {
     const { controller } = makeController();
-    const result = await (controller as any).previewPeople({ body: { personIds: ["p1", "p2", "p3", "p4"] } }, {});
+    const result = await controller.previewPeople(previewReq({ personIds: ["p1", "p2", "p3", "p4"] }), res);
     expect(result).toEqual({ totalMembers: 4, eligibleCount: 1, optedOutCount: 1, noPhoneCount: 1 });
     expect(axios.get).not.toHaveBeenCalled();
   });
@@ -51,23 +59,23 @@ describe("TextingController people sends", () => {
   it("texts the selected people, skipping opted-out, missing and repeated numbers", async () => {
     const { controller, repos, loadByIds } = makeController();
     provider.sendBulk.mockResolvedValue([{ success: true }]);
-    const result = await (controller as any).sendToGroup({ body: { personIds: ["p1", "p2", "p3", "p4", "p1"], message: "Practice is at 7" } }, {});
+    const result = await controller.sendToGroup(sendReq({ personIds: ["p1", "p2", "p3", "p4", "p1"], message: "Practice is at 7" }), res);
     expect(loadByIds).toHaveBeenCalledWith("c1", ["p1", "p2", "p3", "p4"]);
     expect(provider.sendBulk.mock.calls[0][1]).toEqual(["+15550001"]);
     expect(result).toEqual({ totalMembers: 4, recipientCount: 1, successCount: 1, failCount: 0, optedOutCount: 1, noPhoneCount: 1 });
     expect(repos.sentText.save.mock.calls[0][0].groupId).toBeUndefined();
-    expect(repos.deliveryLog.save.mock.calls.map((c: any[]) => c[0].personId)).toEqual(["p1", "p3"]);
+    expect(repos.deliveryLog.save.mock.calls.map((c) => c[0].personId)).toEqual(["p1", "p3"]);
   });
 
   it("requires a group or people", async () => {
     const { controller } = makeController();
-    const result = await (controller as any).sendToGroup({ body: { personIds: [], message: "Hi" } }, {});
+    const result = (await controller.sendToGroup(sendReq({ personIds: [], message: "Hi" }), res)) as StatusResult;
     expect(result.status).toBe(400);
   });
 
   it("refuses people without texting permission", async () => {
     const { controller } = makeController(false);
-    expect((await (controller as any).previewPeople({ body: { personIds: ["p1"] } }, {})).status).toBe(401);
-    expect((await (controller as any).sendToGroup({ body: { personIds: ["p1"], message: "Hi" } }, {})).status).toBe(401);
+    expect(((await controller.previewPeople(previewReq({ personIds: ["p1"] }), res)) as StatusResult).status).toBe(401);
+    expect(((await controller.sendToGroup(sendReq({ personIds: ["p1"], message: "Hi" }), res)) as StatusResult).status).toBe(401);
   });
 });
