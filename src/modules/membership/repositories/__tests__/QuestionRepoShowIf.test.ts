@@ -8,7 +8,7 @@ import { getDb } from "../../db/index.js";
 
 describe("QuestionRepo showIf", () => {
   const repo = new QuestionRepo();
-  const row = (raw: any) => ({ id: "q2", churchId: "c1", formId: "f1", fieldType: "Textbox", showIf: raw });
+  const row = (raw: string | null) => ({ id: "q2", churchId: "c1", formId: "f1", fieldType: "Textbox", showIf: raw });
 
   it("parses a stored condition", () => {
     expect(repo.convertToModel("c1", row(JSON.stringify({ questionId: "q1", value: "Yes" })))?.showIf).toEqual({ questionId: "q1", value: "Yes" });
@@ -21,8 +21,8 @@ describe("QuestionRepo showIf", () => {
   });
 
   it("stores a condition as JSON and clears it when no question is picked", async () => {
-    const values: any[] = [];
-    (getDb as jest.Mock).mockReturnValue({ insertInto: () => ({ values: (v: any) => ({ execute: async () => { values.push(v); } }) }) });
+    const values: { showIf?: string | null }[] = [];
+    (getDb as jest.Mock).mockReturnValue({ insertInto: () => ({ values: (v: { showIf?: string | null }) => ({ execute: async () => { values.push(v); } }) }) });
     await repo.save({ churchId: "c1", formId: "f1", title: "Guests", showIf: { questionId: "q1" } });
     await repo.save({ churchId: "c1", formId: "f1", title: "Notes", showIf: { questionId: "", value: "x" } });
     expect(JSON.parse(values[0].showIf)).toEqual({ questionId: "q1", value: "" });
