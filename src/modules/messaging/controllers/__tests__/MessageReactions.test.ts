@@ -16,6 +16,7 @@ jest.mock("../MessagingBaseController", () => ({
       return au.checkAccess(contentType === "personConfidential" ? "peopleViewConfidentialNotes" : "peopleEdit");
     }
     isNote(contentType?: string) { return this.isPersonNote(contentType) || contentType === "groupNote" || contentType === "eventNote"; }
+    isEventRequest(contentType?: string) { return contentType === "eventRequest"; }
     async isPrivateMessageParticipant(this: { repos: Pick<Repos, "privateMessage"> }, au: AuthenticatedUser, conv: Conversation) {
       const pm = (await this.repos.privateMessage.loadByConversationId(au.churchId, conv.id)) ?? (await this.repos.privateMessage.loadById(au.churchId, conv.contentId));
       return !!pm && (pm.fromPersonId === au.personId || pm.toPersonId === au.personId);

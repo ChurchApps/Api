@@ -926,3 +926,63 @@ describe("NotificationHelper.checkShouldNotify note links (#1495)", () => {
     expect(await linkFor("groupNote")).toBe("/mobile/groups/C1?openChat=1&chatTab=notes");
   });
 });
+
+// ChurchAppsSupport#1676: staff and the requester discuss an event request in one thread.
+describe("NotificationHelper.checkShouldNotify event request discussion", () => {
+  let createNotificationsSpy: jest.SpyInstance;
+  const conversation: Conversation = { id: "CONV1", churchId: "CHU1", contentType: "eventRequest", contentId: "EVT1" };
+  const message = { id: "MSG1", churchId: "CHU1", conversationId: "CONV1" } as Message;
+
+  const setup = (posters: string[], event: Record<string, unknown> | null) => {
+    NotificationHelper.init(asRepos({ message: { loadLatestPerPerson: jest.fn(async () => posters.map((personId, i) => ({ personId, messageType: "comment", timeSent: new Date(2026, 10, i + 1) }))) } }));
+    loadEventMock.mockResolvedValueOnce(event);
+  };
+
+  // peopleIds and link of each createNotifications call
+  const calls = () => createNotificationsSpy.mock.calls.map((c) => ({ people: c[0], contentType: c[2], contentId: c[3], message: c[4], link: c[5] }));
+
+  beforeEach(() => {
+    loadEventMock.mockReset();
+    createNotificationsSpy = jest.spyOn(NotificationHelper, "createNotifications").mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    createNotificationsSpy.mockRestore();
+  });
+
+  it("tells the requester about a staff message even though the requester has not posted", async () => {
+    setup(["STAFF1"], { id: "EVT1", title: "Baptism", requestedBy: "REQ1", approvalStatus: "pending" });
+    await NotificationHelper.checkShouldNotify(conversation, message, "STAFF1");
+    expect(calls()).toEqual([{ people: ["REQ1"], contentType: "eventRequest", contentId: "EVT1", message: "New message: Baptism (event request)", link: "/mobile/myRequests?request=EVT1" }]);
+  });
+
+  it("sends the requester's reply to the staff who joined the thread, with the B1 Admin link", async () => {
+    setup(["STAFF1", "REQ1"], { id: "EVT1", title: "Baptism", requestedBy: "REQ1", approvalStatus: "pending" });
+    await NotificationHelper.checkShouldNotify(conversation, message, "REQ1");
+    expect(calls()).toEqual([{ people: ["STAFF1"], contentType: "eventRequest", contentId: "EVT1", message: "New message: Baptism (event request)", link: "https://admin.example.org/calendars/approvals?request=EVT1" }]);
+  });
+
+  it("includes whoever decided the request, even if they never posted", async () => {
+    setup(["REQ1"], { id: "EVT1", title: "Baptism", requestedBy: "REQ1", approvalStatus: "approved", resolvedBy: "STAFF2" });
+    await NotificationHelper.checkShouldNotify(conversation, message, "REQ1");
+    expect(calls().map((c) => c.people)).toEqual([["STAFF2"]]);
+  });
+
+  it("notifies nobody when the requester writes first on a request no one has picked up", async () => {
+    setup(["REQ1"], { id: "EVT1", title: "Baptism", requestedBy: "REQ1", approvalStatus: "pending" });
+    await NotificationHelper.checkShouldNotify(conversation, message, "REQ1");
+    expect(createNotificationsSpy).not.toHaveBeenCalled();
+  });
+
+  it("notifies the other staff and the requester when a second staff member posts", async () => {
+    setup(["STAFF1", "STAFF2"], { id: "EVT1", title: "Baptism", requestedBy: "REQ1", approvalStatus: "pending" });
+    await NotificationHelper.checkShouldNotify(conversation, message, "STAFF2");
+    expect(calls().map((c) => c.people)).toEqual([["REQ1"], ["STAFF1"]]);
+  });
+
+  it("does nothing when the event is gone", async () => {
+    setup(["STAFF1"], null);
+    await NotificationHelper.checkShouldNotify(conversation, message, "STAFF1");
+    expect(createNotificationsSpy).not.toHaveBeenCalled();
+  });
+});

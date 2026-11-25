@@ -599,27 +599,11 @@ export class NotificationHelper {
         });
         break;
       }
+      case "eventRequest":
+        await NotificationHelper.notifyEventRequest(conversation, senderPersonId);
+        break;
       default: {
-        const allMessages: Message[] = await NotificationHelper.repos.message.loadLatestPerPerson(conversation.churchId, conversation.id);
-        // Subscription model: latest action per person wins (real comment auto-subscribes; subscription marker toggles state). Iterate chronologically.
-        const sorted = [...allMessages].sort((a, b) => {
-          const ta = a.timeSent ? new Date(a.timeSent).getTime() : 0;
-          const tb = b.timeSent ? new Date(b.timeSent).getTime() : 0;
-          return ta - tb;
-        });
-        const stateByPerson = new Map<string, boolean>();
-        sorted.forEach((m) => {
-          if (!m.personId) return;
-          if (m.messageType === "subscription") {
-            stateByPerson.set(m.personId, m.content !== "off");
-          } else {
-            stateByPerson.set(m.personId, true);
-          }
-        });
-        const subscribers = Array.from(stateByPerson.entries())
-          .filter(([, subscribed]) => subscribed)
-          .map(([personId]) => personId)
-          .filter((pid) => pid !== senderPersonId);
+        const subscribers = await NotificationHelper.loadSubscribers(conversation, senderPersonId);
         const recipientDevices = subscribers.length > 0
           ? (await Promise.all(subscribers.map((personId) => NotificationHelper.repos.device.loadForPerson(conversation.churchId, personId)))).flat()
           : [];
@@ -639,6 +623,50 @@ export class NotificationHelper {
         }
         break;
       }
+    }
+  };
+
+  // Subscription model: latest action per person wins (real comment auto-subscribes; subscription marker toggles state). Iterate chronologically.
+  private static loadSubscribers = async (conversation: Conversation, senderPersonId: string): Promise<string[]> => {
+    const allMessages: Message[] = await NotificationHelper.repos.message.loadLatestPerPerson(conversation.churchId, conversation.id);
+    const sorted = [...allMessages].sort((a, b) => {
+      const ta = a.timeSent ? new Date(a.timeSent).getTime() : 0;
+      const tb = b.timeSent ? new Date(b.timeSent).getTime() : 0;
+      return ta - tb;
+    });
+    const stateByPerson = new Map<string, boolean>();
+    sorted.forEach((m) => {
+      if (!m.personId) return;
+      if (m.messageType === "subscription") {
+        stateByPerson.set(m.personId, m.content !== "off");
+      } else {
+        stateByPerson.set(m.personId, true);
+      }
+    });
+    return Array.from(stateByPerson.entries())
+      .filter(([, subscribed]) => subscribed)
+      .map(([personId]) => personId)
+      .filter((pid) => pid !== senderPersonId);
+  };
+
+  // Event request discussion (ChurchAppsSupport#1676). The requester always hears about a reply, even
+  // before posting; on the staff side it is whoever has joined the thread plus whoever decided the request.
+  // Each side gets the link to its own screen: My Requests in the app, the approvals inbox in B1 Admin.
+  private static notifyEventRequest = async (conversation: Conversation, senderPersonId: string) => {
+    if (!conversation.contentId) return;
+    const { getContentModuleGateway } = await import("../../../shared/modules/ContentModuleGateway.js");
+    const event: { id?: string; title?: string | null; requestedBy?: string | null; resolvedBy?: string | null } | null = await getContentModuleGateway().loadEvent(conversation.churchId, conversation.contentId);
+    if (!event) return;
+    const requesterId = event.requestedBy || "";
+    const staffIds = new Set((await NotificationHelper.loadSubscribers(conversation, senderPersonId)).filter((id) => id !== requesterId));
+    if (event.resolvedBy && event.resolvedBy !== senderPersonId && event.resolvedBy !== requesterId) staffIds.add(event.resolvedBy);
+    const message = `New message: ${event.title || "Event"} (event request)`;
+    const query = "?request=" + encodeURIComponent(conversation.contentId);
+    if (requesterId && requesterId !== senderPersonId) {
+      await this.createNotifications([requesterId], conversation.churchId, "eventRequest", conversation.contentId, message, "/mobile/myRequests" + query, senderPersonId);
+    }
+    if (staffIds.size > 0) {
+      await this.createNotifications(Array.from(staffIds), conversation.churchId, "eventRequest", conversation.contentId, message, NotificationHelper.adminRoot() + "/calendars/approvals" + query, senderPersonId);
     }
   };
 

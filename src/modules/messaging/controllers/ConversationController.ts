@@ -98,6 +98,31 @@ export class ConversationController extends MessagingBaseController {
     });
   }
 
+  // Message counts for event request discussions (ChurchAppsSupport#1676), so the approvals inbox and
+  // My Requests can show which requests have one without a call per row.
+  @httpGet("/eventRequests/counts")
+  public async eventRequestCounts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!this.isAuthenticated(au)) return this.json([], 401);
+      let eventIds = Array.from(new Set((req.query.eventIds || "").toString().split(",").filter(Boolean))).slice(0, 200);
+      if (!this.isCalendarStaff(au)) {
+        const own: string[] = [];
+        for (const id of eventIds) if (await this.canUseEventRequest(au, id)) own.push(id);
+        eventIds = own;
+      }
+      const rows = await this.repos.conversation.loadCountsForContent(au.churchId, "eventRequest", eventIds);
+      // Newest first, so a request that somehow has two threads reports the one the clients open.
+      const seen = new Set<string>();
+      const result: { eventId: string; conversationId: string; postCount: number }[] = [];
+      for (const row of rows) {
+        if (seen.has(row.contentId)) continue;
+        seen.add(row.contentId);
+        result.push({ eventId: row.contentId, conversationId: row.id, postCount: Number(row.postCount) || 0 });
+      }
+      return result;
+    });
+  }
+
   // Notes page (ChurchAppsSupport#1334): newest notes of one section across every record. Each note
   // still passes the rule its own type already enforces, so nobody sees a note they couldn't open.
   @httpGet("/notes/feed")
@@ -283,11 +308,12 @@ export class ConversationController extends MessagingBaseController {
         if (this.isNote(conversation.contentType) && !(await this.canUseNotes(au, conversation, "post"))) return this.json({}, 401);
         // A group feed row is seeded lazily by the first poster, so seeding needs the same rights as posting.
         if (this.isGroupFeed(conversation.contentType) && !(await this.canPostToGroupFeed(au, conversation.contentType, conversation.contentId))) return this.json({}, 401);
+        if (this.isEventRequest(conversation.contentType) && !(await this.canUseEventRequest(au, conversation.contentId))) return this.json({}, 401);
       }
       const promises: Promise<Conversation>[] = [];
       req.body.forEach((conversation) => {
         conversation.churchId = au.churchId;
-        promises.push(this.repos.conversation.save(conversation));
+        promises.push(this.isEventRequest(conversation.contentType) && !conversation.id ? this.saveEventRequestThread(conversation) : this.repos.conversation.save(conversation));
       });
       const result = await Promise.all(promises);
       // Notify subscribed clients so other tabs see the new conversation.
@@ -305,6 +331,14 @@ export class ConversationController extends MessagingBaseController {
       await Promise.all(activityPromises);
       return this.repos.conversation.convertAllToModel(result);
     });
+  }
+
+  // A request has one thread. Staff and the requester can both open an empty one and post first, so
+  // the second to save gets the thread the first one made.
+  private async saveEventRequestThread(conversation: Conversation): Promise<Conversation> {
+    const existing = await this.repos.conversation.loadForContent(conversation.churchId, "eventRequest", conversation.contentId);
+    if (existing.length > 0) return existing[0];
+    return this.repos.conversation.save({ ...conversation, visibility: "hidden", allowAnonymousPosts: false, groupId: undefined });
   }
 
   // loadPosts returns every conversation tied to the groups, including leader-only and event notes;
@@ -342,6 +376,7 @@ export class ConversationController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (this.isNote(req.body.contentType) && !(await this.canUseNotes(au, req.body, "post"))) return this.json({}, 401);
       if (this.isGroupFeed(req.body.contentType) && !(await this.canPostToGroupFeed(au, req.body.contentType, req.body.contentId))) return this.json({}, 401);
+      if (this.isEventRequest(req.body.contentType) && !(await this.canUseEventRequest(au, req.body.contentId))) return this.json({}, 401);
       const c: Conversation = {
         churchId: au.churchId,
         contentType: req.body.contentType,
