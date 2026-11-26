@@ -51,6 +51,14 @@ export class TaskController extends DoingBaseController {
     });
   }
 
+  @httpGet("/person/:personId")
+  public async getForAssociatedPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
+      return await this.repos.task.loadForAssociatedPerson(au.churchId, personId);
+    });
+  }
+
   @httpGet("/cards/my")
   public async getMyCards(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {

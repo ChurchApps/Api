@@ -224,6 +224,17 @@ export class TaskRepo {
       .execute();
   }
 
+  // Every task about a person (open and closed, workflow cards included), newest first, for the person record.
+  public async loadForAssociatedPerson(churchId: string, personId: string) {
+    return getDb().selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where("associatedWithType", "=", "person")
+      .where("associatedWithId", "=", personId)
+      .orderBy("dateCreated", "desc")
+      .orderBy("taskNumber", "desc")
+      .execute();
+  }
+
   public async loadOpenByTaskType(churchId: string, taskType: string) {
     return getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
