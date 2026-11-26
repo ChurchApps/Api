@@ -435,3 +435,22 @@ describe("TaskController.delete", () => {
     expect(repos.task.delete).not.toHaveBeenCalled();
   });
 });
+
+describe("TaskController tasks about a person", () => {
+  let repos: MockRepos;
+  beforeEach(() => {
+    repos = { task: { loadForAssociatedPerson: jest.fn(async (): Promise<Task[]> => [{ id: "t2", title: "Newer" }, { id: "t1", title: "Older" }]) } };
+  });
+
+  it("requires tasks view", async () => {
+    const result = await makeController([], repos).getForAssociatedPerson("p2", req({}), res);
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.task.loadForAssociatedPerson).not.toHaveBeenCalled();
+  });
+
+  it("returns the church's tasks about that person", async () => {
+    const result = await makeController(["tasksView"], repos).getForAssociatedPerson("p2", req({}), res);
+    expect(repos.task.loadForAssociatedPerson).toHaveBeenCalledWith("c1", "p2");
+    expect(result).toEqual([{ id: "t2", title: "Newer" }, { id: "t1", title: "Older" }]);
+  });
+});
