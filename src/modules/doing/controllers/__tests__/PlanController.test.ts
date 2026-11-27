@@ -164,6 +164,43 @@ describe("PlanController.getSignupVolunteers", () => {
   });
 });
 
+// Issue #1707: the Serving Teams roster resolved names through the directory-filtered people
+// lookup, so members without View People lost assigned Guests. The roster lookup is plan-scoped.
+describe("PlanController.getPlanPeople", () => {
+  const { getMembershipModuleGateway } = jest.requireMock("../../../../shared/modules/index");
+  let repos: MockRepos;
+  let loadPeople: jest.Mock;
+
+  beforeEach(() => {
+    loadPeople = jest.fn(async () => [{ id: "per1", displayName: "John Smith", photo: "p1.png" }, { id: "per2", displayName: "Ryan Lee", photo: null }]);
+    getMembershipModuleGateway.mockReturnValue({ loadPeople });
+    repos = {
+      plan: { load: jest.fn(async () => ({ id: "pla1" })) },
+      assignment: {
+        loadByPlanId: jest.fn(async () => [
+          { id: "a1", positionId: "pos1", personId: "per1", status: "Accepted" },
+          { id: "a2", positionId: "pos2", personId: "per2", status: "Unconfirmed" },
+          { id: "a3", positionId: "pos2", personId: "per3", status: "Declined" },
+          { id: "a4", positionId: "pos3", personId: "per1", status: "Accepted" }
+        ])
+      }
+    };
+  });
+
+  it("returns every non-declined assignee without a people permission", async () => {
+    const result = await makeController(repos).getPlanPeople("pla1", req({}), res);
+    expect(loadPeople).toHaveBeenCalledWith("c1", ["per1", "per2"]);
+    expect(result).toEqual([{ id: "per1", displayName: "John Smith", photo: "p1.png" }, { id: "per2", displayName: "Ryan Lee", photo: null }]);
+  });
+
+  it("returns nothing for a plan outside the caller's church", async () => {
+    repos.plan.load = jest.fn(async () => null);
+    const result = await makeController(repos).getPlanPeople("pla1", req({}), res);
+    expect(result).toEqual([]);
+    expect(loadPeople).not.toHaveBeenCalled();
+  });
+});
+
 // Issue #1241: a church can limit the volunteer signup list to the next week of each plan type.
 describe("PlanController.getSignupPlans", () => {
   const { getMembershipModuleGateway } = jest.requireMock("../../../../shared/modules/index");
