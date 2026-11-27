@@ -152,6 +152,19 @@ export class PlanController extends DoingBaseController {
     });
   }
 
+  // The Serving Teams roster. The directory-filtered people lookup hid assigned Guests from members
+  // without View People; this returns only names and photos of people the plan's assignments already name.
+  @httpGet("/:planId/people")
+  public async getPlanPeople(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      const plan = (await this.repos.plan.load(au.churchId, planId)) as Plan;
+      if (!plan) return [];
+      const assignments = ((await this.repos.assignment.loadByPlanId(au.churchId, planId)) as Assignment[]).filter(a => a.status !== "Declined");
+      const personIds = [...new Set(assignments.map(a => a.personId).filter(Boolean) as string[])];
+      return personIds.length > 0 ? await getMembershipModuleGateway().loadPeople(au.churchId, personIds) : [];
+    });
+  }
+
   private adjustTime(time: Date, serviceDate: Date, oldServiceDate: Date) {
     // Use absolute day diff — getDate() alone is day-of-month, which silently flips negative
     // across month boundaries (e.g. Mar 30 → Apr 6 would yield 6 - 30 = -24).

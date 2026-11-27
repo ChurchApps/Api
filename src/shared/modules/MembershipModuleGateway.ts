@@ -1,4 +1,5 @@
 import { sql } from "kysely";
+import { PersonHelper } from "@churchapps/apihelper";
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { DynamicDatabase, KyselyPool } from "../infrastructure/KyselyPool.js";
 import { WebhookDispatcher } from "../webhooks/WebhookDispatcher.js";
@@ -24,7 +25,7 @@ interface GuestInfo {
 
 export interface MembershipModuleGateway {
   loadIdsMatchingCondition(condition: ConditionInput): Promise<string[]>;
-  loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string }[]>;
+  loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string; photo?: string }[]>;
   loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]>;
   loadGroupMemberPersonIds(churchId: string, groupId: string): Promise<string[]>;
   loadGroupLeaderPersonIds(churchId: string, groupId: string): Promise<string[]>;
@@ -190,15 +191,16 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     return rows.map((r) => r.id);
   }
 
-  public async loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string }[]> {
+  public async loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string; photo?: string }[]> {
     if (personIds.length === 0) return [];
-    return this.getDb().selectFrom("people")
-      .select(["id", "displayName"])
+    const rows = await this.getDb().selectFrom("people")
+      .select(["id", "displayName", "photoUpdated"])
       .where("churchId", "=", churchId)
       .where("removed", "=", 0)
       .where("id", "in", personIds)
       .orderBy("lastName").orderBy("firstName")
-      .execute() as Promise<{ id: string; displayName: string }[]>;
+      .execute() as { id: string; displayName: string; photoUpdated?: Date }[];
+    return rows.map((r) => ({ id: r.id, displayName: r.displayName, photo: PersonHelper.getPhotoPath(churchId, r) }));
   }
 
   public async loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]> {
