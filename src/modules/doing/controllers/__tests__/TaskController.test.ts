@@ -454,3 +454,26 @@ describe("TaskController tasks about a person", () => {
     expect(result).toEqual([{ id: "t2", title: "Newer" }, { id: "t1", title: "Older" }]);
   });
 });
+
+// #1708: GET /tasks also returns tasks assigned to the caller's groups.
+describe("TaskController.getForPerson group tasks", () => {
+  const withGroups = (groupIds: string[] | undefined, repos: MockRepos) => {
+    const controller = new TaskController();
+    controller.repos = Object.assign({} as Repos, repos);
+    controller.actionWrapper = async (_req, _res, action) =>
+      action({ churchId: "c1", personId: "p1", groupIds, checkAccess: () => false } as unknown as AuthenticatedUser);
+    return controller;
+  };
+  let repos: MockRepos;
+  beforeEach(() => { repos = { task: { loadForPerson: jest.fn(async (): Promise<Task[]> => []) } }; });
+
+  it("passes the caller's group ids", async () => {
+    await withGroups(["g1", "g2"], repos).getForPerson(req({}), res);
+    expect(repos.task.loadForPerson).toHaveBeenCalledWith("c1", "p1", "Open", ["g1", "g2"]);
+  });
+
+  it("passes no group ids when the caller has none", async () => {
+    await withGroups(undefined, repos).getForPerson(req({}), res);
+    expect(repos.task.loadForPerson).toHaveBeenCalledWith("c1", "p1", "Open", []);
+  });
+});
