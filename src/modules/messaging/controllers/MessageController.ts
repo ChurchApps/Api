@@ -264,6 +264,7 @@ export class MessageController extends MessagingBaseController {
   // participant; staff with content.edit may always act (moderation).
   private async canParticipate(au: AuthenticatedUser, conv: Conversation): Promise<boolean> {
     if (this.isNote(conv.contentType)) return this.canUseNotes(au, conv, "post");
+    if (this.isEventRequest(conv.contentType)) return this.canUseEventRequest(au, conv.contentId);
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv.contentType === "group" || conv.contentType === "groupAnnouncement") {
       return !!conv.contentId && au.groupIds?.includes(conv.contentId);
@@ -279,6 +280,8 @@ export class MessageController extends MessagingBaseController {
   // conversations. Person notes are never leader-moderated - they run through the notes RBAC.
   private async canModerate(au: AuthenticatedUser, conv: Conversation): Promise<boolean> {
     if (this.isNote(conv?.contentType)) return this.canUseNotes(au, conv, "post");
+    // The requester removes only their own messages; calendar staff may remove any in the thread.
+    if (this.isEventRequest(conv?.contentType)) return this.isCalendarStaff(au);
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv?.contentType === "group" || conv?.contentType === "groupAnnouncement") {
       return !!conv.contentId && !!au.leaderGroupIds?.includes(conv.contentId);

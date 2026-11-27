@@ -12,6 +12,12 @@ interface EventNotesRef {
   notesPostRole?: string;
 }
 
+// The event fields the request-discussion gate reads.
+interface EventRequestRef {
+  approvalStatus?: string | null;
+  requestedBy?: string | null;
+}
+
 const PUBLIC_ANON_CONTENT_TYPES = new Set(["streamingLive", "freeshow"]);
 
 export class MessagingBaseController extends BaseController {
@@ -62,6 +68,26 @@ export class MessagingBaseController extends BaseController {
     if (role === "leaders") return isLeader;
     if (role === "members") return isLeader || !!au.groupIds?.includes(event.groupId);
     return false;
+  }
+
+  // Discussion between calendar staff and the person who requested an event (ChurchAppsSupport#1676).
+  // Kept apart from eventNote so staff notes on the same event never reach the requester.
+  protected isEventRequest(contentType?: string) {
+    return contentType === "eventRequest";
+  }
+
+  protected isCalendarStaff(au: AuthenticatedUser) {
+    return !!au?.checkAccess(Permissions.content.edit) || !!au?.checkAccess(Permissions.calendars.admin);
+  }
+
+  // Reading and posting share one rule: calendar staff, or the requester of an event that is a request.
+  protected async canUseEventRequest(au: AuthenticatedUser, eventId?: string): Promise<boolean> {
+    if (!eventId || !au?.churchId) return false;
+    if (this.isCalendarStaff(au)) return true;
+    if (!au.personId) return false;
+    const { getContentModuleGateway } = await import("../../../shared/modules/ContentModuleGateway.js");
+    const event: EventRequestRef | null = await getContentModuleGateway().loadEvent(au.churchId, eventId);
+    return !!event?.approvalStatus && event.requestedBy === au.personId;
   }
 
   protected isNote(contentType?: string) {
@@ -123,6 +149,7 @@ export class MessagingBaseController extends BaseController {
   // is loaded). Mirrors canReadConversation minus the row-level checks.
   protected async canReadContent(au: AuthenticatedUser, contentType: string, contentId: string): Promise<boolean> {
     if (this.isNote(contentType)) return this.canUseNotes(au, { contentType, contentId }, "view");
+    if (this.isEventRequest(contentType)) return this.canUseEventRequest(au, contentId);
     if (au?.checkAccess(Permissions.content.edit)) return true;
     if (contentType === "group" || contentType === "groupAnnouncement") {
       return !!contentId && (!!au?.groupIds?.includes(contentId) || !!au?.leaderGroupIds?.includes(contentId));
@@ -139,6 +166,7 @@ export class MessagingBaseController extends BaseController {
     if (this.isAnonPublicConversation(conv)) return true;
     if (!this.isSameChurch(au, conv.churchId)) return false;
     if (this.isNote(conv.contentType)) return this.canUseNotes(au, conv, "view");
+    if (this.isEventRequest(conv.contentType)) return this.canUseEventRequest(au, conv.contentId);
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv.contentType === "group" || conv.contentType === "groupAnnouncement") {
       return !!conv.contentId && (!!au.groupIds?.includes(conv.contentId) || !!au.leaderGroupIds?.includes(conv.contentId));

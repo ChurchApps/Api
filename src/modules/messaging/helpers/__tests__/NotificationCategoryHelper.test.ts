@@ -3,6 +3,7 @@ import { NotificationCategoryHelper } from "../NotificationCategoryHelper.js";
 describe("NotificationCategoryHelper.categoryFor", () => {
   it("maps known content types", () => {
     expect(NotificationCategoryHelper.categoryFor("privateMessage")).toBe("direct_messages");
+    expect(NotificationCategoryHelper.categoryFor("eventRequest")).toBe("direct_messages");
     expect(NotificationCategoryHelper.categoryFor("assignment")).toBe("serving_schedule");
     expect(NotificationCategoryHelper.categoryFor("task")).toBe("tasks");
     expect(NotificationCategoryHelper.categoryFor("groupPushNotification")).toBe("announcements");

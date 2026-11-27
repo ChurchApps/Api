@@ -113,6 +113,18 @@ export class ConversationRepo {
       .execute();
   }
 
+  // One row per conversation for a batch of records of one type, for list screens that show a message count.
+  public async loadCountsForContent(churchId: string, contentType: string, contentIds: string[]) {
+    if (!contentIds || contentIds.length === 0) return [];
+    return getDb().selectFrom("conversations")
+      .select(["id", "contentId", "postCount"])
+      .where("churchId", "=", churchId)
+      .where("contentType", "=", contentType)
+      .where("contentId", "in", contentIds)
+      .orderBy("dateCreated", "desc")
+      .execute();
+  }
+
   public async loadCurrent(churchId: string, contentType: string, contentId: string) {
     const cutOff = new Date();
     cutOff.setDate(cutOff.getDate() - 1);

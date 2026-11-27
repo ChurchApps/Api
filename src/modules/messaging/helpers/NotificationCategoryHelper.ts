@@ -30,6 +30,8 @@ const BY_KEY = new Map(CATEGORIES.map((c) => [c.categoryKey, c]));
 // to a locked category — the fallback is the opt-out-able group_messages.
 const TYPE_MAP: Record<string, string> = {
   privateMessage: "direct_messages",
+  // Staff and requester writing to each other about an event request; a reply must not wait behind chat quiet hours.
+  eventRequest: "direct_messages",
   assignment: "serving_schedule",
   task: "tasks",
   groupPushNotification: "announcements",

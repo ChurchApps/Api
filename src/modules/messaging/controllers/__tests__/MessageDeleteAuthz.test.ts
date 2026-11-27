@@ -16,6 +16,7 @@ jest.mock("../MessagingBaseController", () => ({
       return au.checkAccess(contentType === "personConfidential" ? "peopleViewConfidentialNotes" : "peopleEdit");
     }
     isNote(contentType?: string) { return this.isPersonNote(contentType) || contentType === "groupNote" || contentType === "eventNote"; }
+    isEventRequest(contentType?: string) { return contentType === "eventRequest"; }
     async canUseNotes(au: AuthenticatedUser, conv: { contentType?: string }) {
       if (this.isPersonNote(conv?.contentType)) return this.canViewPersonNotes(au, conv.contentType);
       return false;
