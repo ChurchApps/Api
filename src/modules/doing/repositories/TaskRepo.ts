@@ -186,15 +186,18 @@ export class TaskRepo {
     return result?.taskNumber ?? 1;
   }
 
-  public async loadForPerson(churchId: string, personId: string, status: string) {
+  public async loadForPerson(churchId: string, personId: string, status: string, groupIds: string[] = []) {
     return getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
       .where("workflowId", "is", null)
-      .where((eb) =>
-        eb.or([
+      .where((eb) => {
+        const matches = [
           eb.and([eb("assignedToType", "=", "person"), eb("assignedToId", "=", personId)]),
           eb.and([eb("createdByType", "=", "person"), eb("createdById", "=", personId)])
-        ]))
+        ];
+        if (groupIds.length > 0) matches.push(eb.and([eb("assignedToType", "=", "group"), eb("assignedToId", "in", groupIds)]));
+        return eb.or(matches);
+      })
       .where("status", "=", status)
       .orderBy("taskNumber")
       .execute();

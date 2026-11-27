@@ -96,7 +96,7 @@ export class TaskController extends DoingBaseController {
   @httpGet("/")
   public async getForPerson(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.task.loadForPerson(au.churchId, au.personId, "Open");
+      return await this.repos.task.loadForPerson(au.churchId, au.personId, "Open", au.groupIds ?? []);
     });
   }
 
